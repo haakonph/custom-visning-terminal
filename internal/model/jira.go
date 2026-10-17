@@ -14,9 +14,14 @@ func (p PullRequest) JiraKeys() []string {
 	var keys []string
 	seen := map[string]bool{}
 	for _, loc := range jiraKeyPattern.FindAllStringIndex(text, -1) {
-		if loc[0] > 0 && jiraWord(text[loc[0]-1]) || loc[1] < len(text) && jiraWord(text[loc[1]]) { continue }
+		if loc[0] > 0 && jiraWord(text[loc[0]-1]) || loc[1] < len(text) && jiraWord(text[loc[1]]) {
+			continue
+		}
 		key := text[loc[0]:loc[1]]
-		if !seen[key] { keys = append(keys, key); seen[key] = true }
+		if !seen[key] {
+			keys = append(keys, key)
+			seen[key] = true
+		}
 	}
 	return keys
 }
@@ -26,6 +31,10 @@ func jiraWord(c byte) bool {
 }
 
 func (p PullRequest) HasJiraKey(key string) bool {
-	for _, k := range p.JiraKeys() { if k == strings.ToUpper(key) { return true } }
+	for _, k := range p.JiraKeys() {
+		if k == strings.ToUpper(key) {
+			return true
+		}
+	}
 	return false
 }
