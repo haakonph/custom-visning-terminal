@@ -319,3 +319,113 @@ Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
 - `g` og `J` bytter fortsatt leverandør. Begge integrasjonene må være konfigurert for navigering begge veier.
 
 Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
+
+## PR worktrees and editors
+
+Press **Space** to toggle PR selection. Selection survives filters, tabs and
+provider switches, so PRs from different repositories can be opened together.
+Press **o** to open the selection in the default editor, or the highlighted PR
+when nothing is selected. **O** opens a chooser: **1** IntelliJ IDEA, **2** VS
+Code, **3** the configured custom command; **Esc** cancels. **Enter** continues
+to open the PR in your browser. Editor choice in the chooser is for that
+operation; set `editors.default` to persist your preference.
+
+On first startup the app creates a JSON configuration file at
+`os.UserConfigDir()/custom-visning/config.json` (normally
+`~/.config/custom-visning/config.json` on Linux or
+`~/Library/Application Support/custom-visning/config.json` on macOS).
+Edit it and restart the application:
+
+```json
+{
+  "repository_paths": ["/home/alice/src/frontend", "/home/alice/src/backend"],
+  "editors": {
+    "default": "intellij",
+    "intellij": {"command": "idea", "args": ["{path}"]},
+    "vscode": {"command": "code", "args": ["--new-window", "{path}"]},
+    "custom": {"command": "my-editor", "args": ["--project", "{path}"]}
+  }
+}
+```
+
+Registered paths must be **absolute paths to individual Git repositories**
+(normal or bare), not parent directories. No recursive filesystem scan runs.
+SSH (`git@github.com:owner/repo.git` or `ssh://git@github.com/owner/repo.git`)
+and HTTPS remotes are matched by GitHub owner/repository, case insensitively.
+Registered repositories take priority over cached clones. Moved/deleted paths
+are ignored; update the configuration to register their new location.
+
+Each executable is checked on PATH before preparation starts. Arguments are
+passed directly with Go's `os/exec`, without a shell. Every `{path}` is replaced
+with the absolute worktree directory; if no placeholder is supplied the path is
+appended as a final argument. Quote arguments using JSON strings, not shell
+quoting. Each PR launches a separate process; VS Code defaults to `--new-window`.
+IntelliJ's window behavior follows IDEA's project-opening preference (choose
+“New window”). The editor continues running after the dashboard exits.
+
+Repositories are reused in this order: registered repository, validated persisted
+mapping/cache, new bare clone. New storage defaults to:
+
+```text
+~/.local/share/custom-visning/
+├── repos/owner/repo.git/
+├── worktrees/owner/repo/pr-142/
+├── worktrees/owner/repo/pr-156/
+├── repositories.json
+└── worktrees.json
+```
+
+Linux respects an absolute `XDG_DATA_HOME`; macOS and Windows use
+`os.UserConfigDir()/custom-visning` for data. These files contain paths and Git
+identities, never authentication tokens. PR dashboard snapshots continue to use
+the existing account-scoped JSON cache independently.
+
+New worktrees use detached HEADs and share their repository's Git objects.
+Missing commits are fetched from the base repository's `refs/pull/NUMBER/head`,
+which also supports fork PRs; local refs use `refs/custom-visning/owner/repo/pr-NUMBER`.
+Native Git is used because `gh pr checkout --worktree` is unavailable in many
+CLI versions, and checkout behavior is less predictable with bare repositories.
+Git HTTPS authentication uses the existing `gh auth git-credential` helper.
+Install Git and GitHub CLI and run `gh auth login --hostname github.com` with
+access to the repositories. No additional authentication mechanism is introduced.
+
+Existing valid worktrees open immediately without clone or fetch. **They are
+never reset, checked out to a newer commit, cleaned, or deleted automatically**,
+even when clean. `Ready`, `Modified`, and `Outdated` appear in the selected PR's
+detail line (and a LOCAL column in wide terminals). Modified and Outdated can
+appear together. Outdated means local HEAD differs from the latest PR head
+reported by the dashboard; press **r** to refresh GitHub data and local status.
+An older cached snapshot cannot detect remote changes until refreshed. Commit,
+stash or otherwise preserve changes yourself before manually updating a worktree.
+There is no automatic merge/rebase or deletion command in this release.
+
+Preparation runs asynchronously, with up to three preparation jobs and serialized
+clone/fetch/worktree operations per repository. Selection is deduplicated; an
+active open operation cannot be submitted twice. Preparing indicators, recent
+per-PR results and errors remain visible while other navigation works. Local
+status is read asynchronously at startup, refresh and preparation, never during
+rendering. A failed PR does not stop the remaining selection.
+
+### Troubleshooting worktrees
+
+- **Editor unavailable:** install IDEA's `idea` launcher or VS Code's `code`
+  command on PATH, or configure an absolute executable path. Custom commands
+  must name an executable, not a shell command string.
+- **Authentication/access/network failure:** check `gh auth status`, repository
+  access and connectivity. Deleted PR refs may no longer be fetchable; closed
+  PRs work while their refs or commits remain available.
+- **Path exists / metadata conflict:** the app leaves the directory intact.
+  Inspect `git -C /path/to/repo worktree list`; use Git's manual repair workflow
+  for moved/stale worktrees. Do not delete directories containing user changes.
+- **Interrupted preparation:** quitting cancels Git processes; temporary clone
+  staging directories are removed. A partially created worktree is preserved
+  and may require manual metadata repair. An editor already launched stays open.
+- **Configuration/cache parse error:** fix the indicated JSON file and restart.
+  Repository/worktree paths are validated before reuse. Do not edit state files
+  or operate on the same worktree from multiple dashboard processes concurrently;
+  serialization applies within a running application.
+
+Development checks: `make test`, `make lint`, and `make build`. CI already runs
+normal and race-enabled tests, `go vet`, formatting checks, and a build. New Git
+integration tests use temporary local repositories and offline URL rewrites;
+they need neither GitHub credentials nor private repository access.

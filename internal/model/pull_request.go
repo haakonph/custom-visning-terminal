@@ -39,6 +39,7 @@ type PullRequest struct {
 	Repository         string    `json:"repository"`
 	Number             int       `json:"number"`
 	Body               string    `json:"body,omitempty"`
+	HeadOID            string    `json:"head_oid,omitempty"`
 	HeadRef            string    `json:"head_ref,omitempty"`
 	Title              string    `json:"title"`
 	URL                string    `json:"url"`

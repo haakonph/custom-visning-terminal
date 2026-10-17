@@ -14,6 +14,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	local           *localState
 	jira            *jiraState
 	jiraActive      bool
 	relatedKey      string
