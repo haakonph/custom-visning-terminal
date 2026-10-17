@@ -2,12 +2,14 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
@@ -122,4 +124,90 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	}
 	m = taskKey(m, "j")
 	m = taskKey(m, "d")
+}
+
+func TestTaskListWithFifteenTasks(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	m.tasks.active = true
+	for i := 1; i <= 15; i++ {
+		m.tasks.items = append(m.tasks.items, model.Task{Title: fmt.Sprintf("Oppgave %02d", i), References: []model.TaskReference{{Provider: "github", URL: fmt.Sprintf("https://github.com/org/repo/pull/%d", i), Key: fmt.Sprintf("repo#%d", i), Title: "Endring"}}})
+	}
+	m.width, m.height = 112, 10
+	for i := 0; i < 14; i++ {
+		m = taskKey(m, "j")
+	}
+	if m.tasks.selected != 14 || m.tasks.row != 0 {
+		t.Fatal("j should navigate the task list")
+	}
+	if !strings.Contains(m.View().Content, "Oppgave 15") {
+		t.Fatal("selected task must remain visible after scrolling")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !m.tasks.details {
+		t.Fatal("Enter must focus details")
+	}
+	opened := ""
+	m.open = func(_ context.Context, link string) error { opened = link; return nil }
+	_, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter in details must open reference")
+	}
+	cmd()
+	if opened != "https://github.com/org/repo/pull/15" {
+		t.Fatal("opened wrong task reference")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.tasks.details || !m.tasks.active {
+		t.Fatal("Esc must return to the list")
+	}
+	m = taskKey(m, "/")
+	m.tasks.input.SetValue("repo#8")
+	m = taskKey(m, " ")
+	if m.tasks.selected != 7 || len(m.tasks.visibleTasks()) != 1 {
+		t.Fatal("search should match references and select visible task")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = taskKey(m, "n")
+	if m.tasks.query != "" || m.tasks.selected != 15 {
+		t.Fatal("new task must be visible even after filtering")
+	}
+}
+
+func TestTaskPanelsResizeAndEmptySearch(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	m.tasks.active = true
+	m.tasks.items = []model.Task{{Title: "Oppgaven min", References: []model.TaskReference{{Title: "Referansen min"}}}}
+	for _, size := range [][2]int{{112, 24}, {90, 10}, {89, 10}, {40, 8}, {10, 2}} {
+		for _, details := range []bool{false, true} {
+			m.tasks.details = details
+			m, _ = update(m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+			content := m.View().Content
+			lines := strings.Split(content, "\n")
+			if len(lines) > size[1] {
+				t.Fatal("view exceeds height")
+			}
+			for _, line := range lines {
+				if ansi.StringWidth(line) > size[0] {
+					t.Fatal("view exceeds width")
+				}
+			}
+			if size[0] >= 90 && (!strings.Contains(content, "Oppgaven min") || !strings.Contains(content, "Referansen min")) {
+				t.Fatal("wide view should show both panels")
+			}
+			if size[0] == 40 && !details && strings.Contains(content, "Referansen min") {
+				t.Fatal("narrow list should show tasks only")
+			}
+		}
+	}
+	m.tasks.query = "no match"
+	for _, key := range []string{"d", "D", "e"} {
+		m = taskKey(m, key)
+	}
+	if len(m.tasks.items) != 1 || len(m.tasks.items[0].References) != 1 || m.tasks.editing {
+		t.Fatal("empty search must not act on hidden task")
+	}
 }

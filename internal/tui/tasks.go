@@ -15,13 +15,15 @@ import (
 )
 
 type taskState struct {
-	items         []model.Task
-	active        bool
-	selected, row int
-	input         textinput.Model
-	editing       bool
-	path, notice  string
-	loadFailed    bool
+	items              []model.Task
+	active             bool
+	selected, row      int
+	input              textinput.Model
+	editing            bool
+	details, searching bool
+	query              string
+	path, notice       string
+	loadFailed         bool
 }
 
 func newTasks() taskState {
@@ -119,6 +121,7 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if create || len(t.items) == 0 {
+		t.query = ""
 		t.items = append(t.items, model.Task{Title: ref.Title})
 		t.selected = len(t.items) - 1
 		t.row = 0
@@ -135,6 +138,21 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" {
 		m.cancel()
 		return m, tea.Quit
+	}
+	if t.searching {
+		if k == "enter" || k == "esc" {
+			t.searching = false
+			t.input.Blur()
+			if k == "esc" {
+				t.query = ""
+			}
+			return m, nil
+		}
+		var cmd tea.Cmd
+		t.input, cmd = t.input.Update(key)
+		t.query = t.input.Value()
+		t.selectVisible()
+		return m, cmd
 	}
 	if t.editing {
 		switch k {
@@ -155,28 +173,50 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		t.input, cmd = t.input.Update(key)
 		return m, cmd
 	}
+	if len(t.visibleTasks()) == 0 {
+		switch k {
+		case "enter", "right", "d", "D", "e":
+			return m, nil
+		}
+	}
 	switch k {
 	case "q":
 		m.cancel()
 		return m, tea.Quit
-	case "esc", "T":
+	case "esc":
+		if t.details {
+			t.details = false
+		} else if t.query != "" {
+			t.query = ""
+		} else {
+			t.active = false
+		}
+	case "T":
 		t.active = false
 	case "g", "J":
 		t.active = false
 		return m.switchProvider(k == "J")
-	case "tab", "right", "shift+tab", "left":
-		if len(t.items) > 0 {
-			delta := 1
-			if k == "shift+tab" || k == "left" {
-				delta = -1
-			}
-			t.selected = (t.selected + delta + len(t.items)) % len(t.items)
-			t.row = 0
+	case "right":
+		t.details = true
+	case "left":
+		t.details = false
+	case "/":
+		t.searching = true
+		t.details = false
+		t.input.Prompt = "/ "
+		t.input.SetValue(t.query)
+		return m, t.input.Focus()
+	case "tab", "shift+tab":
+		delta := 1
+		if k == "shift+tab" {
+			delta = -1
 		}
+		t.moveTask(delta, true)
 	case "n":
 		if t.loadFailed {
 			return m, nil
 		}
+		t.query = ""
 		t.items = append(t.items, model.Task{Title: "Ny oppgave"})
 		t.selected = len(t.items) - 1
 		t.row = 0
@@ -185,21 +225,31 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		if len(t.items) > 0 && !t.loadFailed {
 			t.editing = true
+			t.input.Prompt = "Tittel: "
 			t.input.SetWidth(max(1, m.width-10))
 			t.input.SetValue(t.items[t.selected].Title)
 			return m, t.input.Focus()
 		}
 	case "j", "down":
+		if !t.details {
+			t.moveTask(1, false)
+			return m, nil
+		}
 		if len(t.items) > 0 {
 			t.row = min(t.row+1, max(0, len(t.items[t.selected].References)-1))
 		}
 	case "k", "up":
+		if !t.details {
+			t.moveTask(-1, false)
+			return m, nil
+		}
 		t.row = max(0, t.row-1)
 	case "D":
 		if len(t.items) > 0 && !t.loadFailed {
 			t.items = append(t.items[:t.selected], t.items[t.selected+1:]...)
 			t.selected = max(0, min(t.selected, len(t.items)-1))
 			t.row = 0
+			t.selectVisible()
 			t.save()
 		}
 	case "d":
@@ -212,6 +262,10 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "enter":
+		if !t.details {
+			t.details = true
+			return m, nil
+		}
 		if len(t.items) == 0 || t.row >= len(t.items[t.selected].References) {
 			return m, nil
 		}
@@ -227,36 +281,139 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (t taskState) visibleTasks() []int {
+	var indices []int
+	for i, task := range t.items {
+		text := task.Title
+		for _, ref := range task.References {
+			text += " " + ref.Key + " " + ref.Title
+		}
+		if strings.Contains(strings.ToLower(text), strings.ToLower(strings.TrimSpace(t.query))) {
+			indices = append(indices, i)
+		}
+	}
+	return indices
+}
+
+func (t *taskState) selectVisible() {
+	indices := t.visibleTasks()
+	for _, i := range indices {
+		if i == t.selected {
+			return
+		}
+	}
+	if len(indices) > 0 {
+		t.selected = indices[0]
+		t.row = 0
+	}
+}
+
+func (t *taskState) moveTask(delta int, wrap bool) {
+	indices := t.visibleTasks()
+	if len(indices) == 0 {
+		return
+	}
+	pos := 0
+	for i, index := range indices {
+		if index == t.selected {
+			pos = i
+			break
+		}
+	}
+	if wrap {
+		pos = (pos + delta + len(indices)) % len(indices)
+	} else {
+		pos = max(0, min(pos+delta, len(indices)-1))
+	}
+	t.selected = indices[pos]
+	t.row = 0
+}
+
 func (m Model) tasksView() tea.View {
 	t := m.tasks
-	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), " Tab / Shift+Tab velger oppgave · g GitHub · J Jira · Esc tilbake"}
-	if len(t.items) == 0 {
-		lines = append(lines, " Ingen oppgaver ennå. Bruk t på en Jira-sak eller PR, eller n for en tom oppgave.")
-	} else {
-		task := t.items[t.selected]
-		lines = append(lines, accent.Render(clean(fmt.Sprintf(" %d/%d · %s", t.selected+1, len(t.items), task.Title))))
-		if t.editing {
-			lines = append(lines, t.input.View())
+	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "g GitHub · J Jira · / søk · Tab neste oppgave · ← liste · → detaljer"}
+	if t.searching || t.editing {
+		lines = append(lines, t.input.View())
+	} else if t.query != "" {
+		lines = append(lines, "Søk: "+clean(t.query))
+	}
+	footer := "j/k velg · Enter detaljer/åpne · n ny · e tittel · d fjern kobling · D slett · Esc tilbake · q avslutt"
+	capacity := max(1, m.height-len(lines)-2)
+	indices := t.visibleTasks()
+	list := []string{accent.Render(fmt.Sprintf(" OPPGAVER (%d/%d)", len(indices), len(t.items)))}
+	pos := 0
+	for i, index := range indices {
+		if index == t.selected {
+			pos = i
 		}
-		lines = append(lines, " g / J: finn flere saker eller PR-er, trykk a for å legge til i denne oppgaven.")
-		capacity := max(1, m.height-len(lines)-3)
-		start := max(0, t.row-capacity+1)
-		for i := start; i < min(len(task.References), start+capacity); i++ {
+	}
+	start := max(0, pos-max(1, capacity-1)+1)
+	for i := start; i < min(len(indices), start+max(1, capacity-1)); i++ {
+		index := indices[i]
+		prefix := "  "
+		if index == t.selected {
+			prefix = "› "
+		}
+		line := clean(fmt.Sprintf("%s%s (%d)", prefix, t.items[index].Title, len(t.items[index].References)))
+		list = append(list, line)
+	}
+	if len(indices) == 0 {
+		list = append(list, " Ingen oppgaver funnet.", " n lager en ny oppgave")
+	}
+	var details []string
+	if len(indices) > 0 {
+		task := t.items[t.selected]
+		details = append(details, accent.Render(clean(task.Title)), "g/J: finn referanser, a legger til her")
+		refsCapacity := max(1, capacity-2)
+		refStart := max(0, t.row-refsCapacity+1)
+		for i := refStart; i < min(len(task.References), refStart+refsCapacity); i++ {
 			r := m.liveReference(task.References[i])
-			line := clean(fmt.Sprintf(" %s · %s · %s %s", r.Provider, r.Key, r.Title, r.Role))
+			prefix := "  "
 			if i == t.row {
-				line = selection.Render(line)
+				prefix = "› "
 			}
-			lines = append(lines, line)
+			line := clean(fmt.Sprintf("%s%s · %s · %s %s", prefix, r.Provider, r.Key, r.Title, r.Role))
+			details = append(details, line)
 		}
 		if len(task.References) == 0 {
-			lines = append(lines, " Ingen referanser. Oppgaven kan fylles ut senere.")
+			details = append(details, " Ingen referanser ennå.")
+		}
+	}
+	if m.width >= 90 {
+		left := min(38, m.width/3)
+		right := max(1, m.width-left-3)
+		for i := 0; i < capacity; i++ {
+			l, r := "", ""
+			if i < len(list) {
+				l = list[i]
+			}
+			if i < len(details) {
+				r = details[i]
+			}
+			l = ansi.Truncate(l, left, "…")
+			l += strings.Repeat(" ", max(0, left-ansi.StringWidth(l)))
+			r = ansi.Truncate(r, right, "…")
+			if !t.details && i > 0 && i-1+start == pos && len(indices) > 0 {
+				l = selection.Render(l)
+			}
+			if t.details && i == 2+t.row-max(0, t.row-max(1, capacity-2)+1) && len(indices) > 0 && len(t.items[t.selected].References) > 0 {
+				r = selection.Render(r)
+			}
+			lines = append(lines, l+muted.Render(" │ ")+r)
+		}
+	} else {
+		panel := list
+		if t.details {
+			panel = details
+		}
+		for _, line := range panel {
+			lines = append(lines, line)
 		}
 	}
 	if t.notice != "" {
 		lines = append(lines, warning.Render(clean(t.notice)))
 	}
-	lines = append(lines, "n ny · e tittel · d fjern kobling · D slett oppgave · j/k velg · Enter åpne · T/Esc tilbake · q avslutt")
+	lines = append(lines, footer)
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

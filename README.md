@@ -329,14 +329,21 @@ flere Jira-saker og PR-er på tvers av repoer. Den har egen tittel og trenger in
 Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
 
 - `t` i Jira/GitHub lager en oppgave fra valgt rad og åpner oppgavesiden.
-- `T` åpner oppgavesiden; `Tab` / `Shift+Tab` velger oppgave.
+- `T` åpner oppgavesiden; `j/k` velger oppgave i listen; `Tab` / `Shift+Tab` blar mellom oppgavene.
+  På brede terminaler vises oppgavelisten til venstre og detaljene til høyre.
+  På smale terminaler bytter du mellom liste og detaljer.
+- `/` søker i oppgavetitler og tilknyttede referanser. `Enter` beholder søket,
+  `Esc` nullstiller det.
+- `Enter` / høyrepil går fra listen til referansene. Venstrepil / `Esc` går tilbake
+  til listen. I detaljene velger `j/k` referanse og `Enter` åpner den.
 - `g` / `J` går til GitHub/Jira. Finn en rad og trykk `a` for å legge den til
   oppgaven du sist valgte. Samme referanse legges ikke til to ganger.
 - `n` lager en tom oppgave, `e` redigerer tittelen, `Enter` lagrer og `Esc` avbryter
   tittelredigeringen. En tom oppgave kan fylles ut senere.
-- `j/k` velger referanse, `Enter` åpner den i nettleseren og `d` fjerner koblingen.
+- `d` fjerner valgt kobling.
   `D` sletter den valgte lokale oppgaven.
-- `Esc` eller `T` går tilbake til forrige provider-visning.
+- `T` går tilbake til forrige provider-visning. `Esc` går først til listen,
+  deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
 
 Oppgavene lagres atomisk i `custom-visning/tasks.json` under operativsystemets
 konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS`). Filen er lokal for

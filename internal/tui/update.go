@@ -38,12 +38,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	if m.tasks.active && m.tasks.editing {
+	if m.tasks.active && (m.tasks.editing || m.tasks.searching) {
 		switch msg.(type) {
 		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, openMsg:
 		default:
 			var cmd tea.Cmd
 			m.tasks.input, cmd = m.tasks.input.Update(msg)
+			if m.tasks.searching {
+				m.tasks.query = m.tasks.input.Value()
+				m.tasks.selectVisible()
+			}
 			return m, cmd
 		}
 	}
