@@ -406,7 +406,23 @@ ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhol
 
 - **/** søker på sesjon, repository, prosjekt, Jira, klient, modell og status.
 - **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
+- **i** åpner den valgte sesjonens prosjekt i IntelliJ fra listen eller detaljene.
 - **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
 - **d** viser diagnostikk; **Esc** går tilbake og fjerner søket.
 - **r** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
 - **g** og **J** bytter til GitHub/Jira når de er konfigurert.
+
+### Åpne IntelliJ fra en sesjon
+
+Trykk **i** i Copilot-visningen. Appen bruker første eksisterende lokale mappe av
+sesjonens prosjektrot, arbeidskatalog og Git-rot. IntelliJ åpner prosjektet eller
+aktiverer det hvis det allerede er åpent. Dette åpner prosjektet; den konkrete
+Copilot-chatten gjenåpnes ikke automatisk, siden sesjonsdataene ikke gir en støttet
+IDE-lenke til den.
+
+På macOS brukes `open -a "IntelliJ IDEA"`. På Linux brukes `idea`, og på Windows
+`idea64.exe`, fra PATH. Med JetBrains Toolbox, Community Edition eller en annen
+installasjonssti kan du sette `COPILOT_IDEA_COMMAND` til launcherens filsti, for
+eksempel `COPILOT_IDEA_COMMAND="/path with spaces/idea"`. Verdien er ett kjørbart
+program uten kommandolinjeflagg. Prosjektstien sendes som ett separat argument,
+uten shell. Manglende prosjektmappe eller launcher vises som en melding i appen.

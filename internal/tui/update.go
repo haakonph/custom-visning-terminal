@@ -14,6 +14,9 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := msg.(copilotOpenMsg); ok {
+		return m.updateCopilot(msg)
+	}
 	if _, ok := msg.(copilotResult); ok {
 		return m.updateCopilot(msg)
 	}

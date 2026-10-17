@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -21,6 +22,9 @@ type copilotState struct {
 	filtering, loading, diagnosticsOpen bool
 	timerPending                        bool
 	notice                              string
+	openIDE                             func(context.Context, copilot.Session) error
+	openingIDE                          bool
+	ideNotice                           string
 }
 type copilotResult struct {
 	sessions    []copilot.Session
@@ -30,13 +34,14 @@ type copilotResult struct {
 	err         error
 }
 type copilotTick struct{}
+type copilotOpenMsg struct{ err error }
 
 func (m Model) WithCopilot(client *copilot.Service, active bool) Model {
 	input := textinput.New()
 	input.Prompt = "/ "
 	input.Placeholder = "session, repository, Jira, model, status"
 	input.CharLimit = 256
-	m.copilot = &copilotState{client: client, input: input}
+	m.copilot = &copilotState{client: client, input: input, openIDE: openIntelliJ}
 	m.copilotActive = active
 	if active {
 		m.jiraActive = false
@@ -95,6 +100,13 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg := msg.(type) {
+	case copilotOpenMsg:
+		c.openingIDE = false
+		if msg.err != nil {
+			c.ideNotice = msg.err.Error()
+		} else {
+			c.ideNotice = "Åpneforespørsel sendt til IntelliJ for sesjonens prosjekt."
+		}
 	case copilotTick:
 		c.timerPending = false
 		if m.copilotActive {
@@ -167,6 +179,25 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m.switchProvider(true)
+		case "i":
+			if c.openingIDE || c.diagnosticsOpen {
+				return m, nil
+			}
+			var session copilot.Session
+			if c.detail != nil {
+				session = c.detail.Session
+			} else {
+				rows := c.rows()
+				if c.selected >= len(rows) {
+					c.ideNotice = "Velg en Copilot-sesjon først."
+					return m, nil
+				}
+				session = rows[c.selected]
+			}
+			c.openingIDE = true
+			c.ideNotice = "Åpner prosjektet i IntelliJ…"
+			opener, ctx := c.openIDE, m.ctx
+			return m, func() tea.Msg { return copilotOpenMsg{err: opener(ctx, session)} }
 		case "r":
 			return m, m.refreshCopilot()
 		case "d":
@@ -277,10 +308,13 @@ func (m Model) copilotView() tea.View {
 	if c.loading {
 		lines = append(lines, muted.Render("Oppdaterer…"))
 	}
+	if c.ideNotice != "" {
+		lines = append(lines, muted.Render(clean(c.ideNotice)))
+	}
 	if c.notice != "" {
 		lines = append(lines, warning.Render(clean(c.notice)))
 	}
-	lines = append(lines, muted.Render("Enter detaljer · j/k ↑/↓ · / søk · d diagnostikk · r oppdater · Esc tilbake · q avslutt"))
+	lines = append(lines, muted.Render("i IntelliJ · Enter detaljer · j/k ↑/↓ · / søk · d diagnostikk · r oppdater · Esc tilbake · q avslutt"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}
