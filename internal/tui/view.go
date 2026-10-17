@@ -77,6 +77,9 @@ func (m Model) View() tea.View {
 		}
 	}
 	lines = append(lines, strings.Join(tabs, "  "))
+	if m.relatedKey != "" {
+		lines = append(lines, " Relaterte PR-er: "+m.relatedKey+" · lastede GitHub-visninger · Esc tilbake")
+	}
 	sync := "never"
 	if at := m.snapshot.Datasets[m.active].SyncedAt; !at.IsZero() {
 		sync = at.Local().Format("2006-01-02 15:04:05")
@@ -98,7 +101,7 @@ func (m Model) View() tea.View {
 		rows := m.filtered()
 		lines = append(lines, m.row(model.PullRequest{}, true, false))
 		// Reserve room for a selected-PR detail line, warning and footer.
-		capacity := max(1, m.height-len(lines)-4)
+		capacity := max(1, m.height-len(lines)-5)
 		start := max(0, m.selected-capacity+1)
 		for i := start; i < min(len(rows), start+capacity); i++ {
 			lines = append(lines, m.row(rows[i], false, i == m.selected))
@@ -108,6 +111,7 @@ func (m Model) View() tea.View {
 		}
 		if len(rows) > 0 {
 			p := rows[m.selected]
+			lines = append(lines, " Jira: "+strings.Join(p.JiraKeys(), ", ")+" · l relaterte saker")
 			detail := fmt.Sprintf(" %d/%d · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), strings.Join(p.RequestedTeams, ", "), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 		}

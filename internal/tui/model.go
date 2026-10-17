@@ -16,6 +16,7 @@ type Cache interface {
 type Model struct {
 	jira            *jiraState
 	jiraActive      bool
+	relatedKey      string
 	ctx             context.Context
 	cancel          context.CancelFunc
 	source          model.Source

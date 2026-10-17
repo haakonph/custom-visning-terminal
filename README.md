@@ -307,3 +307,15 @@ Klienten har 30 sekunders request-timeout og to minutter per søk. Ved ugyldig J
 401/403, rate limit eller serverfeil vises en melding; rå feilbodyer og token
 vises ikke. Redirects følges ikke, og nettleserlenker begrenses til konfigurert
 Jira-server og context path. Integrasjonen endrer ingen Jira-saker.
+
+
+## Navigering mellom GitHub og Jira
+
+Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
+
+- Fra GitHub: Jira-nøkler (for eksempel `TEAM-123`) hentes fra PR-tittel, beskrivelse og branchnavn. Jira viser alle refererte saker i et eget JQL-søk, uavhengig av hurtigfiltrene.
+- Fra Jira: viser relaterte PR-er fra alle fire lastede GitHub-visninger, uten duplikater. Dette er ikke et søk i alle organisasjonens PR-er.
+- `Enter` åpner valgt PR eller sak i nettleseren. `Esc` i GitHub fjerner avgrensningen til en Jira-sak. I Jira velger du en vanlig fane for å forlate relasjonssøket.
+- `g` og `J` bytter fortsatt leverandør. Begge integrasjonene må være konfigurert for navigering begge veier.
+
+Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
