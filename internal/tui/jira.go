@@ -247,14 +247,16 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			j.active = (j.active + delta + len(j.tabs)) % len(j.tabs)
 			j.custom = ""
-			j.input.SetValue("")
-			j.input.Prompt = ""
+			j.selected = 0
 			return m, m.refreshJira()
-		case "1", "2", "3", "4":
-			j.active = int(key[0] - '1')
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			index := int(key[0] - '1')
+			if index >= len(j.tabs) {
+				return m, nil
+			}
+			j.active = index
 			j.custom = ""
-			j.input.SetValue("")
-			j.input.Prompt = ""
+			j.selected = 0
 			return m, m.refreshJira()
 		case "r":
 			return m, m.refreshJira()
@@ -304,6 +306,9 @@ func (m Model) jiraView() tea.View {
 	var tabs []string
 	for i, t := range j.tabs {
 		label := t.Name
+		if i < 9 {
+			label = fmt.Sprintf("%d %s", i+1, t.Name)
+		}
 		if i == j.active {
 			label = "[" + label + "]"
 		}
@@ -320,7 +325,7 @@ func (m Model) jiraView() tea.View {
 	}
 	lines = append(lines, fmt.Sprintf(" %s · siste synk: %s", state, sync), " JQL: "+clean(j.query))
 	if j.help {
-		lines = append(lines, "g: GitHub · J (Shift+j): Jira (i navigasjonsmodus)", "Tab / Shift+Tab: bytt standardfaner og lagrede søk", "f: kombiner filtre, Enter neste felt, Esc avbryter", ": skriv JQL (inkludert ORDER BY); s: lagre med navn", "/: filtrer lokalt; x: nullstill hurtigfiltre og egen JQL", "JQL-søk kjøres i Jira. Lagrede søk brukes uten hurtigfiltre.")
+		lines = append(lines, "g: GitHub · J (Shift+j): Jira (i navigasjonsmodus)", "1–9: velg fane direkte · Tab / Shift+Tab: neste / forrige fane", "f: kombiner filtre, Enter neste felt, Esc avbryter", ": skriv JQL (inkludert ORDER BY); s: lagre med navn", "/: filtrer lokalt; x: nullstill hurtigfiltre og egen JQL", "JQL-søk kjøres i Jira. Lagrede søk brukes uten hurtigfiltre.")
 	}
 	if j.mode != "" || j.input.Prompt == "/ " {
 		lines = append(lines, j.input.View())
@@ -376,7 +381,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, "g GitHub · J Jira · 1–4 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
+	lines = append(lines, "g GitHub · J Jira · 1–9 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

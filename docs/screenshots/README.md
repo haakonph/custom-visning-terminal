@@ -8,3 +8,5 @@ Skjermbildene viser den bygde terminalappen (`custom-visning --jira`) mot en lok
 - `jira-saved-query.png`: lagret søk «Mine feil» med tre treff.
 
 Bildene illustrerer grensesnittet og dokumenterer ikke tilkobling til en faktisk Jira-installasjon.
+
+Oppdatert med nummererte faner: `1–4` for standardvisninger og `5–9` for de første lagrede søkene. `g` åpner GitHub, og `J` (Shift+j) åpner Jira.

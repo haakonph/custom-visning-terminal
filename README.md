@@ -246,7 +246,8 @@ prosjekter når prosjektfilter ikke er satt. Aktiv sprint krever Jira Software.
 | --- | --- |
 | `g` | Gå til GitHub; behold tilstanden |
 | `J` (Shift+j) | Gå til Jira; behold tilstanden |
-| `1`–`4` | Velg standardfane |
+| `1`–`4` | Velg standardfane, som i GitHub-visningen |
+| `5`–`9` | Velg de fem første lagrede søkene direkte |
 | `Tab` / `Shift+Tab`, `←` / `→` | Bytt mellom standardfaner og lagrede søk |
 | `j` / `k`, `↓` / `↑` | Velg sak |
 | `Enter` | Åpne valgt sak i Jira |
@@ -259,6 +260,10 @@ prosjekter når prosjektfilter ikke er satt. Aktiv sprint krever Jira Software.
 | `Esc` | Avbryt redigering eller fjern lokalt tekstfilter |
 | `?` | Vis/skjul hjelp |
 | `q` / `Ctrl+C` | Avslutt og kanseller nettverksarbeid |
+
+Fanene viser nummeret du kan trykke for å velge dem, på samme måte som i
+GitHub-visningen. Lokalt tekstfilter beholdes ved fanebytte. Flere enn fem lagrede
+søk nås med Tab eller piltastene.
 
 Hurtigfiltrene er prosjekt, status, ansvarlig (Jira-brukernavn), prioritet,
 sakstype, sprint, epic og label. Enter går til neste felt; tom verdi fjerner

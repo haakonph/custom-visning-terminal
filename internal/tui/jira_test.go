@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -110,5 +111,32 @@ func TestJiraPastedJQLAndModeSwitch(t *testing.T) {
 	m = updated.(Model)
 	if m.loading[0] {
 		t.Fatal("background GitHub refresh was swallowed")
+	}
+}
+
+func TestJiraNumberedTabsAndLocalFilterMatchGitHub(t *testing.T) {
+	m := jiraModel(t)
+	defer m.cancel()
+	m.jira.tabs = append(m.jira.tabs, jira.Query{Name: "Bugs", JQL: "issuetype = Bug"})
+	m.jira.input.Prompt = "/ "
+	m.jira.input.SetValue("login")
+	m, cmd := update(m, key('5'))
+	if m.jira.active != 4 || cmd == nil || m.jira.custom != "" {
+		t.Fatal("saved query shortcut failed")
+	}
+	if m.jira.input.Value() != "login" || m.jira.input.Prompt != "/ " {
+		t.Fatal("tab change lost local filter")
+	}
+	if !strings.Contains(m.View().Content, "5 Bugs") {
+		t.Fatal("shortcut missing from tab label")
+	}
+	generation := m.jira.generation
+	m, cmd = update(m, key('9'))
+	if m.jira.active != 4 || cmd != nil || m.jira.generation != generation {
+		t.Fatal("missing tab shortcut changed view")
+	}
+	m, _ = update(m, key('2'))
+	if m.jira.active != 1 || m.jira.input.Value() != "login" {
+		t.Fatal("standard tab behavior differs")
 	}
 }
