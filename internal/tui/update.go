@@ -1,0 +1,185 @@
+package tui
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+	"os/exec"
+	"runtime"
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
+)
+
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = max(1, msg.Width)
+		m.height = max(1, msg.Height)
+		m.input.SetWidth(max(1, m.width-4))
+		m.clamp()
+	case bootMsg:
+		m.booting = false
+		if msg.err != nil {
+			m.notice = msg.err.Error()
+			return m, nil
+		}
+		m.snapshot = msg.snapshot
+		m.notice = msg.warning
+		cmds := []tea.Cmd{}
+		for view := model.Open; view < model.ViewCount; view++ {
+			cmds = append(cmds, m.refresh(view))
+		}
+		return m, tea.Batch(cmds...)
+	case refreshMsg:
+		m.loading[msg.view] = false
+		warnings := append([]string{}, msg.result.Warnings...)
+		if msg.err != nil {
+			warnings = append(warnings, msg.err.Error())
+		}
+		m.warnings[msg.view] = strings.Join(warnings, "; ")
+		selectedURL := ""
+		if rows := m.filtered(); m.selected < len(rows) {
+			selectedURL = rows[m.selected].URL
+		}
+		data := &m.snapshot.Datasets[msg.view]
+		if msg.err == nil && msg.result.Complete {
+			data.PRs = msg.result.PRs
+			model.Sort(data.PRs)
+			data.SyncedAt = msg.at
+		} else {
+			data.PRs = model.Merge(data.PRs, msg.result.PRs)
+			if m.warnings[msg.view] == "" {
+				m.warnings[msg.view] = "Partial results; cached rows retained"
+			}
+		}
+		if msg.view == m.active {
+			for i, p := range m.filtered() {
+				if p.URL == selectedURL {
+					m.selected = i
+					break
+				}
+			}
+			m.clamp()
+		}
+		return m, m.persist()
+	case cacheMsg:
+		m.saving = false
+		if msg.err != nil {
+			m.notice = "Cache write failed; data is available in memory"
+		}
+		if m.dirty {
+			return m, m.persist()
+		}
+	case openMsg:
+		if msg.err != nil {
+			m.notice = "Could not open browser; URL: " + msg.err.Error()
+		}
+	case tea.KeyPressMsg:
+		key := msg.String()
+		if key == "ctrl+c" {
+			m.cancel()
+			return m, tea.Quit
+		}
+		if m.filtering {
+			if key == "esc" {
+				m.filtering = false
+				m.input.Blur()
+				m.input.SetValue("")
+				m.selected = 0
+				return m, nil
+			}
+			if key == "enter" {
+				m.filtering = false
+				m.input.Blur()
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			m.selected = 0
+			return m, cmd
+		}
+		switch key {
+		case "q":
+			m.cancel()
+			return m, tea.Quit
+		case "1", "2", "3", "4":
+			m.active = model.View(key[0] - '1')
+			m.selected = 0
+		case "j", "down":
+			m.selected++
+			m.clamp()
+		case "k", "up":
+			m.selected--
+			m.clamp()
+		case "r":
+			if m.snapshot.User == "" && !m.booting {
+				m.booting = true
+				m.notice = ""
+				return m, m.bootstrap()
+			}
+			return m, m.refresh(m.active)
+		case "/":
+			m.filtering = true
+			return m, m.input.Focus()
+		case "esc":
+			m.input.SetValue("")
+			m.help = false
+			m.selected = 0
+		case "?":
+			m.help = !m.help
+		case "enter":
+			rows := m.filtered()
+			if len(rows) == 0 {
+				return m, nil
+			}
+			link, opener, ctx := rows[m.selected].URL, m.open, m.ctx
+			return m, func() tea.Msg { return openMsg{err: opener(ctx, link)} }
+		}
+	default:
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+func (m Model) filtered() []model.PullRequest {
+	rows := m.snapshot.Datasets[m.active].PRs
+	filter := strings.ToLower(strings.TrimSpace(m.input.Value()))
+	if filter == "" {
+		return rows
+	}
+	result := []model.PullRequest{}
+	for _, p := range rows {
+		text := fmt.Sprintf("%s %d %s %s %s %s %s %s", p.Repository, p.Number, p.Title, p.Author, strings.Join(p.Labels, " "), strings.Join(p.RequestedTeams, " "), p.Review, p.CI)
+		if strings.Contains(strings.ToLower(text), filter) {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+func (m *Model) clamp() { m.selected = max(0, min(m.selected, len(m.filtered())-1)) }
+func openBrowser(ctx context.Context, link string) error {
+	parsed, err := url.Parse(link)
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" || parsed.User != nil {
+		return fmt.Errorf("invalid GitHub PR URL")
+	}
+	var command string
+	var args []string
+	switch runtime.GOOS {
+	case "darwin":
+		command = "open"
+		args = []string{link}
+	case "windows":
+		command = "rundll32"
+		args = []string{"url.dll,FileProtocolHandler", link}
+	default:
+		command = "xdg-open"
+		args = []string{link}
+	}
+	if err := exec.CommandContext(ctx, command, args...).Run(); err != nil {
+		return fmt.Errorf("%s", link)
+	}
+	return nil
+}
