@@ -21,10 +21,20 @@ func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	return RunProviders(ctx, stderr, startJira, false)
 }
 func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error {
-	copilotClient, copilotErr := copilot.New(os.Getenv("COPILOT_API_URL"))
+	copilotOptions, copilotErr := copilot.OptionsFromEnv()
 	if copilotErr != nil {
 		return copilotErr
 	}
+	copilotClient, copilotErr := copilot.New(copilotOptions)
+	if copilotErr != nil {
+		return copilotErr
+	}
+	copilotClient.Start(ctx)
+	defer func() {
+		if err := copilotClient.Close(); err != nil {
+			fmt.Fprintln(stderr, "Copilot store could not be saved")
+		}
+	}()
 	if startCopilot {
 		dashboard := tui.New(ctx, nil, nil).WithCopilot(copilotClient, true)
 		return runDashboard(ctx, dashboard)

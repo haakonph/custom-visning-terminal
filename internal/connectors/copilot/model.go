@@ -1,16 +1,7 @@
-// Package copilot reads the same local API as the custom-visning web UI.
+// Package copilot collects local Copilot CLI history and OTLP telemetry.
 package copilot
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
-)
+import "encoding/json"
 
 type Session struct {
 	ID           string   `json:"id"`
@@ -35,6 +26,15 @@ type Session struct {
 	DurationMs   *float64 `json:"durationMs"`
 }
 type Event struct {
+	SessionID    string          `json:"sessionId,omitempty"`
+	TraceID      string          `json:"traceId,omitempty"`
+	SpanID       string          `json:"spanId,omitempty"`
+	EventID      string          `json:"eventId,omitempty"`
+	StartTime    string          `json:"startTime,omitempty"`
+	State        string          `json:"state,omitempty"`
+	Meta         map[string]any  `json:"meta,omitempty"`
+	MetricSeries string          `json:"metricSeries,omitempty"`
+	Temporality  int             `json:"temporality,omitempty"`
 	Key          string          `json:"key"`
 	Source       string          `json:"source"`
 	Time         string          `json:"time"`
@@ -60,6 +60,8 @@ type Detail struct {
 	Events  []Event `json:"events"`
 }
 type Diagnostics struct {
+	SessionRoot       string   `json:"sessionRoot"`
+	StorePath         string   `json:"storePath"`
 	ReceiverRunning   bool     `json:"receiverRunning"`
 	Port              int      `json:"port"`
 	Discovered        int      `json:"discovered"`
@@ -69,56 +71,4 @@ type Diagnostics struct {
 	CollectionEnabled bool     `json:"collectionEnabled"`
 	CaptureContent    bool     `json:"captureContent"`
 	ShowContent       bool     `json:"showContent"`
-}
-type Client struct {
-	base string
-	http *http.Client
-}
-
-func New(address string) (*Client, error) {
-	if address == "" {
-		address = "http://127.0.0.1:3001"
-	}
-	u, err := url.Parse(address)
-	if err != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || (u.Hostname() != "127.0.0.1" && u.Hostname() != "::1" && u.Hostname() != "localhost") {
-		return nil, fmt.Errorf("COPILOT_API_URL must be a local HTTP origin, e.g. http://127.0.0.1:3001")
-	}
-	return &Client{strings.TrimRight(address, "/"), &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
-}
-func (c *Client) get(ctx context.Context, path string, target any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/copilot/"+path, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return fmt.Errorf("Copilot API unavailable; start custom-visning and check COPILOT_API_URL")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Copilot API returned HTTP %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 16*1024*1024+1))
-	if err != nil || len(body) > 16*1024*1024 {
-		return fmt.Errorf("Copilot API response could not be read or is too large")
-	}
-	if json.Unmarshal(body, target) != nil {
-		return fmt.Errorf("Copilot API returned invalid JSON")
-	}
-	return nil
-}
-func (c *Client) Sessions(ctx context.Context) ([]Session, error) {
-	var v []Session
-	err := c.get(ctx, "sessions", &v)
-	return v, err
-}
-func (c *Client) Detail(ctx context.Context, id string) (Detail, error) {
-	var v Detail
-	err := c.get(ctx, "sessions/"+url.PathEscape(id), &v)
-	return v, err
-}
-func (c *Client) Diagnostics(ctx context.Context) (Diagnostics, error) {
-	var v Diagnostics
-	err := c.get(ctx, "diagnostics", &v)
-	return v, err
 }

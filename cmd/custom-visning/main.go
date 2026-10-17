@@ -16,7 +16,7 @@ var version = "dev"
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	startJira := flag.Bool("jira", false, "start in Jira; enable GitHub switching when credentials are available")
-	startCopilot := flag.Bool("copilot", false, "start in Copilot; reads the local custom-visning API without GitHub credentials")
+	startCopilot := flag.Bool("copilot", false, "start in Copilot; collects local history and OTLP without GitHub credentials")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("custom-visning " + version)

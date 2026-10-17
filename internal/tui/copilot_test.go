@@ -11,7 +11,7 @@ import (
 )
 
 func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
-	client, _ := copilot.New("")
+	client := testCopilot(t)
 	m := ready(t).WithCopilot(client, false)
 	m, cmd := update(m, key('c'))
 	if !m.copilotActive || cmd == nil {
@@ -47,7 +47,7 @@ func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
 	}
 }
 func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
-	client, _ := copilot.New("")
+	client := testCopilot(t)
 	m := New(context.Background(), nil, nil).WithCopilot(client, true)
 	defer m.cancel()
 	if m.Init() == nil {
@@ -68,4 +68,14 @@ func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
 	if !m.copilot.diagnosticsOpen {
 		t.Fatal("diagnostics toggle")
 	}
+}
+
+func testCopilot(t *testing.T) *copilot.Service {
+	t.Helper()
+	dir := t.TempDir()
+	client, err := copilot.New(copilot.Options{SessionRoot: dir + "/sessions", StorePath: dir + "/store.json", JiraPattern: `[A-Z]+-[0-9]+`, CaptureContent: true, ShowContent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
 }

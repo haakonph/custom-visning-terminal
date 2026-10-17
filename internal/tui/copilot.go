@@ -12,7 +12,7 @@ import (
 )
 
 type copilotState struct {
-	client                              *copilot.Client
+	client                              *copilot.Service
 	sessions                            []copilot.Session
 	detail                              *copilot.Detail
 	diagnostics                         copilot.Diagnostics
@@ -31,7 +31,7 @@ type copilotResult struct {
 }
 type copilotTick struct{}
 
-func (m Model) WithCopilot(client *copilot.Client, active bool) Model {
+func (m Model) WithCopilot(client *copilot.Service, active bool) Model {
 	input := textinput.New()
 	input.Prompt = "/ "
 	input.Placeholder = "session, repository, Jira, model, status"
@@ -65,6 +65,7 @@ func (m *Model) refreshCopilot() tea.Cmd {
 		id = c.detail.Session.ID
 	}
 	return func() tea.Msg {
+		client.Scan(ctx)
 		sessions, err := client.Sessions(ctx)
 		result := copilotResult{sessions: sessions, id: id, err: err}
 		if err == nil {
@@ -219,11 +220,11 @@ func metric(n *int64) string {
 }
 func (m Model) copilotView() tea.View {
 	c := m.copilot
-	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" g GitHub · J Jira · c Copilot · shared custom-visning API")}
+	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" g GitHub · J Jira · c Copilot · lokal historikk · egen OTLP-mottaker")}
 	body := []string{}
 	if c.diagnosticsOpen {
 		d := c.diagnostics
-		body = append(body, "Diagnostikk", fmt.Sprintf("Innsamling: %t · OTLP: %t · port %d · oppdaget: %d", d.CollectionEnabled, d.ReceiverRunning, d.Port, d.Discovered), "Siste OTLP: "+d.LastOtel, fmt.Sprintf("Innhold mottatt: %t · lagring: %t · visning: %t", d.ContentReceived, d.CaptureContent, d.ShowContent))
+		body = append(body, "Diagnostikk", "Sesjonsmappe: "+d.SessionRoot, "Eget datalager: "+d.StorePath, fmt.Sprintf("Innsamling: %t · OTLP: %t · port %d · oppdaget: %d", d.CollectionEnabled, d.ReceiverRunning, d.Port, d.Discovered), "Siste OTLP: "+d.LastOtel, fmt.Sprintf("Innhold mottatt: %t · lagring: %t · visning: %t", d.ContentReceived, d.CaptureContent, d.ShowContent))
 		body = append(body, d.Errors...)
 	} else if c.detail != nil {
 		s := c.detail.Session
@@ -232,7 +233,7 @@ func (m Model) copilotView() tea.View {
 			body = append(body, fmt.Sprintf("Varighet: %.0f ms", *s.DurationMs))
 		}
 		if len(c.detail.Events) == 0 {
-			body = append(body, "Ingen hendelser mottatt eller innhold er skjult i custom-visning.")
+			body = append(body, "Ingen hendelser mottatt eller innhold er skjult.")
 		}
 		for _, e := range c.detail.Events {
 			body = append(body, "", e.Time+" · "+e.Type+" · "+e.Source+" · "+e.Role+" "+e.Tool)
@@ -260,7 +261,7 @@ func (m Model) copilotView() tea.View {
 			body = append(body, line)
 		}
 		if len(rows) == 0 {
-			body = append(body, "Ingen Copilot-sesjoner. Start custom-visning og en Copilot CLI-sesjon.")
+			body = append(body, "Ingen Copilot-sesjoner. Start en Copilot CLI-sesjon; sjekk d for diagnostikk.")
 		}
 	}
 	if c.detail != nil || c.diagnosticsOpen {

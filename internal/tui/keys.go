@@ -1,7 +1,7 @@
 package tui
 
 const shortcuts = "l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
-const helpText = `c           Go to Copilot sessions (same local API as custom-visning)
+const helpText = `c           Go to Copilot sessions (local history and telemetry)
 g           Go to GitHub (navigation mode)
 J (Shift+j) Go to Jira (navigation mode)
 l           Navigate to related Jira issues / loaded GitHub PRs
