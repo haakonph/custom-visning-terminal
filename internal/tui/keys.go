@@ -1,7 +1,10 @@
 package tui
 
-const shortcuts = "l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
-const helpText = `g           Go to GitHub (navigation mode)
+const shortcuts = "T oppgaver • t ny fra valgt • a legg til • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
+const helpText = `T           Open tasks; Tab selects the task used by a
+t           Create a task wrapping the selected Jira issue / PR
+a           Add selected Jira issue / PR to current task
+g           Go to GitHub (navigation mode)
 J (Shift+j) Go to Jira (navigation mode)
 l           Navigate to related Jira issues / loaded GitHub PRs
 1  My Open PRs (excluding drafts)

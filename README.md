@@ -319,3 +319,34 @@ Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
 - `g` og `J` bytter fortsatt leverandør. Begge integrasjonene må være konfigurert for navigering begge veier.
 
 Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
+
+
+## Oppgaver (fleksibelt konsept)
+
+En oppgave er en lokal samling av eksplisitte referanser. Den kan være en tynn
+wrapper rundt én Jira-sak eller PR, inkludert en PR fra review-fanene, eller samle
+flere Jira-saker og PR-er på tvers av repoer. Den har egen tittel og trenger ingen
+Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
+
+- `t` i Jira/GitHub lager en oppgave fra valgt rad og åpner oppgavesiden.
+- `T` åpner oppgavesiden; `Tab` / `Shift+Tab` velger oppgave.
+- `g` / `J` går til GitHub/Jira. Finn en rad og trykk `a` for å legge den til
+  oppgaven du sist valgte. Samme referanse legges ikke til to ganger.
+- `n` lager en tom oppgave, `e` redigerer tittelen, `Enter` lagrer og `Esc` avbryter
+  tittelredigeringen. En tom oppgave kan fylles ut senere.
+- `j/k` velger referanse, `Enter` åpner den i nettleseren og `d` fjerner koblingen.
+  `D` sletter den valgte lokale oppgaven.
+- `Esc` eller `T` går tilbake til forrige provider-visning.
+
+Oppgavene lagres atomisk i `custom-visning/tasks.json` under operativsystemets
+konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS`). Filen er lokal for
+OS-brukeren og deles mellom appens GitHub/Jira-kontoer; den inneholder titler og
+lenker, ingen tokens. Ta vare på filen som brukerdata, ikke som cache.
+
+Oppgavesiden bruker ferske titler, Jira-status og PR review/CI fra data som allerede
+er lastet i appen. Ellers vises lagret referanse. Den henter ikke alle referanser
+separat og utleder ingen samlet status eller automatisk gruppering. Dette holder
+første versjon åpen for videre konseptarbeid; referansenes `provider`, `url`, `key`,
+`title` og valgfri `role` er adskilt fra oppgavens egen tittel. Review-rollen settes
+når PR-en legges til fra en review-fane og er oppgavens kontekst, ikke en live
+reviewforespørsel.

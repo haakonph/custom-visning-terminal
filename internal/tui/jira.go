@@ -381,7 +381,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, "l relaterte PR-er · g GitHub · J Jira · 1–9 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
+	lines = append(lines, "T oppgaver · t ny fra valgt · a legg til · l relaterte PR-er · g GitHub · J Jira · 1–9 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

@@ -14,6 +14,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	tasks           taskState
 	jira            *jiraState
 	jiraActive      bool
 	relatedKey      string
@@ -54,7 +55,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	input.Placeholder = "repository, title, author, label or team"
 	input.Prompt = "/ "
 	input.CharLimit = 256
-	return Model{ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	return Model{tasks: newTasks(), ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 }
 func (m Model) Init() tea.Cmd {
 	if m.jiraActive {
