@@ -52,7 +52,7 @@ func (m Model) View() tea.View {
 	if user == "" {
 		user = "authenticating…"
 	}
-	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)))
+	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [g GitHub] · J Jira"))
 	tabs := []string{}
 	for v := model.Open; v < model.ViewCount; v++ {
 		label := fmt.Sprintf("%d %s", v+1, v.String())
@@ -119,7 +119,7 @@ func (m Model) View() tea.View {
 	if message != "" {
 		lines = append(lines, warning.Render(clean(message)))
 	}
-	lines = append(lines, muted.Render(shortcuts+" · J Jira"))
+	lines = append(lines, muted.Render("g GitHub · J Jira · "+shortcuts))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}

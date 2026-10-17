@@ -1,7 +1,9 @@
 package tui
 
 const shortcuts = "1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
-const helpText = `1  My Open PRs (excluding drafts)
+const helpText = `g           Go to GitHub (navigation mode)
+J (Shift+j) Go to Jira (navigation mode)
+1  My Open PRs (excluding drafts)
 2  My Draft PRs
 3  My Review Requests (direct requests only)
 4  Team Review Requests (all accessible memberships)

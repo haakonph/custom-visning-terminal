@@ -224,8 +224,18 @@ custom-visning --jira
 go run ./cmd/custom-visning --jira
 ```
 
-`--jira` starter direkte med Jira og krever ingen GitHub-innlogging. Med vanlig
-oppstart kan du trykke `J` for Jira og `g` for GitHub når Jira er konfigurert.
+`--jira` starter direkte med Jira og krever ingen GitHub-innlogging. Hvis GitHub
+allerede er konfigurert med `GITHUB_TOKEN` eller `gh auth login`, er begge
+visninger tilgjengelige også ved oppstart med `--jira`. Alle konfigurerte tjenester
+er tilgjengelige i samme kjøring; flagget velger bare startvisningen. Uten
+GitHub-innlogging starter appen automatisk i Jira dersom Jira er konfigurert.
+Ugyldig Jira-konfigurasjon rapporteres uten å hindre oppstart av GitHub.
+
+**Trykk `g` for GitHub og `J` (Shift+j) for Jira.** Hurtigtastene fungerer
+i navigasjonsmodus. Mens du redigerer et filter eller JQL, skrives bokstavene
+som vanlig tekst; avslutt redigeringen før du bytter. Begge visninger beholder
+valgt fane, filter, markert rad og data. Byttet utløser ingen ny henting etter
+første åpning; bruk `r` når du vil oppdatere. Snarveiene vises øverst i begge visninger.
 GitHub-feil og Jira-feil håndteres hver for seg under kjøring.
 
 Standardfanene er **Mine**, **Prosjekt**, **Uten ansvarlig** og **Aktiv sprint**.
@@ -234,6 +244,8 @@ prosjekter når prosjektfilter ikke er satt. Aktiv sprint krever Jira Software.
 
 | Tast | Jira-handling |
 | --- | --- |
+| `g` | Gå til GitHub; behold tilstanden |
+| `J` (Shift+j) | Gå til Jira; behold tilstanden |
 | `1`–`4` | Velg standardfane |
 | `Tab` / `Shift+Tab`, `←` / `→` | Bytt mellom standardfaner og lagrede søk |
 | `j` / `k`, `↓` / `↑` | Velg sak |

@@ -233,11 +233,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			m.cancel()
 			return m, tea.Quit
-		case "g":
-			if m.source != nil {
-				m.jiraActive = false
-			}
-			return m, nil
+
 		case "j", "down":
 			j.selected++
 			j.clamp()
@@ -304,7 +300,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m Model) jiraView() tea.View {
 	j := m.jira
-	lines := []string{accent.Render(" CUSTOM VISNING · JIRA")}
+	lines := []string{accent.Render(" CUSTOM VISNING · JIRA") + muted.Render("  g GitHub · [J Jira]")}
 	var tabs []string
 	for i, t := range j.tabs {
 		label := t.Name
@@ -324,7 +320,7 @@ func (m Model) jiraView() tea.View {
 	}
 	lines = append(lines, fmt.Sprintf(" %s · siste synk: %s", state, sync), " JQL: "+clean(j.query))
 	if j.help {
-		lines = append(lines, "Tab / Shift+Tab: bytt standardfaner og lagrede søk", "f: kombiner filtre, Enter neste felt, Esc avbryter", ": skriv JQL (inkludert ORDER BY); s: lagre med navn", "/: filtrer lokalt; x: nullstill hurtigfiltre og egen JQL", "JQL-søk kjøres i Jira. Lagrede søk brukes uten hurtigfiltre.")
+		lines = append(lines, "g: GitHub · J (Shift+j): Jira (i navigasjonsmodus)", "Tab / Shift+Tab: bytt standardfaner og lagrede søk", "f: kombiner filtre, Enter neste felt, Esc avbryter", ": skriv JQL (inkludert ORDER BY); s: lagre med navn", "/: filtrer lokalt; x: nullstill hurtigfiltre og egen JQL", "JQL-søk kjøres i Jira. Lagrede søk brukes uten hurtigfiltre.")
 	}
 	if j.mode != "" || j.input.Prompt == "/ " {
 		lines = append(lines, j.input.View())
@@ -380,7 +376,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, "1–4 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · g GitHub · q avslutt")
+	lines = append(lines, "g GitHub · J Jira · 1–4 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

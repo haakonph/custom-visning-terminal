@@ -15,7 +15,7 @@ var version = "dev"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
-	jiraOnly := flag.Bool("jira", false, "start with Jira only; no GitHub authentication required")
+	startJira := flag.Bool("jira", false, "start in Jira; enable GitHub switching when credentials are available")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("custom-visning " + version)
@@ -23,7 +23,7 @@ func main() {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if err := app.RunMode(ctx, os.Stderr, *jiraOnly); err != nil {
+	if err := app.RunMode(ctx, os.Stderr, *startJira); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

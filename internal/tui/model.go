@@ -57,6 +57,9 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 }
 func (m Model) Init() tea.Cmd {
 	if m.jiraActive {
+		if m.source != nil {
+			return tea.Batch(m.refreshJira(), m.bootstrap())
+		}
 		return m.refreshJira()
 	}
 	return m.bootstrap()

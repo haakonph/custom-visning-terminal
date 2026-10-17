@@ -14,6 +14,20 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		editing := m.filtering
+		if m.jiraActive {
+			editing = m.jira.mode != ""
+		}
+		if !editing {
+			switch key.String() {
+			case "g":
+				return m.switchProvider(false)
+			case "J":
+				return m.switchProvider(true)
+			}
+		}
+	}
 	if _, ok := msg.(jiraResult); ok {
 		return m.updateJira(msg)
 	}
@@ -117,12 +131,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		switch key {
-		case "J":
-			if m.jira != nil {
-				m.jiraActive = true
-				return m, m.refreshJira()
-			}
-			m.notice = "Set JIRA_BASE_URL and JIRA_TOKEN to enable Jira"
+
 		case "q":
 			m.cancel()
 			return m, tea.Quit

@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,22 +16,23 @@ import (
 )
 
 func Run(ctx context.Context, stderr io.Writer) error { return RunMode(ctx, stderr, false) }
-func RunMode(ctx context.Context, stderr io.Writer, jiraOnly bool) error {
+func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	var jiraClient *jira.Client
-	if jiraOnly || os.Getenv("JIRA_BASE_URL") != "" || os.Getenv("JIRA_TOKEN") != "" {
-		var err error
-		jiraClient, err = jira.New(os.Getenv("JIRA_BASE_URL"), os.Getenv("JIRA_TOKEN"))
-		if err != nil {
-			return err
-		}
+	var jiraErr error
+	if startJira || os.Getenv("JIRA_BASE_URL") != "" || os.Getenv("JIRA_TOKEN") != "" {
+		jiraClient, jiraErr = jira.New(os.Getenv("JIRA_BASE_URL"), os.Getenv("JIRA_TOKEN"))
 	}
-	if jiraOnly {
-		_, err := tea.NewProgram(tui.New(ctx, nil, nil).WithJira(jiraClient, true), tea.WithContext(ctx)).Run()
-		return err
-	}
+
 	token, err := github.Token(ctx)
 	if err != nil {
-		return err
+		if jiraClient != nil {
+			_, runErr := tea.NewProgram(tui.New(ctx, nil, nil).WithJira(jiraClient, true), tea.WithContext(ctx)).Run()
+			return runErr
+		}
+		return errors.Join(err, jiraErr)
+	}
+	if jiraErr != nil {
+		fmt.Fprintln(stderr, "Jira unavailable:", jiraErr)
 	}
 	client, err := github.New(token)
 	if err != nil {
@@ -45,7 +47,7 @@ func RunMode(ctx context.Context, stderr io.Writer, jiraOnly bool) error {
 	}
 	dashboard := tui.New(ctx, client, persistence)
 	if jiraClient != nil {
-		dashboard = dashboard.WithJira(jiraClient, false)
+		dashboard = dashboard.WithJira(jiraClient, startJira)
 	}
 	_, err = tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
 	return err
