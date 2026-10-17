@@ -12,7 +12,7 @@ import (
 
 func mapIssue(i *gh.Issue) model.PullRequest {
 	repository := strings.TrimPrefix(i.GetRepositoryURL(), "https://api.github.com/repos/")
-	p := model.PullRequest{ID: i.GetNodeID(), Repository: repository, Number: i.GetNumber(), Title: i.GetTitle(), URL: i.GetHTMLURL(), Author: i.GetUser().GetLogin(), Draft: i.GetDraft(), CreatedAt: i.GetCreatedAt().Time, UpdatedAt: i.GetUpdatedAt().Time, Review: model.Unknown, CI: model.Unknown, Mergeability: model.Unknown}
+	p := model.PullRequest{ID: i.GetNodeID(), Repository: repository, Number: i.GetNumber(), Title: i.GetTitle(), Body: i.GetBody(), URL: i.GetHTMLURL(), Author: i.GetUser().GetLogin(), Draft: i.GetDraft(), CreatedAt: i.GetCreatedAt().Time, UpdatedAt: i.GetUpdatedAt().Time, Review: model.Unknown, CI: model.Unknown, Mergeability: model.Unknown}
 	for _, label := range i.Labels {
 		p.Labels = append(p.Labels, label.GetName())
 	}
@@ -21,7 +21,7 @@ func mapIssue(i *gh.Issue) model.PullRequest {
 
 const detailsQuery = `query($ids:[ID!]!) {
  nodes(ids:$ids) { ... on PullRequest {
-  id isDraft reviewDecision mergeable
+  id body headRefName isDraft reviewDecision mergeable
   reviewRequests(first:100) {
    pageInfo { hasNextPage }
    nodes { requestedReviewer { ... on User { login } ... on Team { slug organization { login } } } }
@@ -31,6 +31,8 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
+	Body           string `json:"body"`
+	HeadRef        string `json:"headRefName"`
 	ID             string `json:"id"`
 	IsDraft        bool   `json:"isDraft"`
 	ReviewDecision string `json:"reviewDecision"`
@@ -107,6 +109,8 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 	return errors.Join(failures...)
 }
 func applyDetails(p *model.PullRequest, d *details) {
+	p.Body = d.Body
+	p.HeadRef = d.HeadRef
 	p.Draft = d.IsDraft
 	switch d.ReviewDecision {
 	case "APPROVED":

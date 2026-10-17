@@ -21,6 +21,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !editing {
 			switch key.String() {
+			case "l":
+				return m.navigateRelated()
 			case "g":
 				return m.switchProvider(false)
 			case "J":
@@ -84,7 +86,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.warnings[msg.view] = "Partial results; cached rows retained"
 			}
 		}
-		if msg.view == m.active {
+		if msg.view == m.active || m.relatedKey != "" {
 			for i, p := range m.filtered() {
 				if p.URL == selectedURL {
 					m.selected = i
@@ -156,6 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.input.Focus()
 		case "esc":
 			m.input.SetValue("")
+			m.relatedKey = ""
 			m.help = false
 			m.selected = 0
 		case "?":
@@ -177,6 +180,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m Model) filtered() []model.PullRequest {
 	rows := m.snapshot.Datasets[m.active].PRs
+	if m.relatedKey != "" {
+		rows = m.relatedPRs(m.relatedKey)
+	}
 	filter := strings.ToLower(strings.TrimSpace(m.input.Value()))
 	if filter == "" {
 		return rows

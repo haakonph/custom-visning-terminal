@@ -38,6 +38,8 @@ type PullRequest struct {
 	ID                 string    `json:"id"`
 	Repository         string    `json:"repository"`
 	Number             int       `json:"number"`
+	Body               string    `json:"body,omitempty"`
+	HeadRef            string    `json:"head_ref,omitempty"`
 	Title              string    `json:"title"`
 	URL                string    `json:"url"`
 	Author             string    `json:"author"`
