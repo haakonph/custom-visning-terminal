@@ -44,6 +44,9 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.jiraActive {
+		return m.jiraView()
+	}
 	lines := []string{}
 	user := m.snapshot.User
 	if user == "" {
@@ -116,7 +119,7 @@ func (m Model) View() tea.View {
 	if message != "" {
 		lines = append(lines, warning.Render(clean(message)))
 	}
-	lines = append(lines, muted.Render(shortcuts))
+	lines = append(lines, muted.Render(shortcuts+" · J Jira"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}

@@ -14,6 +14,8 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	jira            *jiraState
+	jiraActive      bool
 	ctx             context.Context
 	cancel          context.CancelFunc
 	source          model.Source
@@ -53,7 +55,12 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	input.CharLimit = 256
 	return Model{ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 }
-func (m Model) Init() tea.Cmd { return m.bootstrap() }
+func (m Model) Init() tea.Cmd {
+	if m.jiraActive {
+		return m.refreshJira()
+	}
+	return m.bootstrap()
+}
 func (m Model) bootstrap() tea.Cmd {
 	return func() tea.Msg {
 		// A credential-scoped cache supplies the previously verified identity,

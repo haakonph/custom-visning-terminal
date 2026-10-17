@@ -1,6 +1,6 @@
 # custom-visning
 
-Et k9s-inspirert GitHub PR-dashboard i terminalen. Se egne åpne PR-er, drafts,
+Et k9s-inspirert GitHub PR- og Jira-dashboard i terminalen. Se egne åpne PR-er, drafts,
 direkte review requests og teamforespørsler på tvers av alle repositories du har
 tilgang til, inkludert private repositories og flere organisasjoner.
 
@@ -162,7 +162,7 @@ forsøkes opptil tre ganger med backoff. `Retry-After` (sekunder/dato) og
 stedet for å holde oppdateringen i gang. HTTP 401 og permanente klientfeil
 forsøkes ikke igjen automatisk. Alle ventinger kan kanselleres.
 
-Første versjon støtter bare GitHub.com. TUI-en kjenner bare det
+GitHub-integrasjonen støtter bare GitHub.com. Jira Data Center 10 støttes separat, se nedenfor. TUI-en kjenner bare det
 SDK-uavhengige `model.Source`-grensesnittet, slik at andre tjenester kan kobles på
 uten å flytte datainnhenting inn i renderingen. Ingen database eller webserver.
 
@@ -207,3 +207,86 @@ minor-/patch-oppdateringer.
 - [GitHub PR-søk](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests)
 - [Teammedlemskap](https://docs.github.com/en/rest/teams/teams#list-teams-for-the-authenticated-user)
 - [GraphQL PullRequest](https://docs.github.com/en/graphql/reference/objects#pullrequest)
+
+## Jira Data Center 10
+
+Jira bruker REST API v2 med et personlig tilgangstoken (PAT), hvis administratoren
+har tillatt det. Alle Jira-kall er lesing, også POST til søkeendepunktet.
+Sett serveradresse og token i miljøet. HTTPS er påkrevd; vanlige systemsertifikater
+brukes. Jira under en context path, for eksempel `/jira`, støttes.
+
+```bash
+export JIRA_BASE_URL="https://jira.example.no/jira"
+# Sett JIRA_TOKEN gjennom din vanlige hemmelighetshåndtering.
+export JIRA_PROJECT="APP"  # valgfritt standard prosjektfilter
+custom-visning --jira
+# Fra kildekoden:
+go run ./cmd/custom-visning --jira
+```
+
+`--jira` starter direkte med Jira og krever ingen GitHub-innlogging. Med vanlig
+oppstart kan du trykke `J` for Jira og `g` for GitHub når Jira er konfigurert.
+GitHub-feil og Jira-feil håndteres hver for seg under kjøring.
+
+Standardfanene er **Mine**, **Prosjekt**, **Uten ansvarlig** og **Aktiv sprint**.
+Alle bruker `statusCategory != Done`. Prosjektfanen viser alle tilgjengelige
+prosjekter når prosjektfilter ikke er satt. Aktiv sprint krever Jira Software.
+
+| Tast | Jira-handling |
+| --- | --- |
+| `1`–`4` | Velg standardfane |
+| `Tab` / `Shift+Tab`, `←` / `→` | Bytt mellom standardfaner og lagrede søk |
+| `j` / `k`, `↓` / `↑` | Velg sak |
+| `Enter` | Åpne valgt sak i Jira |
+| `/` | Filtrer lokalt blant hentede saker |
+| `f` | Rediger kombinerbare hurtigfiltre i standardfaner |
+| `:` | Rediger og kjør full JQL, inkludert ønsket `ORDER BY` |
+| `s` | Lagre gjeldende JQL med navn; samme navn erstatter eksisterende søk |
+| `x` | Fjern hurtigfiltre og midlertidig JQL; vis aktiv fanes søk |
+| `r` | Hent aktivt søk på nytt |
+| `Esc` | Avbryt redigering eller fjern lokalt tekstfilter |
+| `?` | Vis/skjul hjelp |
+| `q` / `Ctrl+C` | Avslutt og kanseller nettverksarbeid |
+
+Hurtigfiltrene er prosjekt, status, ansvarlig (Jira-brukernavn), prioritet,
+sakstype, sprint, epic og label. Enter går til neste felt; tom verdi fjerner
+filteret. Søket kjøres etter siste felt. Esc avbryter hele filterendringen.
+Hurtigfiltre gjelder på tvers av standardfaner. Lagrede søk og egen JQL kjøres
+uendret, slik at de også kan vise ferdige saker. Feltnavn som `Epic Link`
+avhenger av Jira-oppsettet; bruk egen JQL dersom deres installasjon bruker andre
+felt. Endre sortering gjennom `ORDER BY`, for eksempel `updated DESC` eller
+`priority DESC, updated DESC`.
+
+Tabellen viser saksnøkkel, prioritet, status, tittel, ansvarlig og alder.
+På smale terminaler prioriteres saksnøkkel, status og tittel. Under tabellen vises
+prosjekt, sakstype, ansvarlig, frist, labels og et kort utdrag av beskrivelsen.
+Full beskrivelse finnes via Enter i Jira.
+
+Lagrede søk ligger i `filepath.Join(os.UserConfigDir(), "custom-visning", "jira.json")`.
+Bruk `JIRA_CONFIG` for å velge en annen fil. Tokenet lagres aldri i denne filen.
+Slett eller endre søk ved å redigere filen og starte appen på nytt:
+
+```json
+{
+  "queries": [
+    {
+      "name": "Mine feil",
+      "jql": "assignee = currentUser() AND issuetype = Bug AND statusCategory != Done ORDER BY priority DESC"
+    }
+  ]
+}
+```
+
+Søkeresultater caches under appens cachemappe i undermappen `jira`, adskilt per
+server, token og full JQL med SHA-256-fingeravtrykk. Cachen inneholder sakens
+metadata og beskrivelse i klartekst, med mapper `0700` og filer `0600`. Slett
+undermappen for å fjerne lokale Jira-data. Ved oppstart/søk vises eventuell cache
+mens data hentes. Feil beholder forrige resultat og flytter ikke siste vellykkede
+synkronisering. Alle sider må lykkes før et nytt resultat erstatter cachen.
+Jiras `ORDER BY` beholdes. Oppdateringer skjer ved oppstart, søk/fanebytte og `r`.
+Nye søk kansellerer forrige søk, og forsinkede svar ignoreres.
+
+Klienten har 30 sekunders request-timeout og to minutter per søk. Ved ugyldig JQL,
+401/403, rate limit eller serverfeil vises en melding; rå feilbodyer og token
+vises ikke. Redirects følges ikke, og nettleserlenker begrenses til konfigurert
+Jira-server og context path. Integrasjonen endrer ingen Jira-saker.

@@ -9,15 +9,31 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := msg.(jiraResult); ok {
+		return m.updateJira(msg)
+	}
+	if m.jiraActive {
+		switch msg.(type) {
+		case tea.KeyPressMsg:
+			return m.updateJira(msg)
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg:
+		default:
+			return m.updateJira(msg)
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = max(1, msg.Width)
 		m.height = max(1, msg.Height)
 		m.input.SetWidth(max(1, m.width-4))
+		if m.jira != nil {
+			m.jira.input.SetWidth(max(1, m.width-4))
+		}
 		m.clamp()
 	case bootMsg:
 		m.booting = false
@@ -101,6 +117,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		switch key {
+		case "J":
+			if m.jira != nil {
+				m.jiraActive = true
+				return m, m.refreshJira()
+			}
+			m.notice = "Set JIRA_BASE_URL and JIRA_TOKEN to enable Jira"
 		case "q":
 			m.cancel()
 			return m, tea.Quit
@@ -165,6 +187,15 @@ func openBrowser(ctx context.Context, link string) error {
 	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" || parsed.User != nil {
 		return fmt.Errorf("invalid GitHub PR URL")
 	}
+	return launchBrowser(ctx, link)
+}
+func openJiraBrowser(ctx context.Context, client *jira.Client, link string) error {
+	if !client.ValidIssueURL(link) {
+		return fmt.Errorf("invalid Jira issue URL")
+	}
+	return launchBrowser(ctx, link)
+}
+func launchBrowser(ctx context.Context, link string) error {
 	var command string
 	var args []string
 	switch runtime.GOOS {
