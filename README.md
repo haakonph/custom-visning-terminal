@@ -319,3 +319,32 @@ Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
 - `g` og `J` bytter fortsatt leverandør. Begge integrasjonene må være konfigurert for navigering begge veier.
 
 Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
+
+
+## Copilot-sesjoner
+
+Trykk **c** fra GitHub eller Jira for å åpne Copilot. Start direkte uten GitHub-
+eller Jira-token med `custom-visning -copilot` (fra kildekode:
+`go run ./cmd/custom-visning -copilot`). Direkteoppstart bruker bare Copilot;
+start på vanlig måte for å kunne bytte mellom konfigurerte integrasjoner.
+
+Start først backend i [custom-visning](https://github.com/haakonph/custom-visning).
+Terminalen leser de samme `/api/copilot/sessions`, sesjonsdetaljene og
+`/api/copilot/diagnostics` som webgrensesnittet. Dermed brukes den eksisterende
+lokale importen, OTLP-innsamlingen, historikken og innstillingene for innhold.
+Terminalen trenger ingen egen OTLP-port, database eller token. Den endrer ingen
+sesjoner eller Jira-koblinger. Backend må kjøre på samme maskin.
+
+Standardadresse er `http://127.0.0.1:3001`. Sett `COPILOT_API_URL` til en annen
+lokal HTTP-adresse ved behov, for eksempel `http://localhost:3100`. Eksterne
+adresser og videresendinger avvises. Sesjonsinnhold lagres ikke i terminalens cache.
+
+- **/** søker på sesjon, repository, prosjekt, Jira, klient, modell og status.
+- **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
+- **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
+- **d** viser diagnostikk; **Esc** går tilbake og fjerner søket.
+- **r** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
+- **g** og **J** bytter til GitHub/Jira når de er konfigurert.
+
+Ved API-feil beholdes sist mottatte data med en synlig feilmelding. Innhold som
+skjules av personverninnstillingene i `custom-visning`, hentes ikke frem av terminalen.

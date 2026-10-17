@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/cache"
+	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/tui"
@@ -17,6 +18,18 @@ import (
 
 func Run(ctx context.Context, stderr io.Writer) error { return RunMode(ctx, stderr, false) }
 func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
+	return RunProviders(ctx, stderr, startJira, false)
+}
+func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error {
+	copilotClient, copilotErr := copilot.New(os.Getenv("COPILOT_API_URL"))
+	if copilotErr != nil {
+		return copilotErr
+	}
+	if startCopilot {
+		dashboard := tui.New(ctx, nil, nil).WithCopilot(copilotClient, true)
+		return runDashboard(ctx, dashboard)
+	}
+
 	var jiraClient *jira.Client
 	var jiraErr error
 	if startJira || os.Getenv("JIRA_BASE_URL") != "" || os.Getenv("JIRA_TOKEN") != "" {
@@ -26,7 +39,7 @@ func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	token, err := github.Token(ctx)
 	if err != nil {
 		if jiraClient != nil {
-			_, runErr := tea.NewProgram(tui.New(ctx, nil, nil).WithJira(jiraClient, true), tea.WithContext(ctx)).Run()
+			_, runErr := tea.NewProgram(tui.New(ctx, nil, nil).WithJira(jiraClient, true).WithCopilot(copilotClient, false), tea.WithContext(ctx)).Run()
 			return runErr
 		}
 		return errors.Join(err, jiraErr)
@@ -45,10 +58,15 @@ func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	} else {
 		persistence = store
 	}
-	dashboard := tui.New(ctx, client, persistence)
+	dashboard := tui.New(ctx, client, persistence).WithCopilot(copilotClient, false)
 	if jiraClient != nil {
 		dashboard = dashboard.WithJira(jiraClient, startJira)
 	}
 	_, err = tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
+	return err
+}
+
+func runDashboard(ctx context.Context, dashboard tui.Model) error {
+	_, err := tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
 	return err
 }
