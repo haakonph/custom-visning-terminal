@@ -21,7 +21,7 @@ func mapIssue(i *gh.Issue) model.PullRequest {
 
 const detailsQuery = `query($ids:[ID!]!) {
  nodes(ids:$ids) { ... on PullRequest {
-  id body headRefName isDraft reviewDecision mergeable
+  id body headRefName headRefOid isDraft reviewDecision mergeable
   reviewRequests(first:100) {
    pageInfo { hasNextPage }
    nodes { requestedReviewer { ... on User { login } ... on Team { slug organization { login } } } }
@@ -31,6 +31,7 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
+	HeadOID        string `json:"headRefOid"`
 	Body           string `json:"body"`
 	HeadRef        string `json:"headRefName"`
 	ID             string `json:"id"`
@@ -111,6 +112,7 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 func applyDetails(p *model.PullRequest, d *details) {
 	p.Body = d.Body
 	p.HeadRef = d.HeadRef
+	p.HeadOID = d.HeadOID
 	p.Draft = d.IsDraft
 	switch d.ReviewDecision {
 	case "APPROVED":
