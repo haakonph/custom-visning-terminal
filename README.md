@@ -389,15 +389,23 @@ Git HTTPS authentication uses the existing `gh auth git-credential` helper.
 Install Git and GitHub CLI and run `gh auth login --hostname github.com` with
 access to the repositories. No additional authentication mechanism is introduced.
 
-Existing valid worktrees open immediately without clone or fetch. **They are
-never reset, checked out to a newer commit, cleaned, or deleted automatically**,
-even when clean. `Ready`, `Modified`, and `Outdated` appear in the selected PR's
-detail line (and a LOCAL column in wide terminals). Modified and Outdated can
-appear together. Outdated means local HEAD differs from the latest PR head
-reported by the dashboard; press **r** to refresh GitHub data and local status.
-An older cached snapshot cannot detect remote changes until refreshed. Commit,
-stash or otherwise preserve changes yourself before manually updating a worktree.
-There is no automatic merge/rebase or deletion command in this release.
+Existing worktrees already at the dashboard's PR head open immediately without
+clone or fetch. When opening an outdated worktree, the app automatically advances
+it to that PR head **only if it is clean, detached, and the change is a
+fast-forward**. Missing commits are fetched if necessary. This never uses reset,
+force checkout, stash, merge or rebase. Attached branches, local commits, rewritten
+PR history, and Git operations in progress require manual updates. Ignored files
+that would be overwritten also prevent updating. Local changes are preserved.
+If fetching or checkout fails, the existing worktree still opens with an update
+notice; cancellation stops the operation.
+
+`Ready`, `Modified`, and `Outdated` appear in the selected PR's detail line (and a
+LOCAL column in wide terminals). Modified and Outdated can appear together.
+Outdated means local HEAD differs from the latest PR head reported by the
+dashboard; press **r** to refresh GitHub data and local status, then **o** to open
+and attempt a safe update. Refreshing alone never changes worktree files. An
+older cached snapshot cannot detect remote changes until refreshed. There is no
+automatic merge/rebase or deletion command in this release.
 
 Preparation runs asynchronously, with up to three preparation jobs and serialized
 clone/fetch/worktree operations per repository. Selection is deduplicated; an

@@ -23,6 +23,7 @@ type Status struct {
 	Modified bool   `json:"-"`
 	Outdated bool   `json:"-"`
 	Error    string `json:"-"`
+	Note     string `json:"-"`
 }
 
 func (s Status) String() string {
@@ -38,6 +39,9 @@ func (s Status) String() string {
 	}
 	if s.Outdated {
 		v += " · Outdated"
+	}
+	if s.Note != "" {
+		v += " · " + s.Note
 	}
 	return v
 }
@@ -171,7 +175,7 @@ func (w *WorktreeManager) Prepare(ctx context.Context, p model.PullRequest) (Sta
 		if e != nil {
 			return s, e
 		}
-		return s, w.remember(p, s)
+		return w.reuse(ctx, p, s)
 	} else if !os.IsNotExist(err) {
 		return Status{}, err
 	}
@@ -191,29 +195,13 @@ func (w *WorktreeManager) Prepare(ctx context.Context, p model.PullRequest) (Sta
 		if e != nil {
 			return s, e
 		}
-		return s, w.remember(p, s)
+		return w.reuse(ctx, p, s)
 	} else if !os.IsNotExist(err) {
 		return Status{}, err
 	}
-	// Base repository refs/pull/N/head also represent fork PRs. Detached HEADs
-	// avoid checked-out branch conflicts; no checkout/reset touches existing trees.
-	ref := fmt.Sprintf("refs/custom-visning/%s/pr-%d", id, p.Number)
-	have := ""
-	if commitPattern.MatchString(p.HeadOID) {
-		have, _ = git(ctx, repo, "rev-parse", "--verify", p.HeadOID+"^{commit}")
-	}
-	if have == "" {
-		if _, err := exec.LookPath("gh"); err != nil {
-			return Status{}, fmt.Errorf("install GitHub CLI and run gh auth login before fetching PR commits: %w", err)
-		}
-		_, err = git(ctx, repo, "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "fetch", "--no-tags", "--", "https://github.com/"+id+".git", fmt.Sprintf("+refs/pull/%d/head:%s", p.Number, ref))
-		if err != nil {
-			return Status{}, fmt.Errorf("PR #%d fetch failed (deleted PR, access, network or gh authentication): %w", p.Number, err)
-		}
-		have, err = git(ctx, repo, "rev-parse", ref+"^{commit}")
-		if err != nil {
-			return Status{}, err
-		}
+	have, err := prCommit(ctx, repo, p)
+	if err != nil {
+		return Status{}, err
 	}
 	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return Status{}, err
@@ -227,6 +215,95 @@ func (w *WorktreeManager) Prepare(ctx context.Context, p model.PullRequest) (Sta
 	}
 	return s, w.remember(p, s)
 }
+
+// prCommit resolves the dashboard head locally, fetching the base PR ref
+// (including forks) only when necessary. It never changes a working tree.
+func prCommit(ctx context.Context, repo string, p model.PullRequest) (string, error) {
+	if commitPattern.MatchString(p.HeadOID) {
+		if have, err := git(ctx, repo, "rev-parse", "--verify", p.HeadOID+"^{commit}"); err == nil {
+			return have, nil
+		}
+	}
+	if _, err := exec.LookPath("gh"); err != nil {
+		return "", fmt.Errorf("install GitHub CLI and run gh auth login before fetching PR commits: %w", err)
+	}
+	ref := fmt.Sprintf("refs/custom-visning/%s/pr-%d", strings.ToLower(p.Repository), p.Number)
+	if _, err := git(ctx, repo, "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "fetch", "--no-tags", "--", "https://github.com/"+strings.ToLower(p.Repository)+".git", fmt.Sprintf("+refs/pull/%d/head:%s", p.Number, ref)); err != nil {
+		return "", fmt.Errorf("PR #%d fetch failed (deleted PR, access, network or gh authentication): %w", p.Number, err)
+	}
+	return git(ctx, repo, "rev-parse", ref+"^{commit}")
+}
+
+// Only fast-forward a clean detached HEAD. No reset, force checkout, rebase,
+// branch movement, or automatic stash is used. Unsafe/unavailable updates still
+// open the existing checkout and explain why it remains outdated.
+func (w *WorktreeManager) reuse(ctx context.Context, p model.PullRequest, s Status) (Status, error) {
+	if s.Modified || !s.Outdated || !commitPattern.MatchString(p.HeadOID) {
+		return s, w.remember(p, s)
+	}
+	branch, err := git(ctx, s.Path, "rev-parse", "--symbolic-full-name", "HEAD")
+	if err != nil {
+		return s, err
+	}
+	if branch != "HEAD" {
+		s.Note = "on a branch; update manually"
+		return s, w.remember(p, s)
+	}
+	for _, name := range []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_LOG", "BISECT_START", "rebase-merge", "rebase-apply", "sequencer"} {
+		marker, err := git(ctx, s.Path, "rev-parse", "--git-path", name)
+		if err != nil {
+			return s, err
+		}
+		if !filepath.IsAbs(marker) {
+			marker = filepath.Join(s.Path, marker)
+		}
+		if _, err = os.Lstat(marker); !os.IsNotExist(err) {
+			s.Note = "Git operation in progress; update manually"
+			return s, w.remember(p, s)
+		}
+	}
+	target, err := prCommit(ctx, s.Path, p)
+	if err != nil {
+		if ctx.Err() != nil {
+			return s, ctx.Err()
+		}
+		s.Note = "update unavailable: " + err.Error()
+		return s, w.remember(p, s)
+	}
+	if target != p.HeadOID {
+		s.Note = "PR changed again; refresh before updating"
+		return s, w.remember(p, s)
+	}
+	if _, err = git(ctx, s.Path, "merge-base", "--is-ancestor", s.Head, target); err != nil {
+		s.Note = "local commits or rewritten history; update manually"
+		return s, w.remember(p, s)
+	}
+	// Recheck after fetching, since another tool may have modified the checkout.
+	current, err := inspect(ctx, s.Path, s.Path, p.HeadOID)
+	if err != nil {
+		return s, err
+	}
+	branch, err = git(ctx, s.Path, "rev-parse", "--symbolic-full-name", "HEAD")
+	if err != nil {
+		return current, err
+	}
+	if current.Modified || current.Head != s.Head || branch != "HEAD" {
+		return current, w.remember(p, current)
+	}
+	if _, err = git(ctx, s.Path, "checkout", "--detach", "--no-overwrite-ignore", target); err != nil {
+		if ctx.Err() != nil {
+			return s, ctx.Err()
+		}
+		s.Note = "automatic update failed; checkout preserved; inspect Git status"
+		return s, w.remember(p, s)
+	}
+	updated, err := inspect(ctx, s.Path, s.Path, p.HeadOID)
+	if err != nil {
+		return updated, err
+	}
+	return updated, w.remember(p, updated)
+}
+
 func (w *WorktreeManager) remember(p model.PullRequest, s Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

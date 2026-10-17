@@ -308,3 +308,133 @@ func TestExistingWorktreeSurvivesRepositoryPreferenceChange(t *testing.T) {
 		t.Fatal("existing worktree not reused", again, err)
 	}
 }
+
+func advancePR(t *testing.T, source string, p model.PullRequest) model.PullRequest {
+	t.Helper()
+	run(t, source, "commit", "--allow-empty", "-m", "new remote head")
+	p.HeadOID = run(t, source, "rev-parse", "HEAD")
+	run(t, source, "update-ref", "refs/pull/1/head", p.HeadOID)
+	return p
+}
+func TestCleanWorktreeAutomaticallyFastForwards(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p = advancePR(t, source, p)
+	updated, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Path != first.Path || updated.Head != p.HeadOID || updated.Outdated || updated.Modified {
+		t.Fatalf("not updated: %+v", updated)
+	}
+	if _, err = git(ctx, updated.Path, "symbolic-ref", "-q", "HEAD"); err == nil {
+		t.Fatal("HEAD should remain detached")
+	}
+}
+func TestLocalCommitsAreNotReplaced(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run(t, first.Path, "commit", "--allow-empty", "-m", "my local work")
+	localHead := run(t, first.Path, "rev-parse", "HEAD")
+	p = advancePR(t, source, p)
+	got, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Head != localHead || !got.Outdated || !strings.Contains(got.Note, "local commits") {
+		t.Fatalf("local commits not preserved: %+v", got)
+	}
+}
+func TestAttachedBranchIsNotMovedOrDetached(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run(t, first.Path, "checkout", "-b", "my-branch")
+	p = advancePR(t, source, p)
+	got, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Head != first.Head || !got.Outdated || run(t, first.Path, "symbolic-ref", "--short", "HEAD") != "my-branch" {
+		t.Fatalf("branch changed: %+v", got)
+	}
+}
+func TestFailedUpdateStillReusesCheckout(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p = advancePR(t, source, p)
+	run(t, source, "update-ref", "-d", "refs/pull/1/head")
+	got, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal("existing checkout should still open", err)
+	}
+	if got.Head != first.Head || !got.Outdated || !strings.Contains(got.Note, "update unavailable") {
+		t.Fatalf("missing failure notice: %+v", got)
+	}
+}
+func TestUpdateDoesNotOverwriteIgnoredFiles(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	_ = os.WriteFile(filepath.Join(source, ".gitignore"), []byte("private.txt\n"), 0600)
+	run(t, source, "add", ".gitignore")
+	run(t, source, "commit", "-m", "ignore local file")
+	p.HeadOID = run(t, source, "rev-parse", "HEAD")
+	run(t, source, "update-ref", "refs/pull/1/head", p.HeadOID)
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(first.Path, "private.txt")
+	_ = os.WriteFile(file, []byte("my ignored data"), 0600)
+	_ = os.WriteFile(filepath.Join(source, "private.txt"), []byte("remote content"), 0600)
+	run(t, source, "add", "-f", "private.txt")
+	run(t, source, "commit", "-m", "track file")
+	p.HeadOID = run(t, source, "rev-parse", "HEAD")
+	run(t, source, "update-ref", "refs/pull/1/head", p.HeadOID)
+	got, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(file)
+	if err != nil || string(b) != "my ignored data" || got.Head != first.Head || !got.Outdated {
+		t.Fatalf("ignored file changed: %+v, %q, %v", got, b, err)
+	}
+}
+func TestGitOperationPreventsUpdate(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p = advancePR(t, source, p)
+	marker := run(t, first.Path, "rev-parse", "--git-path", "BISECT_LOG")
+	if !filepath.IsAbs(marker) {
+		marker = filepath.Join(first.Path, marker)
+	}
+	if err = os.WriteFile(marker, []byte("in progress"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Head != first.Head || !strings.Contains(got.Note, "in progress") {
+		t.Fatalf("operation not preserved: %+v", got)
+	}
+}
