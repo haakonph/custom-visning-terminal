@@ -19,3 +19,13 @@ referansene til valgt oppgave til høyre. Innholdet er gjengitt fra appens fakti
 `Model.View()` med lokale eksempeldata, i et terminalrutenett på 112 × 24 tegn.
 ANSI-farger er gjengitt i PNG, med en vindusramme lagt til for presentasjon.
 Ingen eksterne tjenester eller ekte saker er brukt.
+
+## GitHub-detaljer
+
+- `github-details-files.png`: detaljvisning for en PR med endrede filer som mappetre.
+- `github-details-comments.png`: samme visning etter blaing, med individuelle
+  Actions-statuser, PR-kommentarer, kodekommentarer og reviews.
+
+Bildene er gjengitt fra faktisk `Model.View()` med lokale eksempeldata i et
+terminalrutenett på 106 × 30 tegn. Vindusramme og seksjonsfarger er lagt til
+ved PNG-gjengivelse. Ingen ekte PR-data eller Actions-kjøringer er brukt.
