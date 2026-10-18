@@ -14,29 +14,21 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
-	tasks           taskState
-	copilot         *copilotState
-	copilotActive   bool
-	local           *localState
-	jira            *jiraState
-	jiraActive      bool
-	relatedKey      string
-	ctx             context.Context
-	cancel          context.CancelFunc
-	source          model.Source
-	cache           Cache
-	snapshot        model.Snapshot
-	active          model.View
-	selected        int
-	width, height   int
-	input           textinput.Model
-	filtering, help bool
-	booting         bool
-	loading         [model.ViewCount]bool
-	warnings        [model.ViewCount]string
-	notice          string
-	saving, dirty   bool
-	open            func(context.Context, string) error
+	shellState
+	tasks         taskState
+	copilot       *copilotState
+	copilotActive bool
+	local         *localState
+	jira          *jiraState
+	jiraActive    bool
+	relatedKey    string
+	source        model.Source
+	cache         Cache
+	snapshot      model.Snapshot
+	selected      int
+	loading       [model.ViewCount]bool
+	warnings      [model.ViewCount]string
+	saving, dirty bool
 }
 type bootMsg struct {
 	snapshot model.Snapshot
@@ -58,7 +50,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	input.Placeholder = "repository, title, author, label or team"
 	input.Prompt = "/ "
 	input.CharLimit = 256
-	return Model{tasks: newTasks(), ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	return Model{shellState: shellState{ctx: ctx, cancel: cancel, input: input, width: 100, height: 24, booting: true, open: openBrowser}, tasks: newTasks(), source: source, cache: cache}
 }
 func (m Model) Init() tea.Cmd {
 	if m.copilotActive {

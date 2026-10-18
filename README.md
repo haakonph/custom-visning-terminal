@@ -4,6 +4,12 @@ Et k9s-inspirert GitHub PR- og Jira-dashboard i terminalen. Se egne åpne PR-er,
 direkte review requests og teamforespørsler på tvers av alle repositories du har
 tilgang til, inkludert private repositories og flere organisasjoner.
 
+## Funksjonsdokumentasjon
+
+Detaljert funksjons- og arkitekturdokumentasjon ligger i [docs/architecture.md](docs/architecture.md)
+og [docs/features.md](docs/features.md). Denne filen beholder installasjon,
+oppstart og en kort oversikt over hurtigtastene.
+
 ```text
  CUSTOM VISNING GitHub · alice
 [1 My Open PRs]  2 My Draft PRs  3 My Review Requests  4 Team Review Requests
