@@ -53,6 +53,8 @@ Fra mappen med de nedlastede filene:
 ```bash
 shasum -a 256 -c checksums.txt
 tar -xzf custom-visning_Darwin_arm64.tar.gz
+# Hvis macOS har satt quarantine på den verifiserte binæren:
+xattr -d com.apple.quarantine custom-visning
 mkdir -p "$HOME/.local/bin"
 install -m 755 custom-visning "$HOME/.local/bin/custom-visning"
 export PATH="$HOME/.local/bin:$PATH"
@@ -62,7 +64,45 @@ custom-visning
 
 Legg PATH-linjen i `~/.zshrc` for senere økter. Første versjon distribuerer kun
 macOS arm64. Binæren er ikke Apple-signert eller notarized; følg macOS sin
-vanlige godkjenning for nedlastet programvare ved behov.
+vanlige godkjenning for nedlastet programvare ved behov. `xattr -d` over
+fjerner quarantine-attributtet fra den utpakkede binæren etter kontroll av
+sjekksummen. Hvis attributtet mangler, kan macOS vise «No such xattr»;
+da kan du fortsette installasjonen.
+
+## Sjekke og laste ned oppdateringer
+
+```bash
+custom-visning --check-update
+custom-visning --update
+```
+
+`--check-update` viser installert versjon og siste stabile release. `--update`
+spør før den laster ned arkivet for maskinens operativsystem og arkitektur til
+arbeidsmappen. Bare macOS arm64 har publiserte releasearkiver foreløpig.
+Arkivet kontrolleres mot SHA-256 i releasens `checksums.txt` før det lagres.
+Eksisterende filer overskrives ikke, og ufullstendige eller avviste nedlastinger
+fjernes. Pakk ut og installer arkivet som beskrevet over; programmet erstatter
+ikke sin egen kjørende binær. Kommandoene starter ikke dashboardet.
+
+Oppdateringer bruker et eget token fra **`CUSTOM_VISNING_UPDATE_TOKEN`**.
+Sett det i miljøet via din vanlige lokale hemmelighetshåndtering. Tokenet trenger
+bare lesetilgang til releaser i `haakonph/custom-visning-terminal`: for et
+fine-grained PAT velger du repositoryet og **Contents: read**. Ingen
+skriverettigheter eller organisasjonsrettigheter er nødvendig for oppdateringer.
+Tokenet lagres ikke av programmet og skal ikke legges i kildekode eller config.
+
+Hvis det egne tokenet mangler eller er tomt, brukes `GITHUB_TOKEN`, deretter
+`gh auth token --hostname github.com` som reserve. Et eksplisitt token som blir
+avvist utløser ingen overgang til en annen identitet. Dashboardet fortsetter å
+bruke sin eksisterende autentisering, uavhengig av oppdateringstokenet.
+Tokenet sendes bare til GitHub API, og fjernes ved videresending til
+nedlastingslagring. API-feilbodyer og tokenverdier vises ikke.
+
+Versjonene sammenlignes som identiteter: prosjektet publiserer både tagger og
+`main-<run>.<attempt>-<sha>`, mens branchbygg heter `build-<sha>`.
+Ved forskjell vises begge versjonene, slik at du selv kan vurdere om du vil
+laste ned siste stabile release. Dette kan også være en eldre release enn et
+lokalt bygg. Sjekk og nedlasting skjer bare når du kjører kommandoene over.
 
 ## Laste ned bygg fra en branch
 
