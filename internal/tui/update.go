@@ -15,6 +15,12 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := msg.(tea.KeyPressMsg); ok && m.sequence == "" && m.jiraAction == nil {
+		m.sequenceNotice = ""
+	}
+	if next, cmd, handled := m.updateKeyboard(msg); handled {
+		return next, cmd
+	}
 	if result, ok := msg.(detailMsg); ok {
 		if m.detail != nil && m.detail.request == result.request {
 			m.detail.loading = false
@@ -142,12 +148,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tasks.active = true
 				m.tasks.selectVisible()
 				return m, nil
-			case "t", "a":
-				return m.collectTask(key.String() == "t")
 			case "c":
 				return m.switchCopilot()
-			case "l":
-				return m.navigateRelated()
 			case "g":
 				return m.switchProvider(false)
 			case "J":

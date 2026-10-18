@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -15,6 +16,11 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	sequence       string
+	sequenceNotice string
+	jiraAction     *jiraActionState
+	jiraChosen     map[string]jira.Issue
+
 	detail          *detailState
 	detailSequence  uint64
 	mmReader        *mattermostReader

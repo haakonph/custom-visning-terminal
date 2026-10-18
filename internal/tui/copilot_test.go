@@ -64,7 +64,7 @@ func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
 	if strings.Contains(rendered, "\x1b]52") || len(strings.Split(rendered, "\n")) > m.height {
 		t.Fatal("unsafe or oversized rendering")
 	}
-	m, _ = update(m, key('d'))
+	m, _ = update(m, key('D'))
 	if !m.copilot.diagnosticsOpen {
 		t.Fatal("diagnostics toggle")
 	}

@@ -1,4 +1,4 @@
-// Package jira implements read-only Jira Data Center REST API v2 searches.
+// Package jira implements Jira Data Center REST API v2 searches and workflow actions.
 package jira
 
 import (

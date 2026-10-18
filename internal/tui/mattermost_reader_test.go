@@ -51,7 +51,8 @@ func TestMattermostPRRoundTrip(t *testing.T) {
 	if m.mmMentionCount("https://github.com/acme/api/pull/1") != 2 {
 		t.Fatal("multiple channels/replies lost")
 	}
-	m, _ = update(m, key('v'))
+	m, _ = update(m, key('r'))
+	m, _ = update(m, key('c'))
 	if !m.mmReader.active || !m.mmReader.mentions || len(m.mmReader.posts()) != 2 {
 		t.Fatal("reverse references")
 	}
@@ -121,7 +122,7 @@ func TestMattermostLinkNavigationWithoutGitHub(t *testing.T) {
 func TestMattermostLoginSecretsClearedOnCancel(t *testing.T) {
 	m := readerModel(t)
 	m.mmReader.authenticated = false
-	m, _ = update(m, key('a'))
+	m, _ = update(m, key('A'))
 	m.mmReader.input.SetValue("password-secret")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.mmReader.password != "password-secret" || m.mmReader.input.Value() != "" {

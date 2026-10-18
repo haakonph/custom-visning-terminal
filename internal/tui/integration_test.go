@@ -22,10 +22,11 @@ func TestWorktreeResultsAcrossCopilotAndTasks(t *testing.T) {
 	}
 	m, _ = update(m, key('g'))
 	m, _ = update(m, key('t'))
+	m, _ = update(m, key('n'))
 	if !m.tasks.active || len(m.tasks.items) != 1 {
 		t.Fatal("task creation failed after returning from Copilot")
 	}
-	m, _ = update(m, key('e'))
+	m, _ = update(m, key('E'))
 	title := m.tasks.input.Value()
 	m.local.running = 1
 	m, _ = update(m, localResult{p: p})

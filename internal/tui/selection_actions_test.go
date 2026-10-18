@@ -120,7 +120,11 @@ func TestSpaceSelectionActions(t *testing.T) {
 			fmt.Sprintf("task %c", actionKey), func(t *testing.T, m Model, want []model.PullRequest) {
 				existing := model.TaskReference{Provider: "jira", URL: "https://jira.example/browse/OLD-1", Title: "Existing"}
 				m.tasks.items = []model.Task{{Title: "Existing task", References: []model.TaskReference{existing}}}
-				m, _ = update(m, key(actionKey))
+				if actionKey == 't' {
+					m, _ = sequence(m, "tn")
+				} else {
+					m, _ = sequence(m, "to")
+				}
 				taskIndex := 0
 				if actionKey == 't' {
 					taskIndex = 1
@@ -205,14 +209,15 @@ func TestSpaceSelectionActions(t *testing.T) {
 			}
 		},
 	}, selectionAction{
-		"related Jira l", func(t *testing.T, m Model, want []model.PullRequest) {
+		"related Jira rt", func(t *testing.T, m Model, want []model.PullRequest) {
 			t.Setenv("XDG_CACHE_HOME", t.TempDir())
 			client, err := jira.New("https://jira.example", "test")
 			if err != nil {
 				t.Fatal(err)
 			}
 			m.jira = &jiraState{client: client}
-			m, cmd := update(m, key('l'))
+			m, _ = update(m, key('r'))
+			m, cmd := update(m, key('t'))
 			if cmd == nil || !m.jiraActive {
 				t.Fatal("related Jira search not scheduled")
 			}

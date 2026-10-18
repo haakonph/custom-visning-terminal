@@ -367,7 +367,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 				s.mentions = false
 			}
 			s.scroll = 0
-		case "a":
+		case "A":
 			if !s.busy {
 				return true, s.prompt("Password")
 			}
@@ -379,7 +379,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			if !s.busy {
 				s.confirmClear = true
 			}
-		case "r":
+		case "R":
 			if s.authenticated {
 				return true, m.mmCommand(s.service.Sync)
 			}
@@ -462,7 +462,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.link++
 		case "[":
 			s.link = max(0, s.link-1)
-		case "t":
+		case "d":
 			ps := s.posts()
 			if len(ps) > 0 {
 				p := ps[s.row]
@@ -493,7 +493,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 					return s.service.More(ctx, p.ChannelID, "", root)
 				})
 			}
-		case "h":
+		case "H":
 			ps := s.posts()
 			if len(ps) > 0 {
 				p := ps[0]
@@ -640,7 +640,7 @@ func (m Model) mmReaderView() tea.View {
 	} else {
 		ps := s.posts()
 		if len(ps) == 0 {
-			lines = append(lines, "No cached messages. + chooses channels; a signs in; p supplies a PAT.")
+			lines = append(lines, "No cached messages. + chooses channels; A signs in; p supplies a PAT.")
 		} else {
 			var body []string
 			selectedLine := 0
@@ -670,7 +670,7 @@ func (m Model) mmReaderView() tea.View {
 				}
 				title := prefix + channel + time.UnixMilli(p.CreatedAt).Local().Format("02 Jan 15:04") + " " + author
 				if p.RootID != "" {
-					title += " ↳ reply (t thread)"
+					title += " ↳ reply (d thread)"
 				}
 				body = append(body, accent.Render(clean(title)))
 				for _, line := range renderMessage(p.Message, max(1, m.width-4)) {
@@ -717,13 +717,13 @@ func (m Model) mmReaderView() tea.View {
 		notice = "Syncing… " + notice
 	}
 	if !s.authenticated {
-		notice = "Offline / sign in: a password, p PAT · " + notice
+		notice = "Offline / sign in: A password, p PAT · " + notice
 	}
 	lines = append(lines, warning.Render(clean(notice)))
 	if s.mentions {
 		lines = append(lines, muted.Render("Enter: jump to channel/message or thread"))
 	}
-	lines = append(lines, muted.Render("↑↓ messages · Tab channels · + add · - remove · t thread · h older · PgUp/PgDn scroll · Enter open · [ ] links · g PR · u read · r sync · D clear · Esc back"))
+	lines = append(lines, muted.Render("↑↓ messages · Tab channels · + add · - remove · d thread · H older · PgUp/PgDn scroll · Enter open · [ ] links · g PR · u read · R sync · D clear · Esc back"))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], max(1, m.width), "…")
 	}

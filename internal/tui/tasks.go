@@ -19,6 +19,7 @@ type taskState struct {
 	snoozes            *snoozeState
 	items              []model.Task
 	active             bool
+	archived           bool
 	selected, row      int
 	input              textinput.Model
 	editing            bool
@@ -109,6 +110,8 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 		t.items[t.selected].Add(ref)
 	}
 	t.active = true
+	t.archived = false
+	t.items[t.selected].Archived = false
 	t.save()
 	return m, nil
 }
@@ -201,12 +204,13 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		t.query = ""
+		t.archived = false
 		t.items = append(t.items, model.Task{Title: "Ny oppgave"})
 		t.selected = len(t.items) - 1
 		t.row = 0
 		t.save()
 		fallthrough
-	case "e":
+	case "E":
 		if len(t.items) > 0 && !t.loadFailed {
 			t.editing = true
 			t.input.Prompt = "Tittel: "
@@ -268,6 +272,9 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (t taskState) visibleTasks() []int {
 	var indices []int
 	for i, task := range t.items {
+		if task.Archived != t.archived {
+			continue
+		}
 		if task.ID != "" && t.snoozes.hidden("task:"+task.ID) {
 			continue
 		}
@@ -318,14 +325,17 @@ func (t *taskState) moveTask(delta int, wrap bool) {
 
 func (m Model) tasksView() tea.View {
 	t := m.tasks
-	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "g GitHub · J Jira · / søk · Tab neste oppgave · ← liste · → detaljer"}
+	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "vg GitHub · vt Jira · / søk · h/l oppgave · d detaljer · E endre tittel · aa arkiver/gjenopprett · A vis arkiv"}
+	if t.archived {
+		lines = append(lines, " Arkiverte oppgaver · aa gjenopprett · A aktive")
+	}
 	lines = append(lines, m.snoozeLines()...)
 	if t.searching || t.editing {
 		lines = append(lines, t.input.View())
 	} else if t.query != "" {
 		lines = append(lines, "Søk: "+clean(t.query))
 	}
-	footer := "j/k velg · Enter detaljer/åpne · n ny · e tittel · d fjern kobling · D slett · Esc tilbake · q avslutt"
+	footer := "j/k velg · Enter detaljer/åpne · n ny · E tittel · d detaljer · ad slett · aa arkiver · A vis arkiv · Esc tilbake · q avslutt"
 	capacity := max(1, m.height-len(lines)-2)
 	indices := t.visibleTasks()
 	list := []string{accent.Render(fmt.Sprintf(" OPPGAVER (%d/%d)", len(indices), len(t.items)))}
@@ -351,7 +361,7 @@ func (m Model) tasksView() tea.View {
 	var details []string
 	if len(indices) > 0 {
 		task := t.items[t.selected]
-		details = append(details, accent.Render(clean(task.Title)), "g/J: finn referanser, a legger til her")
+		details = append(details, accent.Render(clean(task.Title)), "vg/vt: finn referanser, to legger til her")
 		refsCapacity := max(1, capacity-2)
 		refStart := max(0, t.row-refsCapacity+1)
 		for i := refStart; i < min(len(task.References), refStart+refsCapacity); i++ {

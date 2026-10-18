@@ -110,11 +110,11 @@ func TestRefreshAsyncAndNoDuplicates(t *testing.T) {
 	source := &fakeSource{result: model.Result{Complete: true}}
 	m.source = source
 	var cmd tea.Cmd
-	m, cmd = update(m, key('r'))
+	m, cmd = update(m, key('R'))
 	if cmd == nil || source.calls != 0 || !m.loading[0] {
 		t.Fatal("refresh blocked Update")
 	}
-	next, duplicate := update(m, key('r'))
+	next, duplicate := update(m, key('R'))
 	m = next
 	if duplicate != nil {
 		t.Fatal("duplicate refresh")
@@ -154,7 +154,7 @@ func TestBootstrapErrorAndRetry(t *testing.T) {
 		t.Fatal("auth error missing")
 	}
 	source.err = nil
-	m, cmd := update(m, key('r'))
+	m, cmd := update(m, key('R'))
 	if !m.booting || cmd == nil {
 		t.Fatal("cannot retry bootstrap")
 	}
@@ -217,7 +217,7 @@ func TestResponsiveViewAndHelp(t *testing.T) {
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = update(m, key('?'))
-	if !strings.Contains(m.View().Content, "UNKNOWN means") {
+	if !strings.Contains(m.View().Content, "Hurtigtaster") {
 		t.Fatal("help missing")
 	}
 }
@@ -253,13 +253,13 @@ func TestHelpScrollAndSmallWindows(t *testing.T) {
 		}
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 10})
-	if !strings.Contains(m.View().Content, "Partial refreshes") {
+	if !strings.Contains(m.View().Content, "Delvis oppdatering") {
 		t.Fatal("cannot reach the end of help")
 	}
 	for range 50 {
 		m = press(m, "k")
 	}
-	if !strings.Contains(m.View().Content, "Snooze:") {
+	if !strings.Contains(m.View().Content, "Hurtigtaster") {
 		t.Fatal("cannot return to the start of help")
 	}
 	m = press(m, "zZ")

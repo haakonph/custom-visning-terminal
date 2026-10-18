@@ -198,9 +198,9 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 			c.ideNotice = "Åpner prosjektet i IntelliJ…"
 			opener, ctx := c.openIDE, m.ctx
 			return m, func() tea.Msg { return copilotOpenMsg{err: opener(ctx, session)} }
-		case "r":
+		case "R":
 			return m, m.refreshCopilot()
-		case "d":
+		case "D":
 			c.diagnosticsOpen = !c.diagnosticsOpen
 			c.offset = 0
 		case "/":
@@ -251,7 +251,7 @@ func metric(n *int64) string {
 }
 func (m Model) copilotView() tea.View {
 	c := m.copilot
-	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" g GitHub · J Jira · , innstillinger · c Copilot · lokal historikk · egen OTLP-mottaker")}
+	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" vg GitHub · vt Jira · , innstillinger · va Copilot · lokal historikk · egen OTLP-mottaker")}
 	body := []string{}
 	if c.diagnosticsOpen {
 		d := c.diagnostics
@@ -314,7 +314,7 @@ func (m Model) copilotView() tea.View {
 	if c.notice != "" {
 		lines = append(lines, warning.Render(clean(c.notice)))
 	}
-	lines = append(lines, muted.Render(", innstillinger · i IntelliJ · Enter detaljer · j/k ↑/↓ · / søk · d diagnostikk · r oppdater · Esc tilbake · q avslutt"))
+	lines = append(lines, muted.Render(", innstillinger · ee IntelliJ · d / Enter detaljer · j/k ↑/↓ · / søk · D diagnostikk · R oppdater · Esc tilbake · q avslutt"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

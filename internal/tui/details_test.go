@@ -54,7 +54,7 @@ func TestDetailsFromMattermostPRRoundTrip(t *testing.T) {
 		t.Fatal("detail view leaked navigation keys")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	m, _ = update(m, key('v'))
+	m, _ = sequence(m, "rc")
 	if m.detail != nil || !m.mmReader.active || !m.mmReader.mentions {
 		t.Fatal("could not return from GitHub details to Mattermost references")
 	}

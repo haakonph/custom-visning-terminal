@@ -15,6 +15,8 @@ import (
 )
 
 type jiraState struct {
+	detail                *jira.Issue
+	detailOffset          int
 	snoozes               *snoozeState
 	client                *jira.Client
 	config                jira.Config
@@ -314,7 +316,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m Model) jiraView() tea.View {
 	j := m.jira
-	lines := []string{accent.Render(" CUSTOM VISNING · JIRA") + muted.Render("  g GitHub · [J Jira] · c Copilot")}
+	lines := []string{accent.Render(" CUSTOM VISNING · JIRA") + muted.Render("  vg GitHub · [vt Jira] · va Copilot")}
 	var tabs []string
 	for i, t := range j.tabs {
 		label := t.Name
@@ -379,6 +381,9 @@ func (m Model) jiraView() tea.View {
 	start := max(0, selected-capacity+1)
 	for i := start; i < min(len(rows), start+capacity); i++ {
 		line := row(rows[i], false)
+		if _, chosen := m.jiraChosen[rows[i].Key]; chosen {
+			line = "✓ " + line
+		}
 		if i == selected {
 			line = selection.Render(line)
 		}
@@ -394,7 +399,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, ", innstillinger · T oppgaver · t ny fra valgt · a legg til · l relaterte PR-er · g GitHub · J Jira · c Copilot · 1–9 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
+	lines = append(lines, shortcuts)
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

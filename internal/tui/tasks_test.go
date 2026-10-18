@@ -25,22 +25,22 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	defer m.cancel()
 	m.active = model.Reviews
 	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Repository: "org/repo", Number: 1, Title: "Review this"}}
-	m = taskKey(m, "t")
+	m = taskKey(taskKey(m, "t"), "n")
 	if !m.tasks.active || len(m.tasks.items) != 1 || m.tasks.items[0].References[0].Role != "review" {
 		t.Fatal("review PR should create a task")
 	}
 	m = taskKey(m, "T")
-	m = taskKey(m, "a")
+	m = taskKey(taskKey(m, "t"), "o")
 	if len(m.tasks.items[0].References) != 1 {
 		t.Fatal("adding the same PR must not duplicate it")
 	}
 	m.tasks.active = false
 	m.jira = &jiraState{rows: []jira.Issue{{Key: "ABC-1", URL: "https://jira.example/browse/ABC-1", Title: "First issue"}, {Key: "ABC-2", URL: "https://jira.example/browse/ABC-2", Title: "Second issue"}}}
 	m.jiraActive = true
-	m = taskKey(m, "a")
+	m = taskKey(taskKey(m, "t"), "o")
 	m.tasks.active = false
 	m.jira.selected = 1
-	m = taskKey(m, "a")
+	m = taskKey(taskKey(m, "t"), "o")
 	if len(m.tasks.items[0].References) != 3 {
 		t.Fatal("task should contain one PR and two Jira issues")
 	}
@@ -48,7 +48,8 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	if reloaded.loadFailed || len(reloaded.items) != 1 || len(reloaded.items[0].References) != 3 {
 		t.Fatal("references should survive restart")
 	}
-	m = taskKey(m, "d")
+	m.tasks.details = true
+	m = taskKey(taskKey(m, "a"), "d")
 	if len(m.tasks.items[0].References) != 2 {
 		t.Fatal("d should remove only selected reference")
 	}
@@ -98,7 +99,7 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	m := New(context.Background(), &fakeSource{}, nil)
 	defer m.cancel()
 	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "Old title"}}
-	m = taskKey(m, "t")
+	m = taskKey(taskKey(m, "t"), "n")
 	m, _ = update(m, refreshMsg{view: model.Open, result: model.Result{Complete: true, PRs: []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "New title", Review: model.Approved}}}})
 	if !m.tasks.active || !strings.Contains(m.tasksView().Content, "New title") {
 		t.Fatal("background refresh should update task references without leaving the page")
@@ -107,7 +108,7 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	if m.tasks.active {
 		t.Fatal("g should return to GitHub")
 	}
-	m = taskKey(m, "a")
+	m = taskKey(taskKey(m, "t"), "o")
 	if len(m.tasks.items) != 1 || len(m.tasks.items[0].References) != 1 {
 		t.Fatal("returning to provider must preserve target task")
 	}

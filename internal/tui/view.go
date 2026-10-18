@@ -44,6 +44,12 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.jiraActive && !m.tasks.active && !m.copilotActive && (m.mmReader == nil || !m.mmReader.active) && m.jira != nil && m.jira.detail != nil {
+		return m.jiraDetailView()
+	}
+	if m.sequence != "" || m.sequenceNotice != "" || m.jiraAction != nil {
+		return m.keyboardView()
+	}
 	if m.detail != nil {
 		return m.detailView()
 	}
@@ -58,6 +64,9 @@ func (m Model) View() tea.View {
 	}
 	if m.snoozes != nil && m.snoozes.active {
 		return m.snoozeView()
+	}
+	if m.help {
+		return m.helpView()
 	}
 	if m.tasks.active {
 		return m.tasksView()
@@ -76,7 +85,7 @@ func (m Model) View() tea.View {
 	if user == "" {
 		user = "authenticating…"
 	}
-	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [g GitHub] · J Jira"))
+	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [vg GitHub] · vt Jira"))
 	tabs := []string{}
 	for v := model.Open; v < model.ViewCount; v++ {
 		label := fmt.Sprintf("%d %s", v+1, v.String())
@@ -164,7 +173,7 @@ func (m Model) View() tea.View {
 			lines = append(lines, warning.Render(clean(message)))
 		}
 	}
-	lines = append(lines, muted.Render("g GitHub · J Jira · c Copilot · M Mattermost · "+shortcuts))
+	lines = append(lines, muted.Render(shortcuts))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}
