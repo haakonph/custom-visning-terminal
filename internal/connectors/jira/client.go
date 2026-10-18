@@ -166,3 +166,10 @@ func (c *Client) ValidIssueURL(link string) bool {
 	key := strings.TrimPrefix(u.Path, prefix)
 	return strings.HasPrefix(u.Path, prefix) && issueKey.MatchString(key)
 }
+
+// IssueURL builds a link using the configured Jira origin and context path.
+func (c *Client) IssueURL(key string) string {
+	u := *c.base
+	u.Path = strings.TrimRight(u.Path, "/") + "/browse/" + key
+	return u.String()
+}

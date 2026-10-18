@@ -3,6 +3,7 @@ package copilot
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -272,5 +273,77 @@ func TestLegacyCopilotMigration(t *testing.T) {
 	rows, err = s.Sessions(context.Background())
 	if err != nil || len(rows) != 1 {
 		t.Fatal(rows, err)
+	}
+}
+
+func TestStoreLargerThanFormerReadLimit(t *testing.T) {
+	o := testOptions(t)
+	write(t, o.StorePath, "")
+	f, err := os.OpenFile(o.StorePath, os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	// Valid JSON with enough whitespace inside the object to cross the old
+	// limit, without constructing a huge session fixture in memory.
+	if _, err := io.WriteString(f, `{"version":1,"sessions":{},"traces":{},`); err != nil {
+		t.Fatal(err)
+	}
+	padding := strings.Repeat(" ", 1<<20)
+	for range 128 {
+		if _, err := io.WriteString(f, padding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := io.WriteString(f, `"extra":null}`); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(o)
+	if err != nil {
+		t.Fatalf("valid large store could not be reopened: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// SQLite now takes precedence after import. Remove the migrated database
+	// to exercise validation of the large legacy input again.
+	if err := os.Remove(storage.Path(o.StorePath)); err != nil {
+		t.Fatal(err)
+	}
+	// Invalid trailing content must not be hidden beyond the former limit.
+	if _, err := io.WriteString(f, " private-invalid-tail"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(o); err == nil || strings.Contains(err.Error(), "private-invalid-tail") {
+		t.Fatalf("invalid large store: %v", err)
+	}
+}
+
+func TestInvalidStoresPreservedWithRecoveryGuidance(t *testing.T) {
+	for _, content := range []string{
+		"", `{"version":1`, `{"version":2,"sessions":{},"traces":{}}`,
+		`{"version":1,"sessions":{"s":null},"traces":{}}`,
+		`{"version":1,"sessions":{},"traces":{}} private-invalid-tail`,
+	} {
+		t.Run(content, func(t *testing.T) {
+			o := testOptions(t)
+			write(t, o.StorePath, content)
+			_, err := New(o)
+			if err == nil {
+				t.Fatal("accepted invalid store")
+			}
+			for _, want := range []string{o.StorePath, "existing file has been preserved", "COPILOT_STORE_PATH"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("missing recovery guidance %q: %v", want, err)
+				}
+			}
+			if strings.Contains(err.Error(), "private-invalid-tail") {
+				t.Fatalf("file contents leaked: %v", err)
+			}
+			got, readErr := os.ReadFile(o.StorePath)
+			if readErr != nil || string(got) != content {
+				t.Fatalf("original store changed: %v", readErr)
+			}
+		})
 	}
 }

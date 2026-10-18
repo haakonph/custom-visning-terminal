@@ -251,7 +251,7 @@ func metric(n *int64) string {
 }
 func (m Model) copilotView() tea.View {
 	c := m.copilot
-	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" g GitHub · J Jira · c Copilot · lokal historikk · egen OTLP-mottaker")}
+	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" g GitHub · J Jira · , innstillinger · c Copilot · lokal historikk · egen OTLP-mottaker")}
 	body := []string{}
 	if c.diagnosticsOpen {
 		d := c.diagnostics
@@ -314,7 +314,7 @@ func (m Model) copilotView() tea.View {
 	if c.notice != "" {
 		lines = append(lines, warning.Render(clean(c.notice)))
 	}
-	lines = append(lines, muted.Render("i IntelliJ · Enter detaljer · j/k ↑/↓ · / søk · d diagnostikk · r oppdater · Esc tilbake · q avslutt"))
+	lines = append(lines, muted.Render(", innstillinger · i IntelliJ · Enter detaljer · j/k ↑/↓ · / søk · d diagnostikk · r oppdater · Esc tilbake · q avslutt"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

@@ -11,9 +11,39 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.mattermostMessage(msg); handled {
+		return m, cmd
+	}
+	if m.settings.active {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		default:
+			return m.updateSettings(msg)
+		}
+	}
+	if m.help && !m.tasks.active && !m.jiraActive && !m.copilotActive {
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			switch key.String() {
+			case "esc", "?":
+				m.help = false
+			case "j", "down":
+				m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(helpText, "\n"))-max(1, m.height-1)))
+			case "k", "up":
+				m.helpOffset = max(0, m.helpOffset-1)
+			case "q", "ctrl+c":
+				m.cancel()
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+	}
+	if handled, cmd := m.snoozeMessage(msg); handled {
+		return m, cmd
+	}
 	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
@@ -25,6 +55,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if _, ok := msg.(copilotTick); ok {
 		return m.updateCopilot(msg)
+	}
+	if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == "," && !m.tasks.active && !m.filtering && (m.jira == nil || m.jira.mode == "") && (m.copilot == nil || !m.copilot.filtering) {
+		return m.openSettings()
 	}
 	if m.copilotActive {
 		switch msg.(type) {
@@ -64,8 +97,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !editing {
 			switch key.String() {
+			case "P", ",":
+				return m.openSettings()
 			case "T":
 				m.tasks.active = true
+				m.tasks.selectVisible()
 				return m, nil
 			case "t", "a":
 				return m.collectTask(key.String() == "t")
@@ -209,17 +245,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key {
 
 		case "space", " ":
-			if m.local != nil {
-				rows := m.filtered()
-				if len(rows) > 0 {
-					p := rows[m.selected]
-					if _, ok := m.local.chosen[p.Key()]; ok {
-						delete(m.local.chosen, p.Key())
-					} else {
-						m.local.chosen[p.Key()] = p
-					}
+			rows := m.filtered()
+			if len(rows) > 0 {
+				p := rows[m.selected]
+				if _, ok := m.chosen[p.Key()]; ok {
+					delete(m.chosen, p.Key())
+				} else {
+					m.chosen[p.Key()] = p
 				}
 			}
+		case "m":
+			return m, m.composeMattermost()
 		case "o":
 			return m, m.openLocal("")
 		case "O":
@@ -255,6 +291,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = 0
 		case "?":
 			m.help = !m.help
+			m.helpOffset = 0
 		case "enter":
 			rows := m.filtered()
 			if len(rows) == 0 {
@@ -275,6 +312,13 @@ func (m Model) filtered() []model.PullRequest {
 	if m.relatedKey != "" {
 		rows = m.relatedPRs(m.relatedKey)
 	}
+	visible := make([]model.PullRequest, 0, len(rows))
+	for _, p := range rows {
+		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) {
+			visible = append(visible, p)
+		}
+	}
+	rows = visible
 	filter := strings.ToLower(strings.TrimSpace(m.input.Value()))
 	if filter == "" {
 		return rows

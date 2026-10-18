@@ -12,7 +12,7 @@ import (
 
 func jiraModel(t *testing.T) Model {
 	t.Helper()
-	t.Setenv("JIRA_CONFIG", t.TempDir()+"/jira.json")
+	t.Setenv("CUSTOM_VISNING_CONFIG", t.TempDir()+"/jira.json")
 	c, err := jira.New("https://jira.example", "test")
 	if err != nil {
 		t.Fatal(err)

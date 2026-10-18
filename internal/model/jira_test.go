@@ -2,6 +2,7 @@ package model
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -16,5 +17,24 @@ func TestJiraKeys(t *testing.T) {
 	}
 	if !p.HasJiraKey("ABC-12") {
 		t.Fatal("missing exact issue key")
+	}
+}
+
+func TestCustomJiraPattern(t *testing.T) {
+	pattern := regexp.MustCompile(`KAKE-[0-9]{3,5}`)
+	p := PullRequest{
+		Title:   "KAKE-12 KAKE-123 KAKE-123456 ABC-123 xKAKE-456 KAKE-789suffix",
+		Body:    "https://jira.example/browse/KAKE-1234 KAKE-123",
+		HeadRef: "feature/KAKE-12345",
+	}
+	want := []string{"KAKE-123", "KAKE-1234", "KAKE-12345"}
+	if got := p.JiraKeys(pattern); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if p.HasJiraKey("KAKE-12", pattern) || p.HasJiraKey("ABC-123", pattern) {
+		t.Fatal("matched a key outside the custom pattern")
+	}
+	if !p.HasJiraKey("kake-12345", pattern) {
+		t.Fatal("missing custom key")
 	}
 }

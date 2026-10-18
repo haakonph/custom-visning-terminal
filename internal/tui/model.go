@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"regexp"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
@@ -14,12 +15,17 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	settings        settingsState
+	snoozes         *snoozeState
+	mattermost      *mattermostState
+	chosen          map[string]model.PullRequest
 	tasks           taskState
 	copilot         *copilotState
 	copilotActive   bool
 	local           *localState
 	jira            *jiraState
 	jiraActive      bool
+	jiraPattern     *regexp.Regexp
 	relatedKey      string
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -31,6 +37,7 @@ type Model struct {
 	width, height   int
 	input           textinput.Model
 	filtering, help bool
+	helpOffset      int
 	booting         bool
 	loading         [model.ViewCount]bool
 	warnings        [model.ViewCount]string
@@ -58,9 +65,14 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	input.Placeholder = "repository, title, author, label or team"
 	input.Prompt = "/ "
 	input.CharLimit = 256
-	return Model{tasks: newTasks(), ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	s := newSnooze()
+	tasks := newTasks()
+	tasks.snoozes = s
+	m := Model{chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m.loadJiraPattern()
+	return m
 }
-func (m Model) Init() tea.Cmd {
+func (m Model) initProviders() tea.Cmd {
 	if m.copilotActive {
 		return m.refreshCopilot()
 	}
@@ -129,4 +141,12 @@ func (m *Model) persist() tea.Cmd {
 	m.dirty = false
 	snap, store := m.snapshot, m.cache
 	return func() tea.Msg { return cacheMsg{err: store.Save(snap)} }
+}
+
+// WithJiraPattern selects the issue-key pattern used for PR links and navigation.
+func (m Model) WithJiraPattern(pattern *regexp.Regexp) Model {
+	if pattern != nil {
+		m.jiraPattern = pattern
+	}
+	return m
 }

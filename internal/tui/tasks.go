@@ -11,10 +11,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type taskState struct {
+	snoozes            *snoozeState
 	items              []model.Task
 	active             bool
 	selected, row      int
@@ -51,9 +53,9 @@ func newTasks() taskState {
 	return t
 }
 
-func (t *taskState) save() {
+func (t *taskState) save() error {
 	if t.loadFailed {
-		return
+		return errors.New("oppgaver kunne ikke leses")
 	}
 	err := storage.Save(t.path, t.items)
 	if err != nil {
@@ -61,6 +63,7 @@ func (t *taskState) save() {
 	} else {
 		t.notice = "Oppgaver lagret lokalt"
 	}
+	return err
 }
 
 func (m Model) taskReference() (model.TaskReference, bool) {
@@ -110,6 +113,9 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 
 func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := &m.tasks
+	if !t.editing && !t.searching {
+		t.selectVisible()
+	}
 	k := key.String()
 	if k == "ctrl+c" {
 		m.cancel()
@@ -260,6 +266,9 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (t taskState) visibleTasks() []int {
 	var indices []int
 	for i, task := range t.items {
+		if task.ID != "" && t.snoozes.hidden("task:"+task.ID) {
+			continue
+		}
 		text := task.Title
 		for _, ref := range task.References {
 			text += " " + ref.Key + " " + ref.Title
@@ -308,6 +317,7 @@ func (t *taskState) moveTask(delta int, wrap bool) {
 func (m Model) tasksView() tea.View {
 	t := m.tasks
 	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "g GitHub · J Jira · / søk · Tab neste oppgave · ← liste · → detaljer"}
+	lines = append(lines, m.snoozeLines()...)
 	if t.searching || t.editing {
 		lines = append(lines, t.input.View())
 	} else if t.query != "" {
@@ -344,6 +354,9 @@ func (m Model) tasksView() tea.View {
 		refStart := max(0, t.row-refsCapacity+1)
 		for i := refStart; i < min(len(task.References), refStart+refsCapacity); i++ {
 			r := m.liveReference(task.References[i])
+			if m.snoozes.hidden(snooze.Identity(r.Provider, r.URL)) {
+				r.Title += " · utsatt til " + m.snoozes.entries[snooze.Identity(r.Provider, r.URL)].Until.Local().Format("2006-01-02 15:04 MST")
+			}
 			prefix := "  "
 			if i == t.row {
 				prefix = "› "

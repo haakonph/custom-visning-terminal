@@ -236,6 +236,7 @@ brukes. Jira under en context path, for eksempel `/jira`, støttes.
 export JIRA_BASE_URL="https://jira.example.no/jira"
 # Sett JIRA_TOKEN gjennom din vanlige hemmelighetshåndtering.
 export JIRA_PROJECT="APP"  # valgfritt standard prosjektfilter
+export JIRA_PATTERN='KAKE-[0-9]{3,5}'  # valgfritt mønster for Jira-nøkler i PR-er
 custom-visning --jira
 # Fra kildekoden:
 go run ./cmd/custom-visning --jira
@@ -296,18 +297,54 @@ På smale terminaler prioriteres saksnøkkel, status og tittel. Under tabellen v
 prosjekt, sakstype, ansvarlig, frist, labels og et kort utdrag av beskrivelsen.
 Full beskrivelse finnes via Enter i Jira.
 
-Lagrede søk ligger i `filepath.Join(os.UserConfigDir(), "custom-visning", "jira.json")`.
-Bruk `JIRA_CONFIG` for å velge en annen fil. Tokenet lagres aldri i denne filen.
-Slett eller endre søk ved å redigere filen og starte appen på nytt:
+`JIRA_PATTERN` er et Go-regulært uttrykk som brukes til å finne Jira-nøkler i
+PR-tittel, beskrivelse og branchnavn, både i detaljvisningen og ved navigasjon
+mellom relaterte PR-er og Jira-saker. Eksemplet over godtar `KAKE-123` til
+`KAKE-12345`, men ikke 2 eller 6 sifre, andre prefikser eller treff inni ord.
+Trykk `,` for å åpne **Innstillinger** fra GitHub, Jira eller Copilot.
+`P` fungerer også fra GitHub og Jira. Velg felt med ↑/↓ eller j/k og trykk
+Enter for å redigere. Enter validerer og lagrer feltet; Esc avbryter redigering,
+og Esc på innstillingssiden går tilbake til forrige visning.
+
+Alle appinnstillinger ligger i én fil:
+`os.UserConfigDir()/custom-visning/config.json`. Bruk `CUSTOM_VISNING_CONFIG`
+for å velge en annen fil. Siden viser filstien og felter for Jira-server,
+standardprosjekt, Jira-mønster, lagrede søk, lokale repoer, editorer og
+Copilot-innstillinger (mapper, port, innsamling, innholdsvalg, Jira-mønster og
+IntelliJ-launcher). Lister og editorargumenter redigeres som JSON, for eksempel
+`["/sti/til/repo"]` og `["--new-window", "{path}"]`.
+
+Jira-mønsteret tas i bruk med en gang. Tom verdi gjenoppretter
+`[A-Z][A-Z0-9_]*-[0-9]+`. Øvrige innstillinger tas i bruk etter omstart.
+Miljøvariabler overstyrer filverdiene ved oppstart, så fjern eksempelvis
+`JIRA_PATTERN` for å bruke det lagrede mønsteret. Token settes fortsatt via
+miljøet og lagres ikke av innstillingssiden. Oppgaver, snooze-data, sesjonshistorikk
+og cacher er datafiler og holdes adskilt fra innstillingene.
+
+Eksisterende `repository_paths` og `editors` i config.json beholdes.
+Ved oppstart importeres gammel `jira.json` (eventuelt filen pekt på av
+`JIRA_CONFIG`) automatisk hvis den felles filen ennå ikke har en `jira`-seksjon.
+Originalfilen beholdes. Nye endringer skrives bare til den felles filen.
+
+Eksempel på deler av den felles filen (utelatte felt bruker standardverdier):
 
 ```json
 {
-  "queries": [
-    {
-      "name": "Mine feil",
-      "jql": "assignee = currentUser() AND issuetype = Bug AND statusCategory != Done ORDER BY priority DESC"
-    }
-  ]
+  "repository_paths": ["/sti/til/repo"],
+  "editors": {"default": "vscode"},
+  "jira": {
+    "base_url": "https://jira.example.no",
+    "project": "KAKE",
+    "pattern": "KAKE-[0-9]{3,5}",
+    "queries": [{"name": "Mine feil", "jql": "assignee = currentUser() AND issuetype = Bug"}]
+  },
+  "copilot": {
+    "port": 4318,
+    "enabled": true,
+    "capture_content": true,
+    "show_content": true,
+    "jira_pattern": "KAKE-[0-9]{3,5}"
+  }
 }
 ```
 
@@ -397,6 +434,15 @@ på Linux normalt `~/.config/custom-visning-terminal/copilot.sqlite`). Lagrede s
 inkludert mottatt telemetri, beholdes mellom oppstarter, også om kildefilene fjernes.
 Databasen oppdateres atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
 Lageret er separat fra både GitHub-cachen og den andre appens database.
+
+Hvis appen melder `could not read Copilot store`, viser feilmeldingen hvilken
+fil som ikke kan leses. Filen beholdes urørt. Kontroller filsti og lesetilgang;
+en skadet SQLite-database eller ugyldig/ufullstendig JSON ved import må
+gjenopprettes fra en sikkerhetskopi. For å
+starte med et separat lager uten å endre originalen, sett `COPILOT_STORE_PATH`
+til en ny, absolutt filsti. Lokal sesjonshistorikk importeres på nytt når
+innsamling er aktivert; telemetri som bare finnes i det gamle lageret følger
+ikke med. Gyldige lagre over 128 MiB støttes også.
 
 ### Egen OTLP-mottaker
 
@@ -491,7 +537,7 @@ Code, **3** the configured custom command; **Esc** cancels. **Enter** continues
 to open the PR in your browser. Editor choice in the chooser is for that
 operation; set `editors.default` to persist your preference.
 
-On first startup the app creates a JSON configuration file at
+The shared app configuration (also editable with `,` → Innstillinger) is stored at
 `os.UserConfigDir()/custom-visning/config.json` (normally
 `~/.config/custom-visning/config.json` on Linux or
 `~/Library/Application Support/custom-visning/config.json` on macOS).
@@ -617,5 +663,66 @@ inneholde historiske data og må eventuelt slettes manuelt når importen er kont
 `CUSTOM_VISNING_TASKS` og `COPILOT_STORE_PATH` støtter fortsatt gamle JSON-stier;
 disse peker nå på en SQLite-fil ved siden av JSON-filen. Eksplisitte `.sqlite`,
 `.sqlite3` og `.db`-stier brukes direkte; andre filnavn får `.sqlite` lagt til.
-`config.json`, Jira-konfigurasjonen `jira.json`, miljøvariabler og Copilots
+Konfigurasjonslagringen fra `main` beholdes som JSON. Miljøvariabler og Copilots
 kildeformat (`workspace.yaml`/`events.jsonl`) er uendret.
+
+### Lokal snooze
+
+I navigasjonsmodus starter `z` snooze for valgt PR, Jira-sak eller lokal oppgave.
+Skriv et positivt heltall og avslutt med `h`, `d` eller `D`; dette lagrer straks.
+For eksempel betyr `z12h` tolv faktiske timer fra nå, `z3d` tre kalenderdager
+med samme lokale klokkeslett og `z14D` fjorten kalenderdager fra i dag kl. 06:00.
+Backspace retter tallet. Esc avbryter uten å lagre. Null, ugyldige tall og
+verdier utenfor støttet tidsområde avvises. Ny snooze regnes alltid fra nå.
+
+Listen viser antall utsatte elementer. `Z` åpner **Utsatt**, sortert etter
+tidligste returtidspunkt, også for elementer utenfor gjeldende søkeresultat.
+Der endrer `z` tidspunktet, `u` henter valgt element tilbake, og Esc går tilbake.
+Etter lagring vises faktisk lokal returtid med tidssone og UTC-offset.
+
+Snooze deles mellom alle faner og søk for samme tjeneste/server og URL.
+En oppgaves snooze gjelder bare oppgaven; referansene beholdes og merkes hvis
+referansen selv er utsatt. Oppgaver får en varig lokal ID ved første snooze.
+GitHub og Jira endres aldri. Returtid sjekkes hvert sekund uten nettverkskall;
+utløpte elementer er synlige også etter omstart og beholder vanlig sortering.
+
+Kalenderberegning bruker maskinens lokale tidssone. Ved et manglende klokkeslett
+under sommertidsovergangen flyttes tiden frem med gapet. Ved et klokkeslett som
+forekommer to ganger velges første forekomst. Timer er alltid medgått tid.
+
+Data lagres separat fra nettverkscache i `custom-visning/snooze.json` under
+brukerens konfigurasjonsmappe (`CUSTOM_VISNING_SNOOZE` kan overstyre filstien).
+Filen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
+midlertidig fil med 0600-rettigheter og atomisk rename, med 0700 på nye mapper.
+Lagringsfeil vises, og raden skjules først når lagringen har lykkes. En skadet
+snooze-fil blokkerer nye lagringer til filen er rettet og programmet startet på nytt.
+
+## Send PR-er til Mattermost
+
+Sett `MATTERMOST_WEBHOOK_URL` til en HTTPS incoming-webhook for ønsket kanal.
+Webhook-adressen er en hemmelighet; oppbevar den utenfor kildekoden.
+Installer Neovim, Vim eller vi (appen velger første tilgjengelige i den rekkefølgen).
+
+1. Marker én eller flere PR-er med `Space`, også på tvers av faner og filtre.
+   Uten markering brukes PR-en under markøren.
+2. Trykk `m`. Meldingen åpnes ferdig utfylt som Markdown i Vim/Neovim.
+3. Trykk `i` for å redigere. Bruk `Esc` og `:wq` for å lagre og gå tilbake.
+   `:cq` avbryter redigeringen og beholder forrige utkast.
+4. Se gjennom Markdown-teksten i terminalappen (`j/k` ruller), trykk `e` for
+   å redigere videre, `Ctrl+S` for å sende, eller `Esc` for å avbryte sendingen.
+
+Alle valgte PR-er sendes i **én melding**, med én lenke per linje:
+
+```markdown
+[PR-tittel](https://github.com/owner/repo/pull/123)
+[En annen PR-tittel](https://github.com/owner/repo/pull/124)
+[JIRA-123](https://jira.example.com/browse/JIRA-123)
+```
+
+Jira-lenken legges til én gang nederst når Jira er konfigurert med
+`JIRA_BASE_URL` og `JIRA_TOKEN`, og alle PR-ene har nøyaktig én og samme
+Jira-nøkkel i tittel, beskrivelse eller branchnavn. Ved ulike, manglende eller
+flere Jira-nøkler brukes bare PR-lenkene.
+
+Ved sendefeil beholdes utkastet. Appen forsøker ikke automatisk på nytt;
+ved nettverksfeil bør du sjekke kanalen før du sender igjen.

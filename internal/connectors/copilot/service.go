@@ -13,14 +13,18 @@ import (
 	"sync"
 	"time"
 
+	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type Options struct {
-	SessionRoot, StorePath               string
-	Port                                 int
-	Enabled, CaptureContent, ShowContent bool
-	JiraPattern                          string
+	SessionRoot    string `json:"session_root"`
+	StorePath      string `json:"store_path"`
+	Port           int    `json:"port"`
+	Enabled        bool   `json:"enabled"`
+	CaptureContent bool   `json:"capture_content"`
+	ShowContent    bool   `json:"show_content"`
+	JiraPattern    string `json:"jira_pattern"`
 }
 
 func DefaultOptions() (Options, error) {
@@ -37,6 +41,9 @@ func DefaultOptions() (Options, error) {
 func OptionsFromEnv() (Options, error) {
 	o, err := DefaultOptions()
 	if err != nil {
+		return o, err
+	}
+	if err := appconfig.Section(appconfig.Path(), "copilot", &o); err != nil {
 		return o, err
 	}
 	for key, target := range map[string]*string{"COPILOT_SESSION_ROOT": &o.SessionRoot, "COPILOT_STORE_PATH": &o.StorePath, "COPILOT_JIRA_PATTERN": &o.JiraPattern} {
@@ -91,18 +98,22 @@ func New(o Options) (*Service, error) {
 		return nil, errors.New("invalid COPILOT_JIRA_PATTERN")
 	}
 	s := &Service{options: o, pattern: re, cursors: map[string]*cursor{}, data: diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}}, diagnostics: Diagnostics{SessionRoot: o.SessionRoot, StorePath: storage.Path(o.StorePath), Port: o.Port, CollectionEnabled: o.Enabled, CaptureContent: o.CaptureContent, ShowContent: o.ShowContent}}
+	readPath := o.StorePath
+	if _, statErr := os.Stat(storage.Path(o.StorePath)); statErr == nil {
+		readPath = storage.Path(o.StorePath)
+	}
 	err = storage.Load(o.StorePath, &s.data)
 	if err == nil {
 		if s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
-			return nil, errors.New("unsupported or invalid Copilot store; existing file has been preserved")
+			return nil, storeReadError(readPath, "unsupported or invalid store format")
 		}
 		for _, v := range s.data.Sessions {
 			if v == nil || v.Events == nil || v.Meta == nil {
-				return nil, errors.New("invalid Copilot store")
+				return nil, storeReadError(readPath, "invalid session format")
 			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, errors.New("could not open Copilot store")
+		return nil, storeReadError(readPath, "invalid or unreadable store; check format, path and permissions")
 	}
 	if err == nil {
 		if err = storage.Migrate(o.StorePath, s.data); err != nil {
@@ -111,6 +122,12 @@ func New(o Options) (*Service, error) {
 	}
 	return s, nil
 }
+
+func storeReadError(path, reason string) error {
+	// Do not include decoder errors: they can quote private file contents.
+	return fmt.Errorf("could not read Copilot store %q (%s); existing file has been preserved. Set COPILOT_STORE_PATH to a new absolute path to start with a separate store", path, reason)
+}
+
 func (s *Service) Start(parent context.Context) {
 	s.mu.Lock()
 	if s.started {

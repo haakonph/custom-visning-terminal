@@ -36,7 +36,7 @@ type localStatuses struct {
 }
 
 func (m Model) WithLocal(manager *local.WorktreeManager, editors local.Editors) Model {
-	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: map[string]model.PullRequest{}, statuses: map[string]local.Status{}, preparing: map[string]bool{}}
+	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: m.chosen, statuses: map[string]local.Status{}, preparing: map[string]bool{}}
 	return m
 }
 func (m *Model) refreshLocal() tea.Cmd {

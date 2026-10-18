@@ -44,6 +44,15 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.mattermost != nil && m.mattermost.active {
+		return m.mattermostView()
+	}
+	if m.settings.active {
+		return m.settingsView()
+	}
+	if m.snoozes != nil && m.snoozes.active {
+		return m.snoozeView()
+	}
 	if m.tasks.active {
 		return m.tasksView()
 	}
@@ -52,6 +61,9 @@ func (m Model) View() tea.View {
 	}
 	if m.jiraActive {
 		return m.jiraView()
+	}
+	if m.help {
+		return m.helpView()
 	}
 	lines := []string{}
 	user := m.snapshot.User
@@ -83,6 +95,7 @@ func (m Model) View() tea.View {
 		}
 	}
 	lines = append(lines, strings.Join(tabs, "  "))
+	lines = append(lines, m.snoozeLines()...)
 	if m.relatedKey != "" {
 		lines = append(lines, " Relaterte PR-er: "+m.relatedKey+" · lastede GitHub-visninger · Esc tilbake")
 	}
@@ -127,7 +140,7 @@ func (m Model) View() tea.View {
 		}
 		if len(rows) > 0 {
 			p := rows[m.selected]
-			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(), ", ")+" · l relaterte saker")
+			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
 			detail := fmt.Sprintf(" %d/%d · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), strings.Join(p.RequestedTeams, ", "), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 		}
@@ -164,10 +177,8 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	columns := []column{}
 	number := fmt.Sprintf("#%d", p.Number)
 	title := p.Title
-	if m.local != nil {
-		if _, ok := m.local.chosen[p.Key()]; ok {
-			title = "[✓] " + title
-		}
+	if _, ok := m.chosen[p.Key()]; ok {
+		title = "[✓] " + title
 	}
 	if p.Draft {
 		title = "[draft] " + title
@@ -222,4 +233,21 @@ func age(at time.Time) string {
 		return fmt.Sprintf("%dh", int(elapsed.Hours()))
 	}
 	return fmt.Sprintf("%dd", int(elapsed.Hours()/24))
+}
+
+func (m Model) helpView() tea.View {
+	rows := strings.Split(helpText, "\n")
+	capacity := max(1, m.height-1)
+	start := max(0, min(m.helpOffset, len(rows)-capacity))
+	lines := append([]string{}, rows[start:min(len(rows), start+capacity)]...)
+	if m.height > 1 {
+		lines = append(lines, "j/k ↑/↓ scroll · ? / Esc close")
+	}
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], m.width, "…")
+	}
+	v := tea.NewView(strings.Join(lines, "\n"))
+	v.AltScreen = true
+	v.WindowTitle = "custom-visning · Help"
+	return v
 }
