@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -36,7 +38,14 @@ func runUpdate(ctx context.Context, download bool, input io.Reader, output io.Wr
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(output, "Download %s to the current directory? [y/N] ", asset.Name)
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("could not locate running binary: %w", err)
+	}
+	if executable, err = filepath.EvalSymlinks(executable); err != nil {
+		return fmt.Errorf("could not resolve running binary: %w", err)
+	}
+	fmt.Fprintf(output, "Replace %s with the latest release? [y/N] ", executable)
 	scanner := bufio.NewScanner(input)
 	if !scanner.Scan() {
 		if scanner.Err() != nil {
@@ -50,10 +59,18 @@ func runUpdate(ctx context.Context, download bool, input io.Reader, output io.Wr
 		fmt.Fprintln(output, "Download cancelled.")
 		return nil
 	}
-	path, err := client.Download(ctx, release, asset, ".")
+	tmpDir, err := os.MkdirTemp("", "custom-visning-update-")
+	if err != nil {
+		return fmt.Errorf("could not create update workspace")
+	}
+	defer os.RemoveAll(tmpDir)
+	path, err := client.Download(ctx, release, asset, tmpDir)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(output, "Verified SHA-256; saved %s\nExtract the archive and follow the installation instructions in README.md.\nOn macOS, if quarantined: xattr -d com.apple.quarantine custom-visning\n", path)
+	if err := updater.ReplaceArchive(path, executable); err != nil {
+		return err
+	}
+	fmt.Fprintf(output, "Verified SHA-256 and replaced %s\n", executable)
 	return nil
 }
