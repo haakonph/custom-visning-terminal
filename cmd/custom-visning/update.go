@@ -39,8 +39,12 @@ func runUpdate(ctx context.Context, download bool, input io.Reader, output io.Wr
 		return err
 	}
 	executable, err := os.Executable()
-	if err != nil { return fmt.Errorf("could not locate running binary: %w", err) }
-	if executable, err = filepath.EvalSymlinks(executable); err != nil { return fmt.Errorf("could not resolve running binary: %w", err) }
+	if err != nil {
+		return fmt.Errorf("could not locate running binary: %w", err)
+	}
+	if executable, err = filepath.EvalSymlinks(executable); err != nil {
+		return fmt.Errorf("could not resolve running binary: %w", err)
+	}
 	fmt.Fprintf(output, "Replace %s with the latest release? [y/N] ", executable)
 	scanner := bufio.NewScanner(input)
 	if !scanner.Scan() {
@@ -56,13 +60,17 @@ func runUpdate(ctx context.Context, download bool, input io.Reader, output io.Wr
 		return nil
 	}
 	tmpDir, err := os.MkdirTemp("", "custom-visning-update-")
-	if err != nil { return fmt.Errorf("could not create update workspace") }
+	if err != nil {
+		return fmt.Errorf("could not create update workspace")
+	}
 	defer os.RemoveAll(tmpDir)
 	path, err := client.Download(ctx, release, asset, tmpDir)
 	if err != nil {
 		return err
 	}
-	if err := updater.ReplaceArchive(path, executable); err != nil { return err }
+	if err := updater.ReplaceArchive(path, executable); err != nil {
+		return err
+	}
 	fmt.Fprintf(output, "Verified SHA-256 and replaced %s\n", executable)
 	return nil
 }
