@@ -15,7 +15,25 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if handled, cmd := m.snoozeMessage(msg); handled { return m, cmd }
+	if m.help && !m.tasks.active && !m.jiraActive && !m.copilotActive {
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			switch key.String() {
+			case "esc", "?":
+				m.help = false
+			case "j", "down":
+				m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(helpText, "\n"))-max(1, m.height-1)))
+			case "k", "up":
+				m.helpOffset = max(0, m.helpOffset-1)
+			case "q", "ctrl+c":
+				m.cancel()
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+	}
+	if handled, cmd := m.snoozeMessage(msg); handled {
+		return m, cmd
+	}
 	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
@@ -68,6 +86,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch key.String() {
 			case "T":
 				m.tasks.active = true
+				m.tasks.selectVisible()
 				return m, nil
 			case "t", "a":
 				return m.collectTask(key.String() == "t")
@@ -257,6 +276,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = 0
 		case "?":
 			m.help = !m.help
+			m.helpOffset = 0
 		case "enter":
 			rows := m.filtered()
 			if len(rows) == 0 {
@@ -279,7 +299,9 @@ func (m Model) filtered() []model.PullRequest {
 	}
 	visible := make([]model.PullRequest, 0, len(rows))
 	for _, p := range rows {
-		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) { visible = append(visible, p) }
+		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) {
+			visible = append(visible, p)
+		}
 	}
 	rows = visible
 	filter := strings.ToLower(strings.TrimSpace(m.input.Value()))

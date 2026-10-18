@@ -16,7 +16,7 @@ import (
 )
 
 type taskState struct {
-	snoozes *snoozeState
+	snoozes            *snoozeState
 	items              []model.Task
 	active             bool
 	selected, row      int
@@ -137,6 +137,9 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 
 func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := &m.tasks
+	if !t.editing && !t.searching {
+		t.selectVisible()
+	}
 	k := key.String()
 	if k == "ctrl+c" {
 		m.cancel()
@@ -287,7 +290,9 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (t taskState) visibleTasks() []int {
 	var indices []int
 	for i, task := range t.items {
-		if task.ID != "" && t.snoozes.hidden("task:"+task.ID) { continue }
+		if task.ID != "" && t.snoozes.hidden("task:"+task.ID) {
+			continue
+		}
 		text := task.Title
 		for _, ref := range task.References {
 			text += " " + ref.Key + " " + ref.Title

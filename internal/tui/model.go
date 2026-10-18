@@ -14,7 +14,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
-	snoozes *snoozeState
+	snoozes         *snoozeState
 	tasks           taskState
 	copilot         *copilotState
 	copilotActive   bool
@@ -32,6 +32,7 @@ type Model struct {
 	width, height   int
 	input           textinput.Model
 	filtering, help bool
+	helpOffset      int
 	booting         bool
 	loading         [model.ViewCount]bool
 	warnings        [model.ViewCount]string

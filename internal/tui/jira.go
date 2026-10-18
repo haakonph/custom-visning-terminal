@@ -15,7 +15,7 @@ import (
 )
 
 type jiraState struct {
-	snoozes *snoozeState
+	snoozes               *snoozeState
 	client                *jira.Client
 	config                jira.Config
 	configPath            string
@@ -107,7 +107,9 @@ func (m *Model) refreshJira() tea.Cmd {
 func (j *jiraState) filtered() []jira.Issue {
 	visible := make([]jira.Issue, 0, len(j.rows))
 	for _, r := range j.rows {
-		if !j.snoozes.hidden(snooze.Identity("jira", r.URL)) { visible = append(visible, r) }
+		if !j.snoozes.hidden(snooze.Identity("jira", r.URL)) {
+			visible = append(visible, r)
+		}
 	}
 	if j.mode != "local" && j.input.Prompt != "/ " {
 		return visible
