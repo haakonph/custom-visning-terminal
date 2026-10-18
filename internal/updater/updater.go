@@ -1,7 +1,9 @@
-// Package updater checks and downloads releases without modifying the running binary.
+// Package updater checks, downloads, and installs releases.
 package updater
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -165,4 +167,36 @@ func (c *Client) Download(ctx context.Context, release Release, asset Asset, dir
 		return "", errors.New("could not save verified archive; check directory permissions and remove any existing archive")
 	}
 	return destination, nil
+}
+
+// ReplaceArchive extracts the release binary and atomically replaces target.
+func ReplaceArchive(archivePath, target string) error {
+	f, err := os.Open(archivePath)
+	if err != nil { return errors.New("could not open verified update") }
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil { return errors.New("invalid release archive") }
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	var data []byte
+	for {
+		h, err := tr.Next()
+		if err == io.EOF { break }
+		if err != nil { return errors.New("could not read release archive") }
+		if h.Name == "custom-visning" {
+			if !h.FileInfo().Mode().IsRegular() || h.Size <= 0 || h.Size > maxArchive { return errors.New("release archive contains an invalid binary") }
+			data, err = io.ReadAll(io.LimitReader(tr, h.Size+1))
+			if err != nil || int64(len(data)) != h.Size { return errors.New("could not extract release binary") }
+		}
+	}
+	if len(data) == 0 { return errors.New("release archive has no custom-visning binary") }
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".custom-visning-install-*")
+	if err != nil { return errors.New("could not create replacement binary") }
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0755); err != nil { tmp.Close(); return errors.New("could not set replacement permissions") }
+	if _, err := tmp.Write(data); err != nil { tmp.Close(); return errors.New("could not write replacement binary") }
+	if err := tmp.Close(); err != nil { return errors.New("could not finish replacement binary") }
+	if err := os.Rename(tmpName, target); err != nil { return errors.New("could not replace running binary; check permissions") }
+	return nil
 }

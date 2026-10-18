@@ -77,12 +77,10 @@ custom-visning --update
 ```
 
 `--check-update` viser installert versjon og siste stabile release. `--update`
-spør før den laster ned arkivet for maskinens operativsystem og arkitektur til
-arbeidsmappen. Bare macOS arm64 har publiserte releasearkiver foreløpig.
-Arkivet kontrolleres mot SHA-256 i releasens `checksums.txt` før det lagres.
-Eksisterende filer overskrives ikke, og ufullstendige eller avviste nedlastinger
-fjernes. Pakk ut og installer arkivet som beskrevet over; programmet erstatter
-ikke sin egen kjørende binær. Kommandoene starter ikke dashboardet.
+spør før den laster ned, verifiserer og erstatter den kjørende binæren,
+uavhengig av hvilken mappe kommandoen startes fra. Bare macOS arm64 har
+publiserte releasearkiver foreløpig. Midlertidige filer fjernes etterpå, også
+ved feil. Kommandoene starter ikke dashboardet.
 
 Oppdateringer bruker et eget token fra **`CUSTOM_VISNING_UPDATE_TOKEN`**.
 Sett det i miljøet via din vanlige lokale hemmelighetshåndtering. Tokenet trenger
