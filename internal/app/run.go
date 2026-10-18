@@ -23,6 +23,13 @@ func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	return RunProviders(ctx, stderr, startJira, false)
 }
 func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error {
+	if err := jira.Migrate(); err != nil {
+		return fmt.Errorf("configuration migration: %w", err)
+	}
+	jiraConfig, configErr := jira.LoadConfig(jira.ConfigPath())
+	if configErr != nil {
+		return configErr
+	}
 	var jiraPattern *regexp.Regexp
 	if value := os.Getenv("JIRA_PATTERN"); value != "" {
 		var err error
@@ -52,8 +59,12 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 
 	var jiraClient *jira.Client
 	var jiraErr error
-	if startJira || os.Getenv("JIRA_BASE_URL") != "" || os.Getenv("JIRA_TOKEN") != "" {
-		jiraClient, jiraErr = jira.New(os.Getenv("JIRA_BASE_URL"), os.Getenv("JIRA_TOKEN"))
+	baseURL := jiraConfig.BaseURL
+	if value := os.Getenv("JIRA_BASE_URL"); value != "" {
+		baseURL = value
+	}
+	if startJira || baseURL != "" || os.Getenv("JIRA_TOKEN") != "" {
+		jiraClient, jiraErr = jira.New(baseURL, os.Getenv("JIRA_TOKEN"))
 	}
 
 	token, err := github.Token(ctx)

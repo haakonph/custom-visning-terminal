@@ -51,7 +51,10 @@ func (m Model) WithJira(client *jira.Client, direct bool) Model {
 	path := jira.ConfigPath()
 	config, err := jira.LoadConfig(path)
 	state := &jiraState{snoozes: m.snoozes, client: client, config: config, configPath: path, configOK: err == nil, input: input}
-	state.filters.Project = os.Getenv("JIRA_PROJECT")
+	state.filters.Project = config.Project
+	if value := os.Getenv("JIRA_PROJECT"); value != "" {
+		state.filters.Project = value
+	}
 	state.tabs = []jira.Query{
 		{Name: "Mine", JQL: "assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC"},
 		{Name: "Prosjekt", JQL: "statusCategory != Done ORDER BY priority DESC, updated DESC"},
@@ -391,7 +394,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, "P Jira-mønster · T oppgaver · t ny fra valgt · a legg til · l relaterte PR-er · g GitHub · J Jira · c Copilot · 1–9 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
+	lines = append(lines, ", innstillinger · T oppgaver · t ny fra valgt · a legg til · l relaterte PR-er · g GitHub · J Jira · c Copilot · 1–9 / Tab faner · j/k velg · Enter åpne · / lokalt søk · f filtre · : JQL · s lagre · x nullstill · r hent · ? hjelp · q avslutt")
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

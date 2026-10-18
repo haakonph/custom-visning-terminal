@@ -301,30 +301,50 @@ Full beskrivelse finnes via Enter i Jira.
 PR-tittel, beskrivelse og branchnavn, både i detaljvisningen og ved navigasjon
 mellom relaterte PR-er og Jira-saker. Eksemplet over godtar `KAKE-123` til
 `KAKE-12345`, men ikke 2 eller 6 sifre, andre prefikser eller treff inni ord.
-Trykk `P` (Shift+p) i GitHub- eller Jira-visningen for å endre mønsteret i appen.
-`Enter` lagrer i `jira.json` og tar endringen i bruk med en gang; `Esc` avbryter.
-Tom verdi gjenoppretter standardmønsteret `[A-Z][A-Z0-9_]*-[0-9]+`.
-Ugyldige uttrykk vises som feil og lagres ikke. Lagrede søk beholdes.
-Ved oppstart brukes `JIRA_PATTERN` hvis den er satt til en ikke-tom verdi,
-ellers feltet `pattern` fra konfigurasjonsfilen, ellers standardmønsteret.
-For at appens lagrede valg skal brukes ved neste oppstart, fjern eventuell
-`JIRA_PATTERN` fra miljøet. Ugyldig miljøvariabel gir oppstartsfeil.
-For samme mønster i Copilot, sett også
-`COPILOT_JIRA_PATTERN='KAKE-[0-9]{3,5}'`.
+Trykk `,` for å åpne **Innstillinger** fra GitHub, Jira eller Copilot.
+`P` fungerer også fra GitHub og Jira. Velg felt med ↑/↓ eller j/k og trykk
+Enter for å redigere. Enter validerer og lagrer feltet; Esc avbryter redigering,
+og Esc på innstillingssiden går tilbake til forrige visning.
 
-Lagrede søk ligger i `filepath.Join(os.UserConfigDir(), "custom-visning", "jira.json")`.
-Bruk `JIRA_CONFIG` for å velge en annen fil. Tokenet lagres aldri i denne filen.
-Slett eller endre søk ved å redigere filen og starte appen på nytt:
+Alle appinnstillinger ligger i én fil:
+`os.UserConfigDir()/custom-visning/config.json`. Bruk `CUSTOM_VISNING_CONFIG`
+for å velge en annen fil. Siden viser filstien og felter for Jira-server,
+standardprosjekt, Jira-mønster, lagrede søk, lokale repoer, editorer og
+Copilot-innstillinger (mapper, port, innsamling, innholdsvalg, Jira-mønster og
+IntelliJ-launcher). Lister og editorargumenter redigeres som JSON, for eksempel
+`["/sti/til/repo"]` og `["--new-window", "{path}"]`.
+
+Jira-mønsteret tas i bruk med en gang. Tom verdi gjenoppretter
+`[A-Z][A-Z0-9_]*-[0-9]+`. Øvrige innstillinger tas i bruk etter omstart.
+Miljøvariabler overstyrer filverdiene ved oppstart, så fjern eksempelvis
+`JIRA_PATTERN` for å bruke det lagrede mønsteret. Token settes fortsatt via
+miljøet og lagres ikke av innstillingssiden. Oppgaver, snooze-data, sesjonshistorikk
+og cacher er datafiler og holdes adskilt fra innstillingene.
+
+Eksisterende `repository_paths` og `editors` i config.json beholdes.
+Ved oppstart importeres gammel `jira.json` (eventuelt filen pekt på av
+`JIRA_CONFIG`) automatisk hvis den felles filen ennå ikke har en `jira`-seksjon.
+Originalfilen beholdes. Nye endringer skrives bare til den felles filen.
+
+Eksempel på deler av den felles filen (utelatte felt bruker standardverdier):
 
 ```json
 {
-  "pattern": "KAKE-[0-9]{3,5}",
-  "queries": [
-    {
-      "name": "Mine feil",
-      "jql": "assignee = currentUser() AND issuetype = Bug AND statusCategory != Done ORDER BY priority DESC"
-    }
-  ]
+  "repository_paths": ["/sti/til/repo"],
+  "editors": {"default": "vscode"},
+  "jira": {
+    "base_url": "https://jira.example.no",
+    "project": "KAKE",
+    "pattern": "KAKE-[0-9]{3,5}",
+    "queries": [{"name": "Mine feil", "jql": "assignee = currentUser() AND issuetype = Bug"}]
+  },
+  "copilot": {
+    "port": 4318,
+    "enabled": true,
+    "capture_content": true,
+    "show_content": true,
+    "jira_pattern": "KAKE-[0-9]{3,5}"
+  }
 }
 ```
 
@@ -508,7 +528,7 @@ Code, **3** the configured custom command; **Esc** cancels. **Enter** continues
 to open the PR in your browser. Editor choice in the chooser is for that
 operation; set `editors.default` to persist your preference.
 
-On first startup the app creates a JSON configuration file at
+The shared app configuration (also editable with `,` → Innstillinger) is stored at
 `os.UserConfigDir()/custom-visning/config.json` (normally
 `~/.config/custom-visning/config.json` on Linux or
 `~/Library/Application Support/custom-visning/config.json` on macOS).

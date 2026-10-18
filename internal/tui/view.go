@@ -44,8 +44,8 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
-	if m.patternSettings.active {
-		return m.patternSettingsView()
+	if m.settings.active {
+		return m.settingsView()
 	}
 	if m.snoozes != nil && m.snoozes.active {
 		return m.snoozeView()

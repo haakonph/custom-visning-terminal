@@ -15,7 +15,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
-	patternSettings patternSettings
+	settings        settingsState
 	snoozes         *snoozeState
 	tasks           taskState
 	copilot         *copilotState
