@@ -44,6 +44,7 @@ type Model struct {
 	notice          string
 	saving, dirty   bool
 	open            func(context.Context, string) error
+	version         string
 }
 type bootMsg struct {
 	snapshot model.Snapshot
@@ -148,5 +149,10 @@ func (m Model) WithJiraPattern(pattern *regexp.Regexp) Model {
 	if pattern != nil {
 		m.jiraPattern = pattern
 	}
+	return m
+}
+
+func (m Model) WithVersion(version string) Model {
+	m.version = version
 	return m
 }
