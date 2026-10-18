@@ -134,7 +134,7 @@ func TestBootstrapLoadsCacheBeforeRefresh(t *testing.T) {
 	source := &fakeSource{}
 	m := New(context.Background(), source, store)
 	defer m.cancel()
-	msg := m.Init()()
+	msg := m.bootstrap()()
 	m, cmd := update(m, msg)
 	if cmd == nil || len(m.filtered()) != 1 || source.calls != 0 || m.snapshot.User != "alice" {
 		t.Fatal("cache was not displayed before API refresh")
@@ -149,7 +149,7 @@ func TestBootstrapErrorAndRetry(t *testing.T) {
 	source := &fakeSource{err: errors.New("auth missing")}
 	m := New(context.Background(), source, nil)
 	defer m.cancel()
-	m, _ = update(m, m.Init()())
+	m, _ = update(m, m.bootstrap()())
 	if m.notice != "auth missing" || m.booting {
 		t.Fatal("auth error missing")
 	}
@@ -228,7 +228,7 @@ func TestOfflineStartupUsesCredentialScopedCache(t *testing.T) {
 	source := &fakeSource{err: errors.New("offline")}
 	m := New(context.Background(), source, store)
 	defer m.cancel()
-	msg := m.Init()().(bootMsg)
+	msg := m.bootstrap()().(bootMsg)
 	if msg.err != nil || msg.snapshot.User != "alice" || len(msg.snapshot.Datasets[0].PRs) != 1 {
 		t.Fatalf("offline cache unavailable: %+v", msg)
 	}

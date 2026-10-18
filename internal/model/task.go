@@ -3,6 +3,7 @@ package model
 // Task is a user-defined workspace, independent of ownership and provider status.
 // References are explicit: a task can wrap one item or collect several providers.
 type Task struct {
+	ID string `json:"id,omitempty"`
 	Title      string          `json:"title"`
 	References []TaskReference `json:"references"`
 }

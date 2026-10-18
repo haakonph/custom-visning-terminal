@@ -44,6 +44,7 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.snoozes != nil && m.snoozes.active { return m.snoozeView() }
 	if m.tasks.active {
 		return m.tasksView()
 	}
@@ -83,6 +84,7 @@ func (m Model) View() tea.View {
 		}
 	}
 	lines = append(lines, strings.Join(tabs, "  "))
+	lines = append(lines, m.snoozeLines()...)
 	if m.relatedKey != "" {
 		lines = append(lines, " Relaterte PR-er: "+m.relatedKey+" · lastede GitHub-visninger · Esc tilbake")
 	}

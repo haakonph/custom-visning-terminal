@@ -11,9 +11,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.snoozeMessage(msg); handled { return m, cmd }
 	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
@@ -275,6 +277,11 @@ func (m Model) filtered() []model.PullRequest {
 	if m.relatedKey != "" {
 		rows = m.relatedPRs(m.relatedKey)
 	}
+	visible := make([]model.PullRequest, 0, len(rows))
+	for _, p := range rows {
+		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) { visible = append(visible, p) }
+	}
+	rows = visible
 	filter := strings.ToLower(strings.TrimSpace(m.input.Value()))
 	if filter == "" {
 		return rows
