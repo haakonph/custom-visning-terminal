@@ -55,12 +55,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key, ok := msg.(tea.KeyPressMsg); ok {
+		if m.tasks.active {
+			return m.updateTasks(key)
+		}
 		editing := m.filtering
 		if m.jiraActive {
 			editing = m.jira.mode != ""
 		}
 		if !editing {
 			switch key.String() {
+			case "T":
+				m.tasks.active = true
+				return m, nil
+			case "t", "a":
+				return m.collectTask(key.String() == "t")
 			case "c":
 				return m.switchCopilot()
 			case "l":
@@ -71,6 +79,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.switchProvider(true)
 			}
 		}
+	}
+	if m.tasks.active && (m.tasks.editing || m.tasks.searching) {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, openMsg:
+		default:
+			var cmd tea.Cmd
+			m.tasks.input, cmd = m.tasks.input.Update(msg)
+			if m.tasks.searching {
+				m.tasks.query = m.tasks.input.Value()
+				m.tasks.selectVisible()
+			}
+			return m, cmd
+		}
+	}
+	if result, ok := msg.(openMsg); ok && m.tasks.active {
+		if result.err != nil {
+			m.tasks.notice = "Kunne ikke åpne referansen: " + result.err.Error()
+		}
+		return m, nil
 	}
 	if _, ok := msg.(jiraResult); ok {
 		return m.updateJira(msg)
@@ -89,6 +116,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = max(1, msg.Width)
 		m.height = max(1, msg.Height)
 		m.input.SetWidth(max(1, m.width-4))
+		m.tasks.input.SetWidth(max(1, m.width-10))
 		if m.copilot != nil {
 			m.copilot.input.SetWidth(max(1, m.width-4))
 		}

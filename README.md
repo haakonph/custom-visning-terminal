@@ -321,6 +321,43 @@ Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
 Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
 
 
+## Oppgaver (fleksibelt konsept)
+
+En oppgave er en lokal samling av eksplisitte referanser. Den kan være en tynn
+wrapper rundt én Jira-sak eller PR, inkludert en PR fra review-fanene, eller samle
+flere Jira-saker og PR-er på tvers av repoer. Den har egen tittel og trenger ingen
+Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
+
+- `t` i Jira/GitHub lager en oppgave fra valgt rad og åpner oppgavesiden.
+- `T` åpner oppgavesiden; `j/k` velger oppgave i listen; `Tab` / `Shift+Tab` blar mellom oppgavene.
+  På brede terminaler vises oppgavelisten til venstre og detaljene til høyre.
+  På smale terminaler bytter du mellom liste og detaljer.
+- `/` søker i oppgavetitler og tilknyttede referanser. `Enter` beholder søket,
+  `Esc` nullstiller det.
+- `Enter` / høyrepil går fra listen til referansene. Venstrepil / `Esc` går tilbake
+  til listen. I detaljene velger `j/k` referanse og `Enter` åpner den.
+- `g` / `J` går til GitHub/Jira. Finn en rad og trykk `a` for å legge den til
+  oppgaven du sist valgte. Samme referanse legges ikke til to ganger.
+- `n` lager en tom oppgave, `e` redigerer tittelen, `Enter` lagrer og `Esc` avbryter
+  tittelredigeringen. En tom oppgave kan fylles ut senere.
+- `d` fjerner valgt kobling.
+  `D` sletter den valgte lokale oppgaven.
+- `T` går tilbake til forrige provider-visning. `Esc` går først til listen,
+  deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
+
+Oppgavene lagres atomisk i `custom-visning/tasks.json` under operativsystemets
+konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS`). Filen er lokal for
+OS-brukeren og deles mellom appens GitHub/Jira-kontoer; den inneholder titler og
+lenker, ingen tokens. Ta vare på filen som brukerdata, ikke som cache.
+
+Oppgavesiden bruker ferske titler, Jira-status og PR review/CI fra data som allerede
+er lastet i appen. Ellers vises lagret referanse. Den henter ikke alle referanser
+separat og utleder ingen samlet status eller automatisk gruppering. Dette holder
+første versjon åpen for videre konseptarbeid; referansenes `provider`, `url`, `key`,
+`title` og valgfri `role` er adskilt fra oppgavens egen tittel. Review-rollen settes
+når PR-en legges til fra en review-fane og er oppgavens kontekst, ikke en live
+reviewforespørsel.
+
 ## Copilot-sesjoner
 
 Terminalappen samler inn Copilot-data selv. Start med `custom-visning -copilot`
@@ -426,6 +463,7 @@ installasjonssti kan du sette `COPILOT_IDEA_COMMAND` til launcherens filsti, for
 eksempel `COPILOT_IDEA_COMMAND="/path with spaces/idea"`. Verdien er ett kjørbart
 program uten kommandolinjeflagg. Prosjektstien sendes som ett separat argument,
 uten shell. Manglende prosjektmappe eller launcher vises som en melding i appen.
+
 ## PR worktrees and editors
 
 Press **Space** to toggle PR selection. Selection survives filters, tabs and
