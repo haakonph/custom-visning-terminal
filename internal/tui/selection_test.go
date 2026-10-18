@@ -11,8 +11,11 @@ import (
 )
 
 func chooseAll(m Model) Model {
-	for _, p := range m.filtered() {
-		m.chosen[p.Key()] = p
+	for i := 0; i < len(m.filtered()); i++ {
+		m, _ = update(m, key(' '))
+		if i+1 < len(m.filtered()) {
+			m, _ = update(m, key('j'))
+		}
 	}
 	return m
 }
