@@ -435,6 +435,14 @@ inkludert mottatt telemetri, beholdes mellom oppstarter, også om kildefilene fj
 Filen erstattes atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
 Lageret er separat fra både GitHub-cachen og den andre appens database.
 
+Hvis appen melder `could not read Copilot store`, viser feilmeldingen hvilken
+fil som ikke kan leses. Filen beholdes urørt. Kontroller filsti og lesetilgang;
+ugyldig eller ufullstendig JSON må gjenopprettes fra en sikkerhetskopi. For å
+starte med et separat lager uten å endre originalen, sett `COPILOT_STORE_PATH`
+til en ny, absolutt filsti. Lokal sesjonshistorikk importeres på nytt når
+innsamling er aktivert; telemetri som bare finnes i det gamle lageret følger
+ikke med. Gyldige lagre over 128 MiB støttes også.
+
 ### Egen OTLP-mottaker
 
 Mens terminalappen kjører, mottar den også OTLP på `127.0.0.1:4318`, via
