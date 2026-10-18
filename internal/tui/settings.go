@@ -45,6 +45,8 @@ var settingFields = []settingField{
 
 type settingsState struct {
 	active, editing bool
+	help            bool
+	helpOffset      int
 	selected        int
 	input           textinput.Model
 	notice          string
@@ -239,11 +241,31 @@ func saveSetting(field settingField, text string) error {
 func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 	s := &m.settings
 	if key, ok := msg.(tea.KeyPressMsg); ok {
+		if s.help && key.String() != "ctrl+c" && key.String() != "esc" {
+			switch key.String() {
+			case "?":
+				s.help = false
+			case "j", "down":
+				lines := strings.Split(ansi.Wrap(strings.Join(settingsTokenHelp, "\n"), max(1, m.width), ""), "\n")
+				s.helpOffset = min(s.helpOffset+1, max(0, len(lines)-max(1, m.height-4)))
+			case "k", "up":
+				s.helpOffset = max(0, s.helpOffset-1)
+			}
+			return m, nil
+		}
+		if !s.editing && key.String() == "?" {
+			s.help, s.helpOffset = true, 0
+			return m, nil
+		}
 		switch key.String() {
 		case "ctrl+c":
 			m.cancel()
 			return m, tea.Quit
 		case "esc":
+			if s.help {
+				s.help = false
+				return m, nil
+			}
 			if s.editing {
 				s.editing = false
 				s.input.Blur()
@@ -306,9 +328,48 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+var settingsTokenHelp = []string{
+	"Tokenene leses ved oppstart. Start appen på nytt etter oppsett.",
+	"GitHub: Logg inn med GitHub CLI:",
+	"  gh auth login --hostname github.com",
+	"  gh auth refresh --hostname github.com -s repo -s read:org",
+	"Autoriser SAML SSO hvis organisasjonen krever det.",
+	"Alternativ: sett GITHUB_TOKEN til et PAT med tilsvarende tilgang.",
+	"GITHUB_TOKEN overstyrer CLI-innlogging. Fjern med: unset GITHUB_TOKEN",
+	"",
+	"Jira: Opprett et personlig tilgangstoken (PAT) i Jira-profilen.",
+	"Administrator må ha tillatt PAT. Appen bruker Bearer-token / REST API v2.",
+	"Sett Jira · serveradresse til f.eks. https://jira.example.no/jira",
+	"Sett JIRA_TOKEN til PAT-et via din hemmelighetshåndtering.",
+	"Bash: Les inn token uten å vise det eller lagre det i shell-historikken:",
+	`  read -rsp 'Jira PAT: ' JIRA_TOKEN; echo; export JIRA_TOKEN`,
+	"Kjør custom-visning --jira fra samme terminal.",
+	"Samme Bash-kommando kan brukes med GITHUB_TOKEN i stedet for JIRA_TOKEN.",
+	"",
+	"Mattermost: Opprett en incoming-webhook for ønsket kanal.",
+	"Sett MATTERMOST_WEBHOOK_URL til hele HTTPS-adressen via samme metode.",
+	"Webhook-adressen inneholder en hemmelighet og behandles som et token.",
+	"",
+	"Miljøvariabler gjelder prosessen som starter appen; bruk samme terminal.",
+	"Ikke legg token i config.json eller kildekoden. Hjelpen viser aldri tokenverdier.",
+}
+
 func (m Model) settingsView() tea.View {
 	s := m.settings
 	lines := []string{accent.Render(" INNSTILLINGER"), "Felles konfigurasjon: " + clean(appconfig.Path()), ""}
+	if s.help {
+		lines = []string{accent.Render(" TOKENHJELP"), ""}
+		wrapped := strings.Split(ansi.Wrap(strings.Join(settingsTokenHelp, "\n"), max(1, m.width), ""), "\n")
+		capacity := max(1, m.height-4)
+		start := min(s.helpOffset, max(0, len(wrapped)-capacity))
+		lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
+		lines = append(lines, "", "↑/↓ eller j/k rull · ?/Esc tilbake")
+		view := tea.NewView(strings.Join(lines, "\n"))
+		view.AltScreen = true
+		view.WindowTitle = "custom-visning · Tokenhjelp"
+		return view
+	}
 	capacity := max(1, m.height-12)
 	start := max(0, s.selected-capacity+1)
 	for i := start; i < min(len(settingFields), start+capacity); i++ {
@@ -325,10 +386,13 @@ func (m Model) settingsView() tea.View {
 	if s.editing {
 		lines = append(lines, "", settingFields[s.selected].label, s.input.View())
 	}
+	if settingFields[s.selected].path == "jira.base_url" {
+		lines = append(lines, "Eksempel: https://jira.example.no/jira (inkluder eventuell /jira-sti)")
+	}
 	if s.selected == 0 {
 		lines = append(lines, "Eksempel: KAKE-[0-9]{3,5} · tom verdi bruker standardmønsteret")
 	}
-	lines = append(lines, warning.Render(clean(s.notice)), "Miljøvariabler overstyrer filen ved oppstart. Token settes i miljøet.", "↑/↓ eller j/k velg · Enter rediger/lagre · Esc avbryt/tilbake")
+	lines = append(lines, warning.Render(clean(s.notice)), "Miljøvariabler overstyrer filen ved oppstart. Token settes i miljøet.", "? tokenhjelp · ↑/↓ eller j/k velg · Enter rediger/lagre · Esc tilbake")
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

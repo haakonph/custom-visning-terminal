@@ -165,3 +165,32 @@ func TestSettingsFromCopilotAndTypingComma(t *testing.T) {
 		t.Fatal("intercepted filter input")
 	}
 }
+
+func TestSettingsTokenHelpNavigation(t *testing.T) {
+	m := jiraModel(t)
+	defer m.cancel()
+	m, _ = update(m, key(','))
+	m.width, m.height = 60, 12
+	m.settings.selected = 1
+	m, _ = update(m, key('?'))
+	if !m.settings.help || m.settings.editing {
+		t.Fatal("token help did not open")
+	}
+	m, _ = update(m, key('j'))
+	if m.settings.helpOffset != 1 || m.settings.selected != 1 {
+		t.Fatal("help scrolling changed selected setting")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.settings.editing {
+		t.Fatal("help allowed editing")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.settings.help || !m.settings.active {
+		t.Fatal("escape did not return to settings")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = update(m, key('?'))
+	if m.settings.help || !strings.Contains(m.settings.input.Value(), "?") {
+		t.Fatal("help intercepted editing input")
+	}
+}

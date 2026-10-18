@@ -357,7 +357,9 @@ IntelliJ-launcher). Lister og editorargumenter redigeres som JSON, for eksempel
 Jira-mønsteret tas i bruk med en gang. Tom verdi gjenoppretter
 `[A-Z][A-Z0-9_]*-[0-9]+`. Øvrige innstillinger tas i bruk etter omstart.
 Miljøvariabler overstyrer filverdiene ved oppstart, så fjern eksempelvis
-`JIRA_PATTERN` for å bruke det lagrede mønsteret. Token settes fortsatt via
+`JIRA_PATTERN` for å bruke det lagrede mønsteret. Trykk `?` i innstillingssiden for rullbar hjelp til GitHub-innlogging, Jira-PAT
+og Mattermost-webhook, inkludert trygg innlesing i Bash. Jira-serverfeltet viser
+eksempeladressen `https://jira.example.no/jira`. Token settes fortsatt via
 miljøet og lagres ikke av innstillingssiden. Oppgaver, snooze-data, sesjonshistorikk
 og cacher er datafiler og holdes adskilt fra innstillingene.
 
