@@ -156,6 +156,41 @@ erDiagram
         TEXT path
         TEXT head
     }
+    mattermost_accounts {
+        TEXT server PK
+        TEXT user_id PK
+    }
+    mattermost_channels {
+        TEXT server PK,FK
+        TEXT user_id PK,FK
+        TEXT id PK
+        TEXT team_id
+        TEXT name
+        TEXT display_name
+        INTEGER selected
+        INTEGER synced_at
+        INTEGER read_at
+        INTEGER last_sync_at
+    }
+    mattermost_posts {
+        TEXT server PK,FK
+        TEXT user_id PK,FK
+        TEXT id PK
+        TEXT channel_id FK
+        TEXT root_id
+        TEXT sender_id
+        TEXT author
+        TEXT message
+        INTEGER created_at
+        INTEGER updated_at
+        INTEGER deleted_at
+    }
+    mattermost_pr_mentions {
+        TEXT server PK,FK
+        TEXT user_id PK,FK
+        TEXT post_id PK,FK
+        TEXT pr_url PK
+    }
     schema_migrations {
         INTEGER version PK
     }
@@ -201,6 +236,9 @@ erDiagram
     jira_issues |o..o{ jira_labels : fk_0
     jira_issues |o..o{ jira_query_memberships : fk_0
     jira_queries |o..o{ jira_query_memberships : fk_1
+    mattermost_accounts |o..o{ mattermost_channels : fk_0
+    mattermost_channels |o..o{ mattermost_posts : fk_0
+    mattermost_posts |o..o{ mattermost_pr_mentions : fk_0
     accounts |o..o{ sync_state : fk_0
     tasks |o..o{ task_references : fk_0
 ```

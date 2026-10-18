@@ -24,7 +24,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go test ./...
+      - name: Unit and provider integration tests (mocked APIs, including Mattermost)
+        run: go test ./...
       - run: go test -race ./...
   analysis:
     name: Static analysis

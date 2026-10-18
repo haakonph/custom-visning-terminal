@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	tea "charm.land/bubbletea/v2"
@@ -38,6 +39,10 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		if err != nil {
 			return fmt.Errorf("invalid JIRA_PATTERN: %w", err)
 		}
+	}
+	mmConfig, mmErr := mattermost.LoadConfig()
+	if mmErr != nil {
+		return mmErr
 	}
 	copilotOptions, copilotErr := copilot.OptionsFromEnv()
 	if copilotErr != nil {
@@ -71,8 +76,11 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	token, err := github.Token(ctx)
 	if err != nil {
 		if jiraClient != nil {
-			_, runErr := tea.NewProgram(tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithJira(jiraClient, true).WithCopilot(copilotClient, false), tea.WithContext(ctx)).Run()
+			runErr := runDashboard(ctx, tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithJira(jiraClient, true).WithCopilot(copilotClient, false))
 			return runErr
+		}
+		if mmConfig.Server != "" {
+			return runDashboard(ctx, tui.New(ctx, nil, nil).WithCopilot(copilotClient, false))
 		}
 		return errors.Join(err, jiraErr)
 	}
@@ -117,11 +125,38 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	if jiraClient != nil {
 		dashboard = dashboard.WithJira(jiraClient, startJira)
 	}
-	_, err = tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
-	return err
+	return runDashboard(ctx, dashboard)
 }
 
 func runDashboard(ctx context.Context, dashboard tui.Model) error {
-	_, err := tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
+	mmConfig, err := mattermost.LoadConfig()
+	if err != nil {
+		return err
+	}
+	if mmConfig.Server != "" {
+		if mmConfig.Username == "" {
+			return errors.New("MATTERMOST_USERNAME or mattermost.username in config.json is required")
+		}
+		api, err := mattermost.NewAPI(mmConfig.Server)
+		if err != nil {
+			return err
+		}
+		api.ExpectAccount(mmConfig.Username)
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(cacheDir, "custom-visning", "mattermost.sqlite")
+		service, err := mattermost.OpenService(api, path, mmConfig.Server, mmConfig.Username)
+		if err != nil {
+			return fmt.Errorf("Mattermost cache: %w", err)
+		}
+		if err = mattermost.SaveConfig(mmConfig); err != nil {
+			return fmt.Errorf("Mattermost configuration: %w", err)
+		}
+		dashboard = dashboard.WithMattermostReader(service, api, mattermost.Keychain{Server: mmConfig.Server, Account: mmConfig.Username}, mmConfig.Username, os.Getenv("MATTERMOST_TOKEN"))
+	}
+
+	_, err = tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
 	return err
 }
