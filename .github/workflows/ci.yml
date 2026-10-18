@@ -39,6 +39,10 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: make lint
+      - uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: '1.30.0'
+      - run: make check-generated
   build:
     name: Build
     runs-on: ubuntu-latest

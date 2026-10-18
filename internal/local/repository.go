@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 var identityPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
@@ -151,5 +153,5 @@ func (r *RepositoryManager) remember(id, path string) error {
 		r.mappings = map[string]string{}
 	}
 	r.mappings[id] = path
-	return writeJSON(filepath.Join(r.Dir, "repositories.json"), r.mappings)
+	return storage.Save(filepath.Join(r.Dir, "repositories.json"), r.mappings)
 }

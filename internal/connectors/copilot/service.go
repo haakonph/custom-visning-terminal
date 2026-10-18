@@ -2,10 +2,8 @@ package copilot
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +14,7 @@ import (
 	"time"
 
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type Options struct {
@@ -98,28 +97,28 @@ func New(o Options) (*Service, error) {
 	if err != nil {
 		return nil, errors.New("invalid COPILOT_JIRA_PATTERN")
 	}
-	s := &Service{options: o, pattern: re, cursors: map[string]*cursor{}, data: diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}}, diagnostics: Diagnostics{SessionRoot: o.SessionRoot, StorePath: o.StorePath, Port: o.Port, CollectionEnabled: o.Enabled, CaptureContent: o.CaptureContent, ShowContent: o.ShowContent}}
-	f, err := os.Open(o.StorePath)
+	s := &Service{options: o, pattern: re, cursors: map[string]*cursor{}, data: diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}}, diagnostics: Diagnostics{SessionRoot: o.SessionRoot, StorePath: storage.Path(o.StorePath), Port: o.Port, CollectionEnabled: o.Enabled, CaptureContent: o.CaptureContent, ShowContent: o.ShowContent}}
+	readPath := o.StorePath
+	if _, statErr := os.Stat(storage.Path(o.StorePath)); statErr == nil {
+		readPath = storage.Path(o.StorePath)
+	}
+	err = storage.Load(o.StorePath, &s.data)
 	if err == nil {
-		defer f.Close()
-		// The store grows with imported history. Read the complete file so that
-		// a store we successfully saved can also be opened on the next launch.
-		dec := json.NewDecoder(f)
-		err = dec.Decode(&s.data)
-		if err != nil {
-			return nil, storeReadError(o.StorePath, "invalid or incomplete JSON")
-		}
-		var extra any
-		if dec.Decode(&extra) != io.EOF || s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
-			return nil, storeReadError(o.StorePath, "unsupported or invalid store format")
+		if s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
+			return nil, storeReadError(readPath, "unsupported or invalid store format")
 		}
 		for _, v := range s.data.Sessions {
 			if v == nil || v.Events == nil || v.Meta == nil {
-				return nil, storeReadError(o.StorePath, "invalid session format")
+				return nil, storeReadError(readPath, "invalid session format")
 			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, storeReadError(o.StorePath, "file could not be opened; check path and permissions")
+		return nil, storeReadError(readPath, "invalid or unreadable store; check format, path and permissions")
+	}
+	if err == nil {
+		if err = storage.Migrate(o.StorePath, s.storageSnapshot()); err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }

@@ -1,0 +1,3 @@
+-- Kept only to import databases created by the original document store.
+CREATE TABLE IF NOT EXISTS documents (id INTEGER PRIMARY KEY CHECK (id = 1), payload BLOB NOT NULL);
+CREATE TABLE storage_state (kind TEXT PRIMARY KEY);

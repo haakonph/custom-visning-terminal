@@ -1,0 +1,81 @@
+name: Database documentation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'internal/storage/**'
+      - 'cmd/db-docs/**'
+      - 'docs/database/**'
+      - 'scripts/schema-report*.mjs'
+      - 'package.json'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/database-docs*.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'internal/storage/**'
+      - 'cmd/db-docs/**'
+      - 'docs/database/**'
+      - 'scripts/schema-report*.mjs'
+      - 'package.json'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/database-docs*.yml'
+permissions:
+  contents: read
+concurrency:
+  group: database-docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: go test ./cmd/db-docs ./internal/storage
+      - run: node --test scripts/schema-report.test.mjs
+      - name: Generate PR schema in scratch directory
+        run: npm run db:docs -- --out work/schema-head
+      - name: Checkout current main for comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          path: work/base
+          persist-credentials: false
+      - name: Generate main schema using the same migration runner
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if [ -d work/base/internal/storage/migrations ]; then
+            npm run db:docs -- --migrations-root work/base/internal/storage --out work/schema-base
+          elif grep -q 'modernc.org/sqlite' work/base/go.mod; then
+            echo 'main uses SQLite but its migration directory is missing' >&2
+            exit 1
+          else
+            npm run db:docs -- --empty --out work/schema-base
+          fi
+          node scripts/schema-report.mjs work/schema-base/schema.sql work/schema-head work/schema-report.md
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: sqlite-schema-report
+          path: |
+            work/schema-report.md
+            work/schema-head/schema.sql
+            work/schema-base/schema.sql
+          retention-days: 7
+          if-no-files-found: error
+      # Upload the comparison before failing on stale committed documentation.
+      - name: Check committed documentation
+        run: npm run db:docs:check

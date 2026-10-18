@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,38 +12,12 @@ import (
 	"sync"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 var commitPattern = regexp.MustCompile(`^[a-fA-F0-9]{40}([a-fA-F0-9]{24})?$`)
 
-type Status struct {
-	Path     string `json:"path"`
-	Head     string `json:"head"`
-	Modified bool   `json:"-"`
-	Outdated bool   `json:"-"`
-	Error    string `json:"-"`
-	Note     string `json:"-"`
-}
-
-func (s Status) String() string {
-	if s.Error != "" {
-		return "Error: " + s.Error
-	}
-	if s.Path == "" {
-		return "Not downloaded"
-	}
-	v := "Ready"
-	if s.Modified {
-		v = "Modified"
-	}
-	if s.Outdated {
-		v += " · Outdated"
-	}
-	if s.Note != "" {
-		v += " · " + s.Note
-	}
-	return v
-}
+type Status = model.LocalStatus
 
 type WorktreeManager struct {
 	Repositories *RepositoryManager
@@ -64,14 +37,14 @@ func New(dir string, c Config) (*WorktreeManager, error) {
 		name  string
 		value any
 	}{{"repositories.json", &r.mappings}, {"worktrees.json", &w.entries}} {
-		b, err := os.ReadFile(filepath.Join(dir, item.name))
+		err := storage.Load(filepath.Join(dir, item.name), item.value)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
-		if err = json.Unmarshal(b, item.value); err != nil {
+		if err = storage.Migrate(filepath.Join(dir, item.name), item.value); err != nil {
 			return nil, fmt.Errorf("invalid %s: %w", item.name, err)
 		}
 	}
@@ -311,5 +284,5 @@ func (w *WorktreeManager) remember(p model.PullRequest, s Status) error {
 		w.entries = map[string]Status{}
 	}
 	w.entries[key(p)] = s
-	return writeJSON(filepath.Join(w.Repositories.Dir, "worktrees.json"), w.entries)
+	return storage.Save(filepath.Join(w.Repositories.Dir, "worktrees.json"), w.entries)
 }

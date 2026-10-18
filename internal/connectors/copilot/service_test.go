@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 func testOptions(t *testing.T) Options {
@@ -61,7 +63,7 @@ func TestIndependentLocalCollectionPersistenceAndUsage(t *testing.T) {
 	if detail.Events[3].Result != "passed" {
 		t.Fatalf("tool result: %+v", detail.Events)
 	}
-	info, err := os.Stat(o.StorePath)
+	info, err := os.Stat(storage.Path(o.StorePath))
 	if err != nil || info.Mode().Perm() != 0600 {
 		t.Fatalf("private store: %v %v", info, err)
 	}
@@ -162,7 +164,7 @@ func TestContentControlsAndDisabledCollection(t *testing.T) {
 	o.CaptureContent = false
 	s := service(t, o)
 	s.Scan(ctx)
-	content, err := os.ReadFile(o.StorePath)
+	content, err := os.ReadFile(storage.Path(o.StorePath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,6 +251,31 @@ func TestStoreCorruptionAndConfiguration(t *testing.T) {
 	}
 }
 
+func TestLegacyCopilotMigration(t *testing.T) {
+	o := testOptions(t)
+	original := `{"version":1,"sessions":{"existing":{"metadata":{"cwd":"/work/repo"},"events":{}}},"traces":{"trace-id":"existing"}}`
+	write(t, o.StorePath, original)
+	s := service(t, o)
+	rows, err := s.Sessions(context.Background())
+	if err != nil || len(rows) != 1 || rows[0].Cwd != "/work/repo" {
+		t.Fatal(rows, err)
+	}
+	if b, _ := os.ReadFile(o.StorePath); string(b) != original {
+		t.Fatal("legacy Copilot store changed")
+	}
+	if err := os.Remove(o.StorePath); err != nil {
+		t.Fatal(err)
+	}
+	s = service(t, o)
+	if s.data.Traces["trace-id"] != "existing" {
+		t.Fatal("trace mapping lost")
+	}
+	rows, err = s.Sessions(context.Background())
+	if err != nil || len(rows) != 1 {
+		t.Fatal(rows, err)
+	}
+}
+
 func TestStoreLargerThanFormerReadLimit(t *testing.T) {
 	o := testOptions(t)
 	write(t, o.StorePath, "")
@@ -276,6 +303,11 @@ func TestStoreLargerThanFormerReadLimit(t *testing.T) {
 		t.Fatalf("valid large store could not be reopened: %v", err)
 	}
 	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// SQLite now takes precedence after import. Remove the migrated database
+	// to exercise validation of the large legacy input again.
+	if err := os.Remove(storage.Path(o.StorePath)); err != nil {
 		t.Fatal(err)
 	}
 	// Invalid trailing content must not be hidden beyond the former limit.
