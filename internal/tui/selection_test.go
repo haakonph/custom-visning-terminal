@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -57,8 +58,11 @@ func TestSnoozeAllChosenAndClearSelection(t *testing.T) {
 func TestSnoozeBatchFailureRetainsSelectionAndEntries(t *testing.T) {
 	m := chooseAll(snoozeReady(t))
 	// A file as the parent prevents creation without depending on permissions.
-	m.snoozes.store.Path = filepath.Join(m.tasks.path, "snooze.json")
-	m.tasks.save()
+	blocked := filepath.Join(t.TempDir(), "blocked")
+	if err := os.WriteFile(blocked, []byte("not a directory"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	m.snoozes.store.Path = filepath.Join(blocked, "snooze.json")
 	m = press(m, "z2h")
 	if len(m.snoozes.entries) != 0 || len(m.chosen) != 2 || !m.snoozes.input {
 		t.Fatal("failed save changed state")
