@@ -94,25 +94,33 @@ func New(o Options) (*Service, error) {
 	f, err := os.Open(o.StorePath)
 	if err == nil {
 		defer f.Close()
-		dec := json.NewDecoder(io.LimitReader(f, 128<<20))
+		// The store grows with imported history. Read the complete file so that
+		// a store we successfully saved can also be opened on the next launch.
+		dec := json.NewDecoder(f)
 		err = dec.Decode(&s.data)
 		if err != nil {
-			return nil, errors.New("could not read Copilot store; existing file has been preserved")
+			return nil, storeReadError(o.StorePath, "invalid or incomplete JSON")
 		}
 		var extra any
 		if dec.Decode(&extra) != io.EOF || s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
-			return nil, errors.New("unsupported or invalid Copilot store; existing file has been preserved")
+			return nil, storeReadError(o.StorePath, "unsupported or invalid store format")
 		}
 		for _, v := range s.data.Sessions {
 			if v == nil || v.Events == nil || v.Meta == nil {
-				return nil, errors.New("invalid Copilot store")
+				return nil, storeReadError(o.StorePath, "invalid session format")
 			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, errors.New("could not open Copilot store")
+		return nil, storeReadError(o.StorePath, "file could not be opened; check path and permissions")
 	}
 	return s, nil
 }
+
+func storeReadError(path, reason string) error {
+	// Do not include decoder errors: they can quote private file contents.
+	return fmt.Errorf("could not read Copilot store %q (%s); existing file has been preserved. Set COPILOT_STORE_PATH to a new absolute path to start with a separate store", path, reason)
+}
+
 func (s *Service) Start(parent context.Context) {
 	s.mu.Lock()
 	if s.started {
