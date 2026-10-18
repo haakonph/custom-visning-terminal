@@ -1,6 +1,6 @@
 package tui
 
-const shortcuts = ", innstillinger • z snooze • Z vis utsatte • T oppgaver • t ny fra valgt • a legg til • Space select • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
+const shortcuts = ", innstillinger • z snooze • Z vis utsatte • T oppgaver • t ny fra valgt • a legg til • Space select • m Mattermost • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
 const helpText = `, / P       Open app settings
 z           Snooze: positive integer, then h hours / d calendar days / D days at 06:00
             Backspace edits; Esc cancels. Only in navigation mode.
@@ -18,6 +18,7 @@ l           Navigate to related Jira issues / loaded GitHub PRs
 4  Team Review Requests (all accessible memberships)
 j/k or ↑/↓  Select pull request
 Space       Toggle PR selection (persists across views and filters)
+m           Edit selected PRs as Markdown in Vim and send to Mattermost
 o / O       Open selected PRs in default editor / choose editor
             Without selection, use highlighted PR
 Enter       Open pull request in browser

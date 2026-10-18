@@ -44,6 +44,9 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.mattermost != nil && m.mattermost.active {
+		return m.mattermostView()
+	}
 	if m.settings.active {
 		return m.settingsView()
 	}
@@ -174,10 +177,8 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	columns := []column{}
 	number := fmt.Sprintf("#%d", p.Number)
 	title := p.Title
-	if m.local != nil {
-		if _, ok := m.local.chosen[p.Key()]; ok {
-			title = "[✓] " + title
-		}
+	if _, ok := m.chosen[p.Key()]; ok {
+		title = "[✓] " + title
 	}
 	if p.Draft {
 		title = "[draft] " + title

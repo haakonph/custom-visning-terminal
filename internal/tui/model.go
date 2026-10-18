@@ -17,6 +17,8 @@ type Cache interface {
 type Model struct {
 	settings        settingsState
 	snoozes         *snoozeState
+	mattermost      *mattermostState
+	chosen          map[string]model.PullRequest
 	tasks           taskState
 	copilot         *copilotState
 	copilotActive   bool
@@ -66,7 +68,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	s := newSnooze()
 	tasks := newTasks()
 	tasks.snoozes = s
-	m := Model{snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m := Model{chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadJiraPattern()
 	return m
 }
