@@ -47,6 +47,9 @@ func (m Model) View() tea.View {
 	if m.patternSettings.active {
 		return m.patternSettingsView()
 	}
+	if m.snoozes != nil && m.snoozes.active {
+		return m.snoozeView()
+	}
 	if m.tasks.active {
 		return m.tasksView()
 	}
@@ -55,6 +58,9 @@ func (m Model) View() tea.View {
 	}
 	if m.jiraActive {
 		return m.jiraView()
+	}
+	if m.help {
+		return m.helpView()
 	}
 	lines := []string{}
 	user := m.snapshot.User
@@ -86,6 +92,7 @@ func (m Model) View() tea.View {
 		}
 	}
 	lines = append(lines, strings.Join(tabs, "  "))
+	lines = append(lines, m.snoozeLines()...)
 	if m.relatedKey != "" {
 		lines = append(lines, " Relaterte PR-er: "+m.relatedKey+" · lastede GitHub-visninger · Esc tilbake")
 	}
@@ -225,4 +232,21 @@ func age(at time.Time) string {
 		return fmt.Sprintf("%dh", int(elapsed.Hours()))
 	}
 	return fmt.Sprintf("%dd", int(elapsed.Hours()/24))
+}
+
+func (m Model) helpView() tea.View {
+	rows := strings.Split(helpText, "\n")
+	capacity := max(1, m.height-1)
+	start := max(0, min(m.helpOffset, len(rows)-capacity))
+	lines := append([]string{}, rows[start:min(len(rows), start+capacity)]...)
+	if m.height > 1 {
+		lines = append(lines, "j/k ↑/↓ scroll · ? / Esc close")
+	}
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], m.width, "…")
+	}
+	v := tea.NewView(strings.Join(lines, "\n"))
+	v.AltScreen = true
+	v.WindowTitle = "custom-visning · Help"
+	return v
 }

@@ -615,3 +615,35 @@ Development checks: `make test`, `make lint`, and `make build`. CI already runs
 normal and race-enabled tests, `go vet`, formatting checks, and a build. New Git
 integration tests use temporary local repositories and offline URL rewrites;
 they need neither GitHub credentials nor private repository access.
+
+
+### Lokal snooze
+
+I navigasjonsmodus starter `z` snooze for valgt PR, Jira-sak eller lokal oppgave.
+Skriv et positivt heltall og avslutt med `h`, `d` eller `D`; dette lagrer straks.
+For eksempel betyr `z12h` tolv faktiske timer fra nå, `z3d` tre kalenderdager
+med samme lokale klokkeslett og `z14D` fjorten kalenderdager fra i dag kl. 06:00.
+Backspace retter tallet. Esc avbryter uten å lagre. Null, ugyldige tall og
+verdier utenfor støttet tidsområde avvises. Ny snooze regnes alltid fra nå.
+
+Listen viser antall utsatte elementer. `Z` åpner **Utsatt**, sortert etter
+tidligste returtidspunkt, også for elementer utenfor gjeldende søkeresultat.
+Der endrer `z` tidspunktet, `u` henter valgt element tilbake, og Esc går tilbake.
+Etter lagring vises faktisk lokal returtid med tidssone og UTC-offset.
+
+Snooze deles mellom alle faner og søk for samme tjeneste/server og URL.
+En oppgaves snooze gjelder bare oppgaven; referansene beholdes og merkes hvis
+referansen selv er utsatt. Oppgaver får en varig lokal ID ved første snooze.
+GitHub og Jira endres aldri. Returtid sjekkes hvert sekund uten nettverkskall;
+utløpte elementer er synlige også etter omstart og beholder vanlig sortering.
+
+Kalenderberegning bruker maskinens lokale tidssone. Ved et manglende klokkeslett
+under sommertidsovergangen flyttes tiden frem med gapet. Ved et klokkeslett som
+forekommer to ganger velges første forekomst. Timer er alltid medgått tid.
+
+Data lagres separat fra nettverkscache i `custom-visning/snooze.json` under
+brukerens konfigurasjonsmappe (`CUSTOM_VISNING_SNOOZE` kan overstyre filstien).
+Filen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
+midlertidig fil med 0600-rettigheter og atomisk rename, med 0700 på nye mapper.
+Lagringsfeil vises, og raden skjules først når lagringen har lykkes. En skadet
+snooze-fil blokkerer nye lagringer til filen er rettet og programmet startet på nytt.

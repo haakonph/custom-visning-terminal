@@ -16,6 +16,7 @@ type Cache interface {
 }
 type Model struct {
 	patternSettings patternSettings
+	snoozes         *snoozeState
 	tasks           taskState
 	copilot         *copilotState
 	copilotActive   bool
@@ -34,6 +35,7 @@ type Model struct {
 	width, height   int
 	input           textinput.Model
 	filtering, help bool
+	helpOffset      int
 	booting         bool
 	loading         [model.ViewCount]bool
 	warnings        [model.ViewCount]string
@@ -61,11 +63,14 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	input.Placeholder = "repository, title, author, label or team"
 	input.Prompt = "/ "
 	input.CharLimit = 256
-	m := Model{tasks: newTasks(), ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	s := newSnooze()
+	tasks := newTasks()
+	tasks.snoozes = s
+	m := Model{snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadJiraPattern()
 	return m
 }
-func (m Model) Init() tea.Cmd {
+func (m Model) initProviders() tea.Cmd {
 	if m.copilotActive {
 		return m.refreshCopilot()
 	}
