@@ -293,12 +293,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help = !m.help
 			m.helpOffset = 0
 		case "enter":
-			rows := m.filtered()
+			rows := m.selectedPRs()
+			opener, ctx := m.open, m.ctx
 			if len(rows) == 0 {
 				return m, nil
 			}
-			link, opener, ctx := rows[m.selected].URL, m.open, m.ctx
-			return m, func() tea.Msg { return openMsg{err: opener(ctx, link)} }
+			return m, func() tea.Msg {
+				var failures []string
+				for _, p := range rows {
+					if err := opener(ctx, p.URL); err != nil {
+						failures = append(failures, err.Error())
+					}
+				}
+				if len(failures) > 0 {
+					return openMsg{err: fmt.Errorf("%s", strings.Join(failures, "; "))}
+				}
+				return openMsg{}
+			}
 		}
 	default:
 		var cmd tea.Cmd

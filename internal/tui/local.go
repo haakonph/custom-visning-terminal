@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -88,31 +87,10 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 		m.notice = err.Error()
 		return nil
 	}
-	rows := []model.PullRequest{}
-	for _, p := range l.chosen {
-		// Use the latest dashboard head even if selection predates a refresh.
-		for _, d := range m.snapshot.Datasets {
-			for _, fresh := range d.PRs {
-				if fresh.Key() == p.Key() && !fresh.UpdatedAt.Before(p.UpdatedAt) {
-					p = fresh
-				}
-			}
-		}
-		rows = append(rows, p)
-	}
+	rows := m.selectedPRs()
 	if len(rows) == 0 {
-		visible := m.filtered()
-		if len(visible) == 0 {
-			return nil
-		}
-		rows = append(rows, visible[m.selected])
+		return nil
 	}
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].Repository == rows[j].Repository {
-			return rows[i].Number < rows[j].Number
-		}
-		return rows[i].Repository < rows[j].Repository
-	})
 	l.generation++
 	l.queue = rows
 	l.editor = editor

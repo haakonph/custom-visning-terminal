@@ -43,11 +43,16 @@ func (m Model) navigateRelated() (tea.Model, tea.Cmd) {
 		m.notice = "Sett JIRA_BASE_URL og JIRA_TOKEN for å vise relaterte saker"
 		return m, nil
 	}
-	rows := m.filtered()
-	if len(rows) == 0 {
-		return m, nil
+	var keys []string
+	seen := map[string]bool{}
+	for _, p := range m.selectedPRs() {
+		for _, key := range p.JiraKeys(m.jiraPattern) {
+			if !seen[key] {
+				keys = append(keys, key)
+				seen[key] = true
+			}
+		}
 	}
-	keys := rows[m.selected].JiraKeys(m.jiraPattern)
 	if len(keys) == 0 {
 		m.notice = "Ingen Jira-nøkler i PR-tittel, beskrivelse eller branchnavn"
 		return m, nil

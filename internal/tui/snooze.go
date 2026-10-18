@@ -22,6 +22,7 @@ type snoozeState struct {
 	input    bool
 	digits   string
 	target   snooze.Entry
+	targets  []snooze.Entry
 	active   bool
 	selected int
 	notice   string
@@ -113,6 +114,10 @@ func (m *Model) snoozeTarget() (snooze.Entry, bool) {
 // All writes complete before the in-memory filter changes. A failed write
 // leaves both the current list and the previous deadline untouched.
 func (s *snoozeState) commit(entry snooze.Entry, remove bool) error {
+	return s.commitEntries([]snooze.Entry{entry}, remove)
+}
+
+func (s *snoozeState) commitEntries(batch []snooze.Entry, remove bool) error {
 	if s.loadErr != nil {
 		return s.loadErr
 	}
@@ -120,10 +125,12 @@ func (s *snoozeState) commit(entry snooze.Entry, remove bool) error {
 	for id, e := range s.entries {
 		entries[id] = e
 	}
-	if remove {
-		delete(entries, entry.ID)
-	} else {
-		entries[entry.ID] = entry
+	for _, entry := range batch {
+		if remove {
+			delete(entries, entry.ID)
+		} else {
+			entries[entry.ID] = entry
+		}
 	}
 	if err := s.store.Save(entries); err != nil {
 		return err
@@ -240,10 +247,27 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				}
 			}
 			a := m.snoozeAnchor()
-			if err := s.commit(entry, false); err != nil {
+			batch := append([]snooze.Entry(nil), s.targets...)
+			if len(batch) == 0 {
+				batch = []snooze.Entry{entry}
+			}
+			for i := range batch {
+				batch[i].Until = at
+			}
+			if err := s.commitEntries(batch, false); err != nil {
 				s.notice = "Kunne ikke lagre snooze: " + err.Error()
 				return true, nil
 			}
+			for _, e := range batch {
+				if e.Kind == "github" {
+					for key, p := range m.chosen {
+						if p.URL == e.URL {
+							delete(m.chosen, key)
+						}
+					}
+				}
+			}
+			s.targets = nil
 			s.input, s.digits = false, ""
 			s.notice = "Utsatt til " + at.Local().Format("2006-01-02 15:04:05 MST -07:00")
 			m.restoreSnoozeAnchor(a)
@@ -284,6 +308,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 		case "z":
 			if entry, ok := m.snoozeTarget(); ok {
 				s.target, s.input, s.digits, s.notice = entry, true, "", ""
+				s.targets = nil
 			}
 		case "ctrl+c", "q":
 			m.cancel()
@@ -304,7 +329,16 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.notice = "Kunne ikke lese snooze: " + s.loadErr.Error()
 			return true, nil
 		}
-		if entry, ok := m.snoozeTarget(); ok {
+		if !m.tasks.active && !m.jiraActive {
+			s.targets = nil
+			for _, ref := range m.taskReferences() {
+				s.targets = append(s.targets, snooze.Entry{ID: snooze.Identity(ref.Provider, ref.URL), Kind: ref.Provider, Title: ref.Title, URL: ref.URL})
+			}
+			if len(s.targets) > 0 {
+				s.target, s.input, s.digits, s.notice = s.targets[0], true, "", ""
+			}
+		} else if entry, ok := m.snoozeTarget(); ok {
+			s.targets = nil
 			s.target, s.input, s.digits, s.notice = entry, true, "", ""
 		}
 		return true, nil

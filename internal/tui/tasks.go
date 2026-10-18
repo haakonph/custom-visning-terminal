@@ -93,19 +93,21 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 		t.active = true
 		return m, nil
 	}
-	ref, ok := m.taskReference()
-	if !ok {
+	refs := m.taskReferences()
+	if len(refs) == 0 {
 		t.active = true
 		t.notice = "Velg en Jira-sak eller PR først, eller trykk n for en tom oppgave"
 		return m, nil
 	}
 	if create || len(t.items) == 0 {
 		t.query = ""
-		t.items = append(t.items, model.Task{Title: ref.Title})
+		t.items = append(t.items, model.Task{Title: refs[0].Title})
 		t.selected = len(t.items) - 1
 		t.row = 0
 	}
-	t.items[t.selected].Add(ref)
+	for _, ref := range refs {
+		t.items[t.selected].Add(ref)
+	}
 	t.active = true
 	t.save()
 	return m, nil
