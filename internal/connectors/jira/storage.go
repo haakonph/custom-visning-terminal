@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type Query struct {
@@ -93,14 +95,16 @@ func (c *Client) cachePath(query string) string {
 }
 func (c *Client) LoadCache(query string) (Cached, error) {
 	var data Cached
-	b, err := os.ReadFile(c.cachePath(query))
+	err := storage.Load(c.cachePath(query), &data)
 	if err != nil {
 		return data, err
 	}
-	err = json.Unmarshal(b, &data)
-	if err == nil && data.Query != query {
+	if data.Query != query {
 		return Cached{}, errors.New("cache query mismatch")
 	}
-	return data, err
+	if err = storage.Migrate(c.cachePath(query), data); err != nil {
+		return Cached{}, err
+	}
+	return data, nil
 }
-func (c *Client) SaveCache(data Cached) error { return writeJSON(c.cachePath(data.Query), data) }
+func (c *Client) SaveCache(data Cached) error { return storage.Save(c.cachePath(data.Query), data) }

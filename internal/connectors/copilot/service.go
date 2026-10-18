@@ -2,10 +2,8 @@ package copilot
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +12,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type Options struct {
@@ -90,17 +90,10 @@ func New(o Options) (*Service, error) {
 	if err != nil {
 		return nil, errors.New("invalid COPILOT_JIRA_PATTERN")
 	}
-	s := &Service{options: o, pattern: re, cursors: map[string]*cursor{}, data: diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}}, diagnostics: Diagnostics{SessionRoot: o.SessionRoot, StorePath: o.StorePath, Port: o.Port, CollectionEnabled: o.Enabled, CaptureContent: o.CaptureContent, ShowContent: o.ShowContent}}
-	f, err := os.Open(o.StorePath)
+	s := &Service{options: o, pattern: re, cursors: map[string]*cursor{}, data: diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}}, diagnostics: Diagnostics{SessionRoot: o.SessionRoot, StorePath: storage.Path(o.StorePath), Port: o.Port, CollectionEnabled: o.Enabled, CaptureContent: o.CaptureContent, ShowContent: o.ShowContent}}
+	err = storage.Load(o.StorePath, &s.data)
 	if err == nil {
-		defer f.Close()
-		dec := json.NewDecoder(io.LimitReader(f, 128<<20))
-		err = dec.Decode(&s.data)
-		if err != nil {
-			return nil, errors.New("could not read Copilot store; existing file has been preserved")
-		}
-		var extra any
-		if dec.Decode(&extra) != io.EOF || s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
+		if s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
 			return nil, errors.New("unsupported or invalid Copilot store; existing file has been preserved")
 		}
 		for _, v := range s.data.Sessions {
@@ -110,6 +103,11 @@ func New(o Options) (*Service, error) {
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, errors.New("could not open Copilot store")
+	}
+	if err == nil {
+		if err = storage.Migrate(o.StorePath, s.data); err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }

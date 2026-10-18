@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -141,5 +143,35 @@ func TestEmptyResultIsSuccessful(t *testing.T) {
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"startAt":0,"total":0,"issues":[]}`)) })
 	if rows, err := c.Search(context.Background(), "x"); err != nil || len(rows) != 0 {
 		t.Fatal(rows, err)
+	}
+}
+
+func TestLegacyJiraCacheMigration(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	c, err := New("https://jira.example", "token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := c.cachePath("mine")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	original := `{"Query":"mine","Issues":[{"Key":"ABC-1"}],"SyncedAt":"2026-10-18T10:00:00Z"}`
+	if err := os.WriteFile(path, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+	data, err := c.LoadCache("mine")
+	if err != nil || len(data.Issues) != 1 || data.Issues[0].Key != "ABC-1" {
+		t.Fatal(data, err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != original {
+		t.Fatal("legacy Jira cache modified")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	data, err = c.LoadCache("mine")
+	if err != nil || data.SyncedAt.IsZero() || len(data.Issues) != 1 {
+		t.Fatal(data, err)
 	}
 }

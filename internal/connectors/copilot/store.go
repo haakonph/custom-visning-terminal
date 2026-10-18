@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type storedSession struct {
@@ -128,28 +128,7 @@ func (s *Service) saveLocked() error {
 	if !s.dirty {
 		return nil
 	}
-	dir := filepath.Dir(s.options.StorePath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-	f, err := os.CreateTemp(dir, ".copilot-*.json")
-	if err != nil {
-		return err
-	}
-	name := f.Name()
-	defer os.Remove(name)
-	if err = json.NewEncoder(f).Encode(s.data); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	if err = os.Rename(name, s.options.StorePath); err != nil {
+	if err := storage.Save(s.options.StorePath, s.data); err != nil {
 		return err
 	}
 	s.dirty = false

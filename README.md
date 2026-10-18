@@ -138,7 +138,7 @@ Cachen ligger i `filepath.Join(os.UserCacheDir(), "custom-visning")`:
 - macOS: `~/Library/Caches/custom-visning/`
 - Linux: `$XDG_CACHE_HOME/custom-visning/`, normalt `~/.cache/custom-visning/`
 
-Hver autentisering har en egen JSON-fil, navngitt med et SHA-256-fingeravtrykk.
+Hver autentisering har en egen SQLite-database, navngitt med et SHA-256-fingeravtrykk.
 Selve tokenet lagres ikke. Filen inneholder verifisert brukernavn, PR-data og siste
 fullførte synkronisering per visning. Tokenbytte gir ny cache. Første oppstart
 krever nettverk for identiteten. Senere oppstarter viser cache umiddelbart, også
@@ -147,7 +147,7 @@ fortsatt innlogging. Korrupte/ukjente cacheversjoner ignoreres med en melding.
 
 Cachemapper opprettes med `0700`, filer med `0600`. Cachen inneholder privat
 PR-metadata i klartekst: slett cachemappen for å fjerne lokale data. Skriving skjer
-via en midlertidig fil i samme mappe, `fsync` og atomisk rename. Skriving er
+i atomiske SQLite-transaksjoner. Skriving er
 serialisert og samles opp for å unngå at eldre svar overskriver nyere snapshots.
 
 REST Search API brukes til oppdagelse med alle sider frem til GitHubs grense på
@@ -362,7 +362,7 @@ Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
 - `T` går tilbake til forrige provider-visning. `Esc` går først til listen,
   deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
 
-Oppgavene lagres atomisk i `custom-visning/tasks.json` under operativsystemets
+Oppgavene lagres atomisk i `custom-visning/tasks.sqlite` under operativsystemets
 konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS`). Filen er lokal for
 OS-brukeren og deles mellom appens GitHub/Jira-kontoer; den inneholder titler og
 lenker, ingen tokens. Ta vare på filen som brukerdata, ikke som cache.
@@ -391,11 +391,11 @@ kilden inneholder dem. Det lokale Copilot-filformatet er ikke en stabil offentli
 API; ukjente hendelser beholdes og ugyldige poster rapporteres i diagnostikk.
 Kildemappene og filene endres aldri; symlinker følges ikke.
 
-Terminalen har et eget datalager i `os.UserConfigDir()/custom-visning-terminal/copilot.json`
-(på macOS normalt `~/Library/Application Support/custom-visning-terminal/copilot.json`,
-på Linux normalt `~/.config/custom-visning-terminal/copilot.json`). Lagrede sesjoner,
+Terminalen har et eget datalager i `os.UserConfigDir()/custom-visning-terminal/copilot.sqlite`
+(på macOS normalt `~/Library/Application Support/custom-visning-terminal/copilot.sqlite`,
+på Linux normalt `~/.config/custom-visning-terminal/copilot.sqlite`). Lagrede sesjoner,
 inkludert mottatt telemetri, beholdes mellom oppstarter, også om kildefilene fjernes.
-Filen erstattes atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
+Databasen oppdateres atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
 Lageret er separat fra både GitHub-cachen og den andre appens database.
 
 ### Egen OTLP-mottaker
@@ -433,7 +433,7 @@ Disse miljøvariablene styrer terminalappen; start den på nytt etter endringer:
 | Variabel | Standard | Bruk |
 | --- | --- | --- |
 | `COPILOT_SESSION_ROOT` | `~/.copilot/session-state` | Absolutt sti til historikkmappen; en egendefinert verdi må være ferdig ekspandert |
-| `COPILOT_STORE_PATH` | Se datalagerstien ovenfor | Absolutt sti til terminalens eget JSON-lager |
+| `COPILOT_STORE_PATH` | Se datalagerstien ovenfor | Absolutt sti til terminalens eget SQLite-lager (eldre JSON-stier støttes) |
 | `COPILOT_OTLP_PORT` | `4318` | Lokal mottakerport |
 | `COPILOT_COLLECTION_ENABLED` | `true` | `false` stopper filimport og mottaker; lagret historikk kan leses |
 | `COPILOT_CAPTURE_CONTENT` | `true` | `false` utelater innhold, argumenter/resultater, feiltekst og rådata fra nye lagrede observasjoner |
@@ -532,14 +532,14 @@ mapping/cache, new bare clone. New storage defaults to:
 ├── repos/owner/repo.git/
 ├── worktrees/owner/repo/pr-142/
 ├── worktrees/owner/repo/pr-156/
-├── repositories.json
-└── worktrees.json
+├── repositories.sqlite
+└── worktrees.sqlite
 ```
 
 Linux respects an absolute `XDG_DATA_HOME`; macOS and Windows use
 `os.UserConfigDir()/custom-visning` for data. These files contain paths and Git
 identities, never authentication tokens. PR dashboard snapshots continue to use
-the existing account-scoped JSON cache independently.
+the existing account-scoped SQLite cache independently.
 
 New worktrees use detached HEADs and share their repository's Git objects.
 Missing commits are fetched from the base repository's `refs/pull/NUMBER/head`,
@@ -589,7 +589,7 @@ rendering. A failed PR does not stop the remaining selection.
 - **Interrupted preparation:** quitting cancels Git processes; temporary clone
   staging directories are removed. A partially created worktree is preserved
   and may require manual metadata repair. An editor already launched stays open.
-- **Configuration/cache parse error:** fix the indicated JSON file and restart.
+- **Configuration/cache parse error:** fix the indicated configuration JSON file, or restore the affected SQLite database from backup, and restart.
   Repository/worktree paths are validated before reuse. Do not edit state files
   or operate on the same worktree from multiple dashboard processes concurrently;
   serialization applies within a running application.
@@ -598,3 +598,23 @@ Development checks: `make test`, `make lint`, and `make build`. CI already runs
 normal and race-enabled tests, `go vet`, formatting checks, and a build. New Git
 integration tests use temporary local repositories and offline URL rewrites;
 they need neither GitHub credentials nor private repository access.
+
+### SQLite-lagring og import av eksisterende data
+
+GitHub- og Jira-cache, oppgaver, Copilot-historikk og lokale repo-/worktree-oversikter
+lagres i SQLite. Hvert tidligere JSON-datalager får en database i samme mappe,
+med `.sqlite` i stedet for `.json`. Data beholdes som JSON-dokumenter inne i SQLite,
+med atomiske transaksjoner og private filrettigheter. Ingen separat databasetjener
+eller CGO kreves.
+
+Ved første lesing importeres eksisterende JSON-data etter validering. De gamle
+filene beholdes uendret som sikkerhetskopi; etter import er SQLite autoritativ.
+En skadet database gir feil fremfor å falle tilbake til en utdatert sikkerhetskopi.
+Ta sikkerhetskopi av `.sqlite`-filene når appen er avsluttet. Gamle JSON-kopier kan
+inneholde historiske data og må eventuelt slettes manuelt når importen er kontrollert.
+
+`CUSTOM_VISNING_TASKS` og `COPILOT_STORE_PATH` støtter fortsatt gamle JSON-stier;
+disse peker nå på en SQLite-fil ved siden av JSON-filen. Eksplisitte `.sqlite`,
+`.sqlite3` og `.db`-stier brukes direkte; andre filnavn får `.sqlite` lagt til.
+`config.json`, Jira-konfigurasjonen `jira.json`, miljøvariabler og Copilots
+kildeformat (`workspace.yaml`/`events.jsonl`) er uendret.
