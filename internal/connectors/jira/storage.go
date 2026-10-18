@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Query struct {
 }
 type Config struct {
 	Queries []Query `json:"queries"`
+	Pattern string  `json:"pattern,omitempty"`
 }
 
 func ConfigPath() string {
@@ -46,6 +48,11 @@ func LoadConfig(path string) (Config, error) {
 			if q.Name == "" || q.JQL == "" {
 				return Config{}, errors.New("saved queries require name and JQL")
 			}
+		}
+	}
+	if c.Pattern != "" {
+		if _, err := regexp.Compile(c.Pattern); err != nil {
+			return Config{}, errors.New("invalid Jira pattern: " + err.Error())
 		}
 	}
 	return c, err

@@ -14,6 +14,13 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.patternSettings.active {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		default:
+			return m.updatePatternSettings(msg)
+		}
+	}
 	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
@@ -64,6 +71,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !editing {
 			switch key.String() {
+			case "P":
+				return m.editJiraPattern()
 			case "T":
 				m.tasks.active = true
 				return m, nil

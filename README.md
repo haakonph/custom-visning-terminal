@@ -301,8 +301,14 @@ Full beskrivelse finnes via Enter i Jira.
 PR-tittel, beskrivelse og branchnavn, både i detaljvisningen og ved navigasjon
 mellom relaterte PR-er og Jira-saker. Eksemplet over godtar `KAKE-123` til
 `KAKE-12345`, men ikke 2 eller 6 sifre, andre prefikser eller treff inni ord.
-Uten variabelen (eller med tom verdi) brukes standardmønsteret
-`[A-Z][A-Z0-9_]*-[0-9]+`. Ugyldige uttrykk gir en feil ved oppstart.
+Trykk `P` (Shift+p) i GitHub- eller Jira-visningen for å endre mønsteret i appen.
+`Enter` lagrer i `jira.json` og tar endringen i bruk med en gang; `Esc` avbryter.
+Tom verdi gjenoppretter standardmønsteret `[A-Z][A-Z0-9_]*-[0-9]+`.
+Ugyldige uttrykk vises som feil og lagres ikke. Lagrede søk beholdes.
+Ved oppstart brukes `JIRA_PATTERN` hvis den er satt til en ikke-tom verdi,
+ellers feltet `pattern` fra konfigurasjonsfilen, ellers standardmønsteret.
+For at appens lagrede valg skal brukes ved neste oppstart, fjern eventuell
+`JIRA_PATTERN` fra miljøet. Ugyldig miljøvariabel gir oppstartsfeil.
 For samme mønster i Copilot, sett også
 `COPILOT_JIRA_PATTERN='KAKE-[0-9]{3,5}'`.
 
@@ -312,6 +318,7 @@ Slett eller endre søk ved å redigere filen og starte appen på nytt:
 
 ```json
 {
+  "pattern": "KAKE-[0-9]{3,5}",
   "queries": [
     {
       "name": "Mine feil",
