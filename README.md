@@ -848,3 +848,13 @@ flere Jira-nøkler brukes bare PR-lenkene.
 
 Ved sendefeil beholdes utkastet. Appen forsøker ikke automatisk på nytt;
 ved nettverksfeil bør du sjekke kanalen før du sender igjen.
+
+## Les Mattermost-kanaler
+
+Sett `MATTERMOST_SERVER=https://chat.example.org` og `MATTERMOST_USERNAME` og
+start appen. `M` åpner Mattermost, `a` logger inn med passord/TOTP, `p` bruker PAT,
+og `+` velger kanaler. Sesjoner lagres i OS-nøkkelringen når den er tilgjengelig;
+meldinger og kanalvalg i SQLite gir offline-lesing. `g` går fra en melding til en
+cachet GitHub-PR, og `v` i GitHub viser Mattermost-referansene tilbake.
+
+Se [Mattermost-oppsett, tastatursnarveier og begrensninger](docs/mattermost.md).
