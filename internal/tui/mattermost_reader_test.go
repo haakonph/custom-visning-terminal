@@ -17,13 +17,13 @@ import (
 func readerModel(t *testing.T) Model {
 	m := ready(t)
 	input := textinput.New()
-	m.mmReader = &mattermostReader{active: true, authenticated: true, input: input, data: model.MattermostData{Channels: []model.MattermostChannel{{ID: "c", Name: "backend", Selected: true}, {ID: "d", Name: "frontend", Selected: true}}, Posts: []model.MattermostPost{{ID: "p", ChannelID: "c", Message: "https://github.com/acme/api/pull/1", CreatedAt: 100}, {ID: "reply", ChannelID: "d", RootID: "root", Message: "https://github.com/acme/api/pull/1 https://github.com/acme/api/pull/2", CreatedAt: 200}}}}
+	m.mmReader = &mattermostReader{active: true, authenticated: true, input: input, data: model.MattermostData{Server: "https://chat.example", Channels: []model.MattermostChannel{{ID: "c", Name: "backend", Selected: true}, {ID: "d", Name: "frontend", Selected: true}}, Posts: []model.MattermostPost{{ID: "p", ChannelID: "c", Message: "https://github.com/acme/api/pull/1", CreatedAt: 100}, {ID: "reply", ChannelID: "d", RootID: "root", Message: "https://github.com/acme/api/pull/1 https://github.com/acme/api/pull/2", CreatedAt: 200}}}}
 	return m
 }
 func TestMattermostTabsAndAddTab(t *testing.T) {
 	m := readerModel(t)
 	for _, want := range []int{1, 2, 0} {
-		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyTab})
+		m, _ = sequence(m, "l")
 		if m.mmReader.tab != want {
 			t.Fatalf("got %d want %d", m.mmReader.tab, want)
 		}
@@ -44,7 +44,7 @@ func TestMattermostTabsAndAddTab(t *testing.T) {
 }
 func TestMattermostPRRoundTrip(t *testing.T) {
 	m := readerModel(t)
-	m, _ = update(m, key('g'))
+	m, _ = sequence(m, "rg")
 	if m.mmReader.active || m.active != model.Open || m.filtered()[m.selected].Number != 1 {
 		t.Fatal("message to cached PR")
 	}
@@ -53,7 +53,7 @@ func TestMattermostPRRoundTrip(t *testing.T) {
 	}
 	m, _ = update(m, key('r'))
 	m, _ = update(m, key('c'))
-	if !m.mmReader.active || !m.mmReader.mentions || len(m.mmReader.posts()) != 2 {
+	if m.dialog == nil || len(m.dialog.rows) != 2 {
 		t.Fatal("reverse references")
 	}
 	// The first mention is already in a selected channel, so offline jump needs no I/O.
@@ -106,6 +106,7 @@ func TestMattermostLinkNavigationWithoutGitHub(t *testing.T) {
 	m.snapshot = model.Snapshot{}
 	opened := ""
 	m.open = func(_ context.Context, u string) error { opened = u; return nil }
+	m, _ = sequence(m, "el")
 	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("missing browser command")
@@ -114,15 +115,15 @@ func TestMattermostLinkNavigationWithoutGitHub(t *testing.T) {
 	if opened != "https://github.com/acme/api/pull/1" {
 		t.Fatal(opened)
 	}
-	m, _ = update(m, key('g'))
-	if !m.mmReader.active || !strings.Contains(m.mmReader.notice, "cache") {
+	m, _ = sequence(m, "rg")
+	if !m.mmReader.active || m.sequenceNotice == "" {
 		t.Fatal("GitHub must be optional")
 	}
 }
 func TestMattermostLoginSecretsClearedOnCancel(t *testing.T) {
 	m := readerModel(t)
 	m.mmReader.authenticated = false
-	m, _ = update(m, key('A'))
+	m, _ = sequence(m, "al")
 	m.mmReader.input.SetValue("password-secret")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.mmReader.password != "password-secret" || m.mmReader.input.Value() != "" {

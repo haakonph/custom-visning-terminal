@@ -35,7 +35,7 @@ func spaceActionModel(t *testing.T, scenario string) (Model, []model.PullRequest
 		// Remove the second selection and reselect it from another view.
 		m = press(m, "k ")
 		m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{rows[1], rows[2]}
-		m = press(m, "3 ")
+		m = press(m, "ll ")
 		m = press(m, "/no matches")
 		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 		if len(m.filtered()) != 0 {
@@ -78,10 +78,10 @@ type selectionAction struct {
 
 func TestSpaceSelectionActions(t *testing.T) {
 	actions := []selectionAction{
-		{"browser Enter", func(t *testing.T, m Model, want []model.PullRequest) {
+		{"browser en", func(t *testing.T, m Model, want []model.PullRequest) {
 			var opened []string
 			m.open = func(_ context.Context, url string) error { opened = append(opened, url); return nil }
-			_, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+			_, cmd := sequence(m, "en")
 			if cmd == nil {
 				t.Fatal("Enter did not open browser")
 			}
@@ -121,15 +121,16 @@ func TestSpaceSelectionActions(t *testing.T) {
 				existing := model.TaskReference{Provider: "jira", URL: "https://jira.example/browse/OLD-1", Title: "Existing"}
 				m.tasks.items = []model.Task{{Title: "Existing task", References: []model.TaskReference{existing}}}
 				if actionKey == 't' {
-					m, _ = sequence(m, "tn")
+					m, _ = sequence(m, "an")
 				} else {
 					m, _ = sequence(m, "to")
+					m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 				}
 				taskIndex := 0
 				if actionKey == 't' {
 					taskIndex = 1
 				}
-				if !m.tasks.active || len(m.tasks.items) != taskIndex+1 {
+				if (actionKey == 't' && !m.tasks.active) || len(m.tasks.items) != taskIndex+1 {
 					t.Fatal("wrong task created/selected")
 				}
 				saved := newTasks()
@@ -149,7 +150,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 			},
 		})
 	}
-	for _, keys := range []string{"o", "O1", "O2", "O3"} {
+	for _, keys := range []string{"ee", "ev\n", "evj\n", "evjj\n"} {
 		actions = append(actions, selectionAction{
 			"editor " + keys, func(t *testing.T, m Model, want []model.PullRequest) {
 				manager, err := local.New(t.TempDir(), local.Defaults())
@@ -165,7 +166,11 @@ func TestSpaceSelectionActions(t *testing.T) {
 				m = m.WithLocal(manager, local.Editors{Default: "intellij", IntelliJ: editor, VSCode: editor, Custom: editor})
 				var cmd tea.Cmd
 				for _, k := range keys {
-					m, cmd = update(m, key(k))
+					if k == '\n' {
+						m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+					} else {
+						m, cmd = update(m, key(k))
+					}
 				}
 				if cmd == nil || m.local.running != len(want) || m.local.choosing {
 					t.Fatal("selected editor operations not scheduled")
@@ -175,7 +180,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 					urls = append(urls, url)
 				}
 				assertActionURLs(t, urls, want)
-				expectedEditor := map[string]string{"o": "", "O1": "intellij", "O2": "vscode", "O3": "custom"}[keys]
+				expectedEditor := map[string]string{"ee": "intellij", "ev\n": "intellij", "evj\n": "vscode", "evjj\n": "custom"}[keys]
 				if m.local.editor != expectedEditor {
 					t.Fatalf("editor = %q, want %q", m.local.editor, expectedEditor)
 				}
@@ -187,7 +192,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 			t.Setenv("PATH", t.TempDir()) // No interactive Vim process in tests.
 			sender := &fakeMessageSender{}
 			m = m.WithMattermost(sender)
-			m, _ = update(m, key('m'))
+			m, _ = sequence(m, "ac")
 			if !m.mattermost.active {
 				t.Fatal("Mattermost draft not opened")
 			}
@@ -199,7 +204,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 				t.Fatalf("draft = %q, want %v", m.mattermost.text, expected)
 			}
 			draft := m.mattermost.text
-			m, cmd := update(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+			m, cmd := sequence(m, "ac")
 			if cmd == nil {
 				t.Fatal("send command missing")
 			}
@@ -218,25 +223,33 @@ func TestSpaceSelectionActions(t *testing.T) {
 			m.jira = &jiraState{client: client}
 			m, _ = update(m, key('r'))
 			m, cmd := update(m, key('t'))
-			if cmd == nil || !m.jiraActive {
-				t.Fatal("related Jira search not scheduled")
-			}
-			defer m.jira.cancel()
-			// The two selected PRs share ABC-9: it must appear only once.
-			var keys []string
-			seen := map[string]bool{}
-			for _, p := range want {
-				for _, k := range strings.Fields(p.Title) {
-					if strings.HasPrefix(k, "ABC-") && !seen[k] {
-						keys = append(keys, k)
-						seen[k] = true
+			if len(want) > 0 && m.dialog != nil {
+				if m.dialog.mode != "related" {
+					t.Fatal("not a related picker")
+				}
+				var got []string
+				for _, r := range m.dialog.rows {
+					got = append(got, r.Key)
+				}
+				var expected []string
+				seen := map[string]bool{}
+				for _, p := range want {
+					for _, key := range p.JiraKeys() {
+						if !seen[key] {
+							seen[key] = true
+							expected = append(expected, key)
+						}
 					}
 				}
+				slices.Sort(got)
+				slices.Sort(expected)
+				if !reflect.DeepEqual(got, expected) {
+					t.Fatalf("targets %v want %v", got, expected)
+				}
+			} else if cmd == nil || !m.jiraActive {
+				t.Fatal("single Jira target not opened")
 			}
-			expected := "key IN (" + strings.Join(keys, ",") + ") ORDER BY key ASC"
-			if m.jira.query != expected {
-				t.Fatalf("JQL = %q, want %q", m.jira.query, expected)
-			}
+
 		},
 	})
 	for _, action := range actions {
@@ -267,7 +280,11 @@ func TestSpaceSelectionSnoozeUnitsAndCancel(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			m = press(m, "z2"+unit)
+			keyUnit := unit
+			if keyUnit == "D" {
+				keyUnit = "m"
+			}
+			m = press(m, "z2"+keyUnit)
 			saved, err := m.snoozes.store.Load()
 			if err != nil {
 				t.Fatal(err)

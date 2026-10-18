@@ -12,6 +12,8 @@ import (
 
 func jiraModel(t *testing.T) Model {
 	t.Helper()
+	t.Setenv("CUSTOM_VISNING_LINKS", t.TempDir()+"/links.sqlite")
+	t.Setenv("CUSTOM_VISNING_TASKS", t.TempDir()+"/tasks.sqlite")
 	t.Setenv("CUSTOM_VISNING_CONFIG", t.TempDir()+"/jira.json")
 	c, err := jira.New("https://jira.example", "test")
 	if err != nil {
@@ -114,29 +116,29 @@ func TestJiraPastedJQLAndModeSwitch(t *testing.T) {
 	}
 }
 
-func TestJiraNumberedTabsAndLocalFilterMatchGitHub(t *testing.T) {
+func TestJiraTabsAndLocalFilterMatchGitHub(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
 	m.jira.tabs = append(m.jira.tabs, jira.Query{Name: "Bugs", JQL: "issuetype = Bug"})
 	m.jira.input.Prompt = "/ "
 	m.jira.input.SetValue("login")
-	m, cmd := update(m, key('5'))
+	m, cmd := sequence(m, "h")
 	if m.jira.active != 4 || cmd == nil || m.jira.custom != "" {
-		t.Fatal("saved query shortcut failed")
+		t.Fatal("previous tab failed")
 	}
-	if m.jira.input.Value() != "login" || m.jira.input.Prompt != "/ " {
-		t.Fatal("tab change lost local filter")
+	if m.jira.input.Value() != "login" {
+		t.Fatal("lost filter")
 	}
-	if !strings.Contains(m.View().Content, "5 Bugs") {
-		t.Fatal("shortcut missing from tab label")
+	if !strings.Contains(m.View().Content, "Bugs") {
+		t.Fatal("tab label missing")
 	}
 	generation := m.jira.generation
-	m, cmd = update(m, key('9'))
+	m, cmd = sequence(m, "9")
 	if m.jira.active != 4 || cmd != nil || m.jira.generation != generation {
-		t.Fatal("missing tab shortcut changed view")
+		t.Fatal("legacy number changed view")
 	}
-	m, _ = update(m, key('2'))
+	m, _ = sequence(m, "ll")
 	if m.jira.active != 1 || m.jira.input.Value() != "login" {
-		t.Fatal("standard tab behavior differs")
+		t.Fatal("tab/filter behavior differs")
 	}
 }

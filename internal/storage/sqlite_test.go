@@ -176,7 +176,7 @@ func TestDocumentDatabaseImportsIntoNormalizedTables(t *testing.T) {
 		t.Fatal("legacy document not retired", err)
 	}
 	var version int
-	if err := db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil || version != 7 {
+	if err := db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil || version != 8 {
 		t.Fatal(version, err)
 	}
 }

@@ -50,7 +50,7 @@ func TestSnoozeInputAndEscape(t *testing.T) {
 		t.Fatal("zero accepted")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	m = press(m, "z9999999999999999999999999D")
+	m = press(m, "z9999999999999999999999999m")
 	if !m.snoozes.input || len(m.snoozes.entries) != 0 {
 		t.Fatal("overflow accepted")
 	}
@@ -79,7 +79,7 @@ func TestSnoozeCrossViewRestartAndAutomaticExpiry(t *testing.T) {
 	if len(restarted.snoozes.rows()) != 1 {
 		t.Fatal("snooze lost after restart")
 	}
-	m = press(m, "Zz2h")
+	m = press(m, "vzz2h")
 	if rows := m.snoozes.rows(); len(rows) != 1 || !rows[0].Until.Equal(now.Add(2*time.Hour)) {
 		t.Fatal("replacement not based on now")
 	}
@@ -123,8 +123,8 @@ func TestJiraAndTaskScope(t *testing.T) {
 	m.tasks.active = true
 	m = press(m, "z")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.tasks.items[0].ID != "" {
-		t.Fatal("Esc changed task")
+	if len(m.snoozes.entries) != 1 {
+		t.Fatal("Esc added a deferral")
 	}
 	m = press(m, "z1h")
 	if len(m.tasks.visibleTasks()) != 0 || len(m.snoozes.entries) != 2 {
@@ -133,13 +133,13 @@ func TestJiraAndTaskScope(t *testing.T) {
 	if len(m.tasks.items[0].References) != 1 {
 		t.Fatal("reference removed")
 	}
-	m = press(m, "Z")
+	m = press(m, "vz")
 	for i, e := range m.snoozes.rows() {
 		if e.Kind == "task" {
 			m.snoozes.selected = i
 		}
 	}
-	m = press(m, "u")
+	m = press(m, "az")
 	if len(m.tasks.visibleTasks()) != 1 || !m.snoozes.hidden(id) {
 		t.Fatal("restoring task restored reference")
 	}
@@ -168,16 +168,16 @@ func TestSnoozeKeysStayTextInOtherEditors(t *testing.T) {
 	m.tasks.active, m.tasks.editing = true, true
 	m.tasks.items = []model.Task{{Title: "Task"}}
 	m.tasks.input.Focus()
-	m = press(m, "z12hZ")
-	if m.snoozes.input || m.snoozes.active || m.tasks.input.Value() != "z12hZ" {
+	m = press(m, "z12hvz")
+	if m.snoozes.input || m.snoozes.active || m.tasks.input.Value() != "z12hvz" {
 		t.Fatal("task editor consumed snooze keys")
 	}
 	m.tasks.active = false
 	m.jiraActive = true
 	m.jira = &jiraState{mode: "jql", input: m.input, snoozes: m.snoozes}
 	m.jira.input.Focus()
-	m = press(m, "z14DZ")
-	if m.snoozes.input || m.snoozes.active || m.jira.input.Value() != "z14DZ" {
+	m = press(m, "z14mvz")
+	if m.snoozes.input || m.snoozes.active || m.jira.input.Value() != "z14mvz" {
 		t.Fatal("JQL editor consumed snooze keys")
 	}
 }
@@ -194,7 +194,7 @@ func TestSnoozeTaskSelectionAfterRestart(t *testing.T) {
 	}
 	m = New(context.Background(), nil, nil)
 	t.Cleanup(m.cancel)
-	m = press(m, "T")
+	m = press(m, "vo")
 	if m.tasks.selected != 1 {
 		t.Fatal("opening tasks selected a deferred task")
 	}
@@ -208,7 +208,7 @@ func TestExpiredSnoozeInputKeepsTarget(t *testing.T) {
 	m := snoozeReady(t)
 	now := m.snoozes.at
 	m.snoozes.now = func() time.Time { return now }
-	m = press(m, "z1hZz2")
+	m = press(m, "z1hvzz2")
 	target := m.snoozes.target.ID
 	now = now.Add(time.Hour)
 	m, _ = update(m, snoozeTick{})

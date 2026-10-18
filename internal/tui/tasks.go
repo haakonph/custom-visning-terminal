@@ -325,9 +325,9 @@ func (t *taskState) moveTask(delta int, wrap bool) {
 
 func (m Model) tasksView() tea.View {
 	t := m.tasks
-	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "vg GitHub · vt Jira · / søk · h/l oppgave · d detaljer · E endre tittel · aa arkiver/gjenopprett · A vis arkiv"}
+	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "vg GitHub · vt Jira · / søk · h/l oppgave · d detaljer · ae endre tittel · aa arkiver · vb vis arkiv"}
 	if t.archived {
-		lines = append(lines, " Arkiverte oppgaver · aa gjenopprett · A aktive")
+		lines = append(lines, " Arkiverte oppgaver · aa gjenopprett · vo aktive")
 	}
 	lines = append(lines, m.snoozeLines()...)
 	if t.searching || t.editing {
@@ -335,7 +335,7 @@ func (m Model) tasksView() tea.View {
 	} else if t.query != "" {
 		lines = append(lines, "Søk: "+clean(t.query))
 	}
-	footer := "j/k velg · Enter detaljer/åpne · n ny · E tittel · d detaljer · ad slett · aa arkiver · A vis arkiv · Esc tilbake · q avslutt"
+	footer := "j/k velg · d detaljer · en åpne · an ny · ae tittel · d detaljer · ad slett · aa arkiver · vb vis arkiv · Esc tilbake · Ctrl+C avslutt"
 	capacity := max(1, m.height-len(lines)-2)
 	indices := t.visibleTasks()
 	list := []string{accent.Render(fmt.Sprintf(" OPPGAVER (%d/%d)", len(indices), len(t.items)))}
@@ -352,11 +352,14 @@ func (m Model) tasksView() tea.View {
 		if index == t.selected {
 			prefix = "› "
 		}
+		if m.extraSelected(taskRef(t.items[index]), "task") {
+			prefix += "✓ "
+		}
 		line := clean(fmt.Sprintf("%s%s (%d)", prefix, t.items[index].Title, len(t.items[index].References)))
 		list = append(list, line)
 	}
 	if len(indices) == 0 {
-		list = append(list, " Ingen oppgaver funnet.", " n lager en ny oppgave")
+		list = append(list, " Ingen oppgaver funnet.", " an lager en ny oppgave")
 	}
 	var details []string
 	if len(indices) > 0 {
@@ -372,6 +375,9 @@ func (m Model) tasksView() tea.View {
 			prefix := "  "
 			if i == t.row {
 				prefix = "› "
+			}
+			if m.extraSelected(r, "taskrefs:"+task.ID) {
+				prefix += "✓ "
 			}
 			line := clean(fmt.Sprintf("%s%s · %s · %s %s", prefix, r.Provider, r.Key, r.Title, r.Role))
 			details = append(details, line)

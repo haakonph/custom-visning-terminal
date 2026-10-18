@@ -45,7 +45,7 @@ func (m *Model) loadDetails() tea.Cmd {
 }
 func (m Model) detailLines() []string {
 	d := m.detail
-	lines := []string{fmt.Sprintf("%s #%d · %s", d.pr.Repository, d.pr.Number, d.pr.Title), "Esc tilbake · j/k ↑/↓ bla · r oppdater · Enter nettleser", ""}
+	lines := []string{fmt.Sprintf("%s #%d · %s", d.pr.Repository, d.pr.Number, d.pr.Title), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", ""}
 	if d.loading {
 		lines = append(lines, "Laster detaljer …")
 	}

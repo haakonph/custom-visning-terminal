@@ -1,0 +1,155 @@
+# Tastaturnavigasjon
+
+Dette er den fullstendige oversikten. Tastene gjelder i navigasjon, også i
+read-only detaljer. Tekstfelt og dialoger eier inntastingen sin. Enter bekrefter
+et valg eller et tekstfelt; den åpner ikke lenger elementer fra hovedlisten.
+Gamle enkelttaster og tall-/Tab-snarveier er fjernet.
+
+## Tastene fra spesifikasjonen
+
+| Tast | Handling |
+| --- | --- |
+| `j` / `k` / `↓` / `↑` | Neste/forrige rad; rull i detaljer |
+| `h` / `l` / `←` / `→` | Forrige/neste fane; på oppgavesiden forrige/neste oppgave |
+| `d` | Detaljer; for en chatmelding åpnes tråden |
+| `/` | Søk eller filtrer i aktiv visning |
+| `?` | Vis tilgjengelige hurtigtaster |
+| `Space` | Marker eller fjern markering av aktiv rad |
+| `Shift+↑` / `Shift+↓` | Utvid markeringen med aktiv og neste/forrige rad |
+| `x` | Fjern alle markeringer uten å endre søk eller filtre |
+| `z` + tall + `h` / `d` | Utsett valgte elementer i timer eller kalenderdager |
+| `Esc` | Avbryt sekvens/dialog, lukk detaljer eller fjern markeringer |
+
+Flervalg finnes for oppgaver, PR-er, Jira-saker, AI-sesjoner, chatmeldinger,
+oppgavereferanser og valglister. Markeringer beholdes ved bytte av fane/filter,
+men markeringer i en annen type eller en annen oppgaves referanser tas ikke med
+som et skjult valg. Uten markering bruker handlinger den aktive raden.
+Detaljer og tittelredigering gjelder ett aktivt element.
+
+| Ting | Tast |
+| --- | --- |
+| Interne oppgaver | `o` |
+| GitHub / Git management | `g` |
+| Jira / task management | `t` |
+| AI / Copilot | `a` |
+| Chat / Mattermost | `c` |
+
+| Starttast | Mønster | Handling |
+| --- | --- | --- |
+| `r` | `ro`, `rg`, `rt`, `ra`, `rc` | Relaterte elementer av valgt type |
+| `v` | `vo`, `vg`, `vt`, `va`, `vc` | Visningsside |
+| `t` | `to`, `tg`, `tt`, `ta`, `tc` | Velg elementer som skal kobles til valget |
+| `e` | `ee`, `en`, eller `e` + ting … + `e`/`n` | Åpne i editor / nettleser |
+| `a` | `a` + eventuelle ting … + handling | Utfør handling på valget/relasjonen |
+
+Ved kobling vises lastede elementer og lagrede referanser av valgt type.
+Velg med j/k, Space eller Shift+piltaster, og bekreft med Enter. Alle valgte
+kilder kobles til alle valgte mål, uten selvkoblinger eller duplikater. Koblingene
+er lokale og toveis, og lagres i `links.sqlite` i konfigurasjonsmappen
+(`CUSTOM_VISNING_LINKS` kan overstyre plasseringen). En oppgave får også
+referansene lagt til i sin egen lagring. Eksisterende oppgavereferanser,
+Jira-nøkler, PR-lenker i meldinger og AI-sesjonenes Jira-/repo-/branchdata brukes
+som naturlige relasjoner. Gamle oppgaver får en stabil intern ID ved behov.
+
+Ett relatert treff åpnes direkte; flere treff vises i en søkbar valgliste.
+Fra listen kan man markere flere og fortsette med `a`, `e`, `r` eller `t`.
+Enter går til aktivt treff. Hver ting i en sekvens følger én relasjon; en handling
+utvides aldri til et helt nettverk av indirekte sammenkoblede oppgaver.
+
+## Handlinger og kjeding
+
+| Handling | Tast etter `a` |
+| --- | --- |
+| Rediger og send melding til konfigurert Mattermost-webhook | `c` |
+| Arkiver valgte elementer lokalt / gjenopprett fra arkivvisningen | `a` |
+| Slett intern oppgave eller valgte referanser i oppgavedetaljer | `d` |
+| Flytt Jira-saker: hent og velg faktisk overgang | `f` |
+| Tilordne Jira til meg | `m` |
+| Fjern min Jira-tilordning, uten å fjerne andre ansvarlige | `r` |
+
+`ac` lager et redigerbart Markdown-utkast fra valgte elementer uansett type.
+Inne i utkastet betyr `ee` rediger igjen og `ac` send. Teksten må bekreftes ved
+å sende; åpning av utkastet sender ingen melding. Mottakeren er den konfigurerte
+webhook-kanalen, ikke automatisk kanalen til en markert chatmelding.
+
+`aa` skjuler elementene fra vanlige lister uten å endre eksterne systemer.
+`vb` viser det lokale arkivet, der `aa` gjenoppretter valgte elementer.
+`d` viser lagrede detaljer om arkiverte/utsatte elementer uten å velge en annen rad.
+Utsatt-visningen støtter også søk, flervalg og samlet gjenoppretting med `az`.
+`ad` sletter ikke PR-er, Jira-saker, AI-historikk eller chatmeldinger eksternt.
+Ved oppgavesletting fjernes også tilhørende lokale koblinger.
+
+| Tast etter Jira-flytting (`af` eller `atf`) | Målstatus |
+| --- | --- |
+| `q` | QA |
+| `u` | Under arbeid |
+| `a` | Avklaring |
+| `f` | Ferdig |
+
+Overgangene hentes fra hver saks arbeidsflyt. Navn som QA/Quality Assurance,
+In Progress/Under arbeid, Clarification/Avklaring og Done/Closed/Ferdig støttes.
+Listen viser bare entydige målstatuser som er felles for alle valgte saker.
+Velg en annen tilgjengelig overgang med j/k og Enter. En snarvei med manglende
+eller tvetydig status utfører ingen endring. Jira kan avvise overganger som
+krever flere felt. Ved feil stoppes resten av flervalget; tidligere saker kan
+allerede være oppdatert. Esc avbryter før utføring, ikke en allerede sendt endring.
+
+Eksempler:
+
+- `atfq` fra GitHub: Jira-sakene til valgte PR-er flyttes til QA, uten visningsbytte.
+- `atfu`, `atfa`, `atff`: samme målvalg, andre statuser.
+- `atm` / `atr`: tilordne meg / fjern meg fra tilhørende Jira-saker.
+- `afq` / `am` / `ar` direkte i Jira: handling på valgte saker.
+- `etn`: tilhørende Jira-saker åpnes i nettleseren.
+- `eae`: tilhørende AI-sesjoners prosjekt åpnes i IntelliJ.
+- `atgc`: følg Jira, så GitHub, og lag melding om PR-ene som ble funnet.
+- `aod`: slett den tilhørende interne oppgaven.
+- `to` fra AI/chat/Jira/GitHub: velg intern oppgave som skal få referansene.
+
+Målene tas fra valget når sekvensen starter. Bakgrunnsoppdateringer flytter ikke
+handlingen til en annen rad. QA-tasten kan også skrives mens overgangene lastes.
+`ee` bruker IntelliJ. Fra typer uten eget prosjekt følges relasjoner til lastede
+PR-er og AI-prosjekter. `en` åpner HTTPS-adresser; AI-sesjoner uten nettadresse
+kan bare åpnes i editor. En referanse som ikke er lastet kan ikke åpnes i editor
+ved å falle tilbake til en tilfeldig aktiv PR.
+
+## Valg som ikke var definert i listen
+
+Følgende utvider mønsteret for funksjoner som allerede fantes:
+
+| Sekvens | Betydning |
+| --- | --- |
+| `au` | Oppdater/synkroniser aktiv visning eller detaljer; prøv GitHub-oppstart igjen |
+| `an` | Ny intern oppgave fra valgte elementer; på oppgavesiden en tom oppgave |
+| `ae` | Endre aktiv oppgaves tittel; `aoe` kan først finne en tilhørende oppgave |
+| `as` / `ax` | Lagre aktivt Jira-søk / nullstill Jira-hurtigfiltre og egen JQL |
+| `vs` / `vr` | Innstillinger / forrige hovedvisning |
+| `vi` | Copilot-diagnostikk |
+| `vf` / `vj` | Jira-hurtigfiltre / egen JQL |
+| `vz` / `az` | Vis utsatte / gjenopprett valgte utsatte elementer |
+| `vb` | Vis lokalt arkiv |
+| `vk` | Velg hvilke Mattermost-kanaler som skal overvåkes |
+| `al` / `ap` | Chat-innlogging med passord/TOTP / PAT |
+| `av` / `aw` / `ab` | Merk kanal lest / slutt å overvåke / tøm lokal chatkonto og lagret sesjon |
+| `ah` / `aj` / `ak` | Eldre chatmeldinger / rull en halv side ned/opp |
+| `el` | Vis en liste over eksterne lenker i valgte elementer |
+| `ev` | Velg editor med j/k + Enter: IntelliJ, VS Code eller egendefinert |
+| `z` + tall + `m` | Utsett til kl. 06 etter antall kalenderdager, tidligere stor `D` |
+| `Ctrl+C` | Avslutt og kanseller bakgrunnsarbeid |
+| `Enter` | Bekreft valg/tekst i dialoger; ikke en snarvei i hovedlisten |
+
+`a` og `c` er både ting og handlinger i spesifikasjonen. Handlingen vinner:
+`aa` arkiverer og `ac` lager melding. Bruk `:` for et uttrykkelig relatert mål:
+`a:ac` følger AI og lager melding om sesjonene, og `a:cc` følger chat og lager
+melding om treffene. Man kan også først navigere med `ra`/`rc` og deretter utføre
+en handling. Kolonet starter ikke lenger JQL; det er kun en del av en pågående
+handlingssekvens.
+
+Listen definerte heller ikke om kobling, arkivering og sletting skulle endre
+systemene eksternt, hvilken chatkanal en melding skulle sendes til, hvordan
+flertydige relasjoner skulle velges, eller hva som skulle skje når en valgt type
+mangler data/konfigurasjon. Her er valgene: koblinger/arkiv er lokale, sletting er
+avgrenset til interne oppgaver/referanser, meldinger bruker konfigurert webhook,
+flere treff gir valgliste, og manglende mål gir en synlig melding uten å velge et
+annet objekt. Ingen nye API-er for ekstern sletting, fjernarkivering eller
+endring av eksterne relasjoner er innført.

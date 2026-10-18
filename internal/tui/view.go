@@ -44,29 +44,35 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
-	if m.jiraActive && !m.tasks.active && !m.copilotActive && (m.mmReader == nil || !m.mmReader.active) && m.jira != nil && m.jira.detail != nil {
-		return m.jiraDetailView()
+	if m.help {
+		return m.helpView()
+	}
+	if m.snoozes != nil && m.snoozes.input {
+		return m.snoozeInputView()
 	}
 	if m.sequence != "" || m.sequenceNotice != "" || m.jiraAction != nil {
 		return m.keyboardView()
 	}
-	if m.detail != nil {
-		return m.detailView()
-	}
-	if m.mmReader != nil && m.mmReader.active {
-		return m.mmReaderView()
+	if m.settings.active {
+		return m.settingsView()
 	}
 	if m.mattermost != nil && m.mattermost.active {
 		return m.mattermostView()
 	}
-	if m.settings.active {
-		return m.settingsView()
+	if m.dialog != nil {
+		return m.entityView()
 	}
 	if m.snoozes != nil && m.snoozes.active {
 		return m.snoozeView()
 	}
-	if m.help {
-		return m.helpView()
+	if m.detail != nil {
+		return m.detailView()
+	}
+	if m.visibleProvider() == "jira" && m.jira.detail != nil {
+		return m.jiraDetailView()
+	}
+	if m.mmReader != nil && m.mmReader.active {
+		return m.mmReaderView()
 	}
 	if m.tasks.active {
 		return m.tasksView()
@@ -77,9 +83,6 @@ func (m Model) View() tea.View {
 	if m.jiraActive {
 		return m.jiraView()
 	}
-	if m.help {
-		return m.helpView()
-	}
 	lines := []string{}
 	user := m.snapshot.User
 	if user == "" {
@@ -88,7 +91,7 @@ func (m Model) View() tea.View {
 	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [vg GitHub] · vt Jira"))
 	tabs := []string{}
 	for v := model.Open; v < model.ViewCount; v++ {
-		label := fmt.Sprintf("%d %s", v+1, v.String())
+		label := v.String()
 		if m.loading[v] {
 			label += " ↻"
 		}
@@ -102,7 +105,7 @@ func (m Model) View() tea.View {
 	if m.width < 95 {
 		tabs = nil
 		for v := model.Open; v < model.ViewCount; v++ {
-			label := fmt.Sprintf("%d", v+1)
+			label := v.String()
 			if v == m.active {
 				label = "[" + label + "] " + v.String()
 			}
@@ -133,7 +136,7 @@ func (m Model) View() tea.View {
 		lines = append(lines, m.input.View())
 	}
 	if m.local != nil && m.local.choosing {
-		lines = append(lines, " Open in: 1 IntelliJ IDEA · 2 VS Code · 3 custom · Esc cancel")
+		lines = append(lines, fmt.Sprintf(" Editor: %s · j/k velg · Enter åpne · Esc avbryt", []string{"IntelliJ IDEA", "VS Code", "egendefinert"}[m.local.editorChoice]))
 	}
 	if m.help {
 		lines = append(lines, strings.Split(helpText, "\n")...)

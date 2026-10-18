@@ -16,6 +16,13 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	previousProvider string
+	entities         *entityState
+	dialog           *entityDialog
+	extraChosen      map[string]model.TaskReference
+	sequenceRefs     []model.TaskReference
+	internalKey      bool
+
 	sequence       string
 	sequenceNotice string
 	jiraAction     *jiraActionState
@@ -77,7 +84,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	s := newSnooze()
 	tasks := newTasks()
 	tasks.snoozes = s
-	m := Model{chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m := Model{entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadJiraPattern()
 	return m
 }

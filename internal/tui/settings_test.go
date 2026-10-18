@@ -35,7 +35,7 @@ func TestSettingsSaveReloadAndReset(t *testing.T) {
 		if err := jira.SaveConfig(jira.ConfigPath(), jira.Config{Queries: []jira.Query{query}}); err != nil {
 			t.Fatal(err)
 		}
-		m, _ = update(m, key(','))
+		m, _ = sequence(m, "vs")
 		m = editSetting(t, m, 0, `KAKE-[0-9]{3,5}`)
 		if !m.settings.active || m.settings.editing {
 			t.Fatal(m.settings.notice)
@@ -63,7 +63,7 @@ func TestSettingsSaveReloadAndReset(t *testing.T) {
 func TestSettingsInvalidCancelAndWriteFailure(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
-	m, _ = update(m, key(','))
+	m, _ = sequence(m, "vs")
 	m = editSetting(t, m, 0, "[")
 	if !m.settings.editing || m.settings.notice == "" || m.jiraPattern != nil {
 		t.Fatal("invalid pattern accepted")
@@ -90,7 +90,7 @@ func TestSettingsUseOneFileAndPreserveOtherSections(t *testing.T) {
 	if err := appconfig.Update(appconfig.Path(), map[string]any{"future": "keep"}); err != nil {
 		t.Fatal(err)
 	}
-	m, _ = update(m, key(','))
+	m, _ = sequence(m, "vs")
 	for _, tc := range []struct {
 		index int
 		value string
@@ -151,7 +151,7 @@ func TestSettingsFromCopilotAndTypingComma(t *testing.T) {
 	defer m.cancel()
 	m.copilot = &copilotState{}
 	m.copilotActive = true
-	m, _ = update(m, key(','))
+	m, _ = sequence(m, "vs")
 	if !m.settings.active {
 		t.Fatal("settings unavailable in Copilot")
 	}
@@ -169,7 +169,7 @@ func TestSettingsFromCopilotAndTypingComma(t *testing.T) {
 func TestSettingsTokenHelpNavigation(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
-	m, _ = update(m, key(','))
+	m, _ = sequence(m, "vs")
 	m.width, m.height = 60, 12
 	m.settings.selected = 1
 	m, _ = update(m, key('?'))

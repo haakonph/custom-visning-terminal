@@ -15,6 +15,8 @@ import (
 )
 
 type jiraState struct {
+	entities *entityState
+
 	detail                *jira.Issue
 	detailOffset          int
 	snoozes               *snoozeState
@@ -52,7 +54,7 @@ func (m Model) WithJira(client *jira.Client, direct bool) Model {
 	input.CharLimit = 8192
 	path := jira.ConfigPath()
 	config, err := jira.LoadConfig(path)
-	state := &jiraState{snoozes: m.snoozes, client: client, config: config, configPath: path, configOK: err == nil, input: input}
+	state := &jiraState{entities: m.entities, snoozes: m.snoozes, client: client, config: config, configPath: path, configOK: err == nil, input: input}
 	state.filters.Project = config.Project
 	if value := os.Getenv("JIRA_PROJECT"); value != "" {
 		state.filters.Project = value
@@ -112,7 +114,7 @@ func (m *Model) refreshJira() tea.Cmd {
 func (j *jiraState) filtered() []jira.Issue {
 	visible := make([]jira.Issue, 0, len(j.rows))
 	for _, r := range j.rows {
-		if !j.snoozes.hidden(snooze.Identity("jira", r.URL)) {
+		if !j.snoozes.hidden(snooze.Identity("jira", r.URL)) && !j.entities.archived("jira", r.URL) {
 			visible = append(visible, r)
 		}
 	}
@@ -282,7 +284,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, j.edit("name", "Lagre søk som: ", "")
 		case "f":
 			if j.active >= 4 || j.custom != "" {
-				j.notice = "Hurtigfiltre gjelder standardfanene; bruk : for å endre lagret JQL"
+				j.notice = "Hurtigfiltre gjelder standardfanene; bruk vj for å endre lagret JQL"
 				return m, nil
 			}
 			j.filterBackup = j.filters
@@ -320,9 +322,7 @@ func (m Model) jiraView() tea.View {
 	var tabs []string
 	for i, t := range j.tabs {
 		label := t.Name
-		if i < 9 {
-			label = fmt.Sprintf("%d %s", i+1, t.Name)
-		}
+
 		if i == j.active {
 			label = "[" + label + "]"
 		}
@@ -339,9 +339,7 @@ func (m Model) jiraView() tea.View {
 		state = "henter…"
 	}
 	lines = append(lines, fmt.Sprintf(" %s · siste synk: %s", state, sync), " JQL: "+clean(j.query))
-	if j.help {
-		lines = append(lines, "g: GitHub · J (Shift+j): Jira (i navigasjonsmodus)", "1–9: velg fane direkte · Tab / Shift+Tab: neste / forrige fane", "f: kombiner filtre, Enter neste felt, Esc avbryter", ": skriv JQL (inkludert ORDER BY); s: lagre med navn", "/: filtrer lokalt; x: nullstill hurtigfiltre og egen JQL", "JQL-søk kjøres i Jira. Lagrede søk brukes uten hurtigfiltre.")
-	}
+
 	if j.mode != "" || j.input.Prompt == "/ " {
 		lines = append(lines, j.input.View())
 	}

@@ -14,6 +14,13 @@ type Account struct {
 	Username string
 }
 
+type ArchivedEntity struct {
+	Provider     string
+	Url          string
+	ReferenceKey string
+	Title        string
+}
+
 type CopilotEvent struct {
 	SessionID         string
 	EventKey          string
@@ -83,6 +90,17 @@ type CopilotUsage struct {
 type Document struct {
 	ID      int64
 	Payload []byte
+}
+
+type EntityLink struct {
+	SourceProvider string
+	SourceUrl      string
+	SourceKey      string
+	SourceTitle    string
+	TargetProvider string
+	TargetUrl      string
+	TargetKey      string
+	TargetTitle    string
 }
 
 type GithubLabel struct {
@@ -252,6 +270,7 @@ type Task struct {
 	Position int64
 	StableID string
 	Title    string
+	Archived int64
 }
 
 type TaskReference struct {

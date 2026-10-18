@@ -109,11 +109,11 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 	m.copilot.selected = 1
 	var opened string
 	m.copilot.openIDE = func(ctx context.Context, s copilot.Session) error { opened = s.ID; return nil }
-	m, cmd := update(m, key('i'))
+	m, cmd := sequence(m, "ee")
 	if cmd == nil || !m.copilot.openingIDE {
 		t.Fatal("IDE action not scheduled")
 	}
-	_, duplicate := update(m, key('i'))
+	_, duplicate := sequence(m, "ee")
 	if duplicate != nil {
 		t.Fatal("duplicate launch while pending")
 	}
@@ -122,7 +122,7 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 		t.Fatal("wrong selection or missing feedback")
 	}
 	m.copilot.detail = &copilot.Detail{Session: copilot.Session{ID: "detail"}}
-	m, cmd = update(m, key('i'))
+	m, cmd = sequence(m, "ee")
 	m, _ = update(m, cmd())
 	if opened != "detail" {
 		t.Fatal("opened list row instead of detail")
@@ -139,7 +139,7 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 	m.copilot.filtering = false
 	m.copilot.detail = nil
 	m.copilot.sessions = nil
-	_, cmd = update(m, key('i'))
+	_, cmd = sequence(m, "ee")
 	if cmd != nil {
 		t.Fatal("launched IDE without session")
 	}

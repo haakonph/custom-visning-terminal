@@ -19,22 +19,28 @@ func (q *Queries) ClearTasks(ctx context.Context) error {
 }
 
 const insertTasks = `-- name: InsertTasks :exec
-INSERT INTO tasks (position, stable_id, title) VALUES (?1, ?2, ?3)
+INSERT INTO tasks (position, stable_id, title, archived) VALUES (?1, ?2, ?3, ?4)
 `
 
 type InsertTasksParams struct {
 	Position int64
 	StableID string
 	Title    string
+	Archived int64
 }
 
 func (q *Queries) InsertTasks(ctx context.Context, arg InsertTasksParams) error {
-	_, err := q.db.ExecContext(ctx, insertTasks, arg.Position, arg.StableID, arg.Title)
+	_, err := q.db.ExecContext(ctx, insertTasks,
+		arg.Position,
+		arg.StableID,
+		arg.Title,
+		arg.Archived,
+	)
 	return err
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT position, stable_id, title FROM tasks ORDER BY position
+SELECT position, stable_id, title, archived FROM tasks ORDER BY position
 `
 
 func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
@@ -46,7 +52,12 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 	items := []Task{}
 	for rows.Next() {
 		var i Task
-		if err := rows.Scan(&i.Position, &i.StableID, &i.Title); err != nil {
+		if err := rows.Scan(
+			&i.Position,
+			&i.StableID,
+			&i.Title,
+			&i.Archived,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

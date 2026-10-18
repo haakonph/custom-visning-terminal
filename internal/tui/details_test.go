@@ -39,7 +39,7 @@ func TestDetailTreeAndStaleResult(t *testing.T) {
 // Exercise both providers through the shared Update/View dispatch after merging.
 func TestDetailsFromMattermostPRRoundTrip(t *testing.T) {
 	m := readerModel(t)
-	m, _ = update(m, key('g'))
+	m, _ = sequence(m, "rg")
 	m, _ = update(m, key('d'))
 	if m.detail == nil || m.detail.pr.Number != 1 || !strings.Contains(m.View().Content, "Endrede filer") {
 		t.Fatal("linked PR did not open GitHub details")
@@ -55,7 +55,7 @@ func TestDetailsFromMattermostPRRoundTrip(t *testing.T) {
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	m, _ = sequence(m, "rc")
-	if m.detail != nil || !m.mmReader.active || !m.mmReader.mentions {
+	if m.detail != nil || m.dialog == nil || len(m.dialog.rows) != 2 {
 		t.Fatal("could not return from GitHub details to Mattermost references")
 	}
 }

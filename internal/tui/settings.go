@@ -313,9 +313,9 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !s.editing {
 			switch key.String() {
-			case "j", "down", "tab":
+			case "j", "down":
 				s.selected = (s.selected + 1) % len(settingFields)
-			case "k", "up", "shift+tab":
+			case "k", "up":
 				s.selected = (s.selected + len(settingFields) - 1) % len(settingFields)
 			}
 			return m, nil

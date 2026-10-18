@@ -30,12 +30,12 @@ func TestPRSelectionAcrossViews(t *testing.T) {
 	m := localModel(t)
 	m, _ = update(m, key(' '))
 	m.snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo", Number: 7, URL: "https://github.com/other/repo/pull/7"}}
-	m, _ = update(m, key('2'))
+	m, _ = sequence(m, "l")
 	m, _ = update(m, key(' '))
 	if len(m.local.chosen) != 2 {
 		t.Fatal("selection lost across views")
 	}
-	m, _ = update(m, key('1'))
+	m, _ = sequence(m, "h")
 	m, _ = update(m, key(' '))
 	if len(m.local.chosen) != 1 {
 		t.Fatal("toggle failed")
@@ -43,7 +43,7 @@ func TestPRSelectionAcrossViews(t *testing.T) {
 }
 func TestEditorChoiceAndFallback(t *testing.T) {
 	m := localModel(t)
-	m, _ = update(m, key('O'))
+	m, _ = sequence(m, "ev")
 	if !m.local.choosing {
 		t.Fatal("no chooser")
 	}
@@ -51,11 +51,11 @@ func TestEditorChoiceAndFallback(t *testing.T) {
 	if m.local.choosing {
 		t.Fatal("chooser did not close")
 	}
-	m, cmd := update(m, key('o'))
+	m, cmd := sequence(m, "ee")
 	if cmd == nil || m.local.running != 1 {
 		t.Fatal("highlighted fallback not queued")
 	}
-	m, cmd = update(m, key('o'))
+	m, cmd = sequence(m, "ee")
 	if cmd != nil {
 		t.Fatal("duplicate operation queued")
 	}

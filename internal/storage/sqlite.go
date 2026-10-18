@@ -157,6 +157,8 @@ func domain(value any) (string, any, error) {
 		kind = "copilot"
 	case []model.Task:
 		kind = "tasks"
+	case model.EntityState:
+		kind = "entities"
 	case map[string]string:
 		kind = "repositories"
 	case map[string]model.LocalStatus:

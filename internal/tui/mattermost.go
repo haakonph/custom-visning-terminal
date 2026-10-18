@@ -172,7 +172,7 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 }
 func (m Model) mattermostView() tea.View {
 	s := m.mattermost
-	lines := []string{accent.Render(" MATTERMOST · Markdown"), " e rediger i Vim · :wq lagre i Vim · Ctrl+S send · Esc avbryt · j/k rull", ""}
+	lines := []string{accent.Render(" MATTERMOST · Markdown"), " ee rediger i Vim · :wq lagre i Vim · ac send · Esc avbryt · j/k rull", ""}
 	content := strings.Split(s.text, "\n")
 	start := min(s.offset, max(0, len(content)-1))
 	for _, line := range content[start:min(len(content), start+max(1, m.height-5))] {

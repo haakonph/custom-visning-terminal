@@ -29,37 +29,18 @@ type jiraActionMsg struct {
 // Resolve and deduplicate at the start of the action; never depend on a view
 // switch or on the timing of a background search to find the intended issues.
 func (m Model) actionJiraKeys() []string {
-	seen := map[string]bool{}
-	if m.tasks.active {
-		if len(m.tasks.visibleTasks()) > 0 {
-			for _, ref := range m.tasks.items[m.tasks.selected].References {
-				if ref.Provider == "jira" {
-					seen[ref.Key] = true
-				}
-			}
-		}
-	} else if m.copilotActive || (m.mmReader != nil && m.mmReader.active) {
-		return nil
-	} else if m.jiraActive {
-		for key := range m.jiraChosen {
-			seen[key] = true
-		}
-		if len(seen) == 0 {
-			rows := m.jira.filtered()
-			if m.jira.selected >= 0 && m.jira.selected < len(rows) {
-				seen[rows[m.jira.selected].Key] = true
-			}
-		}
-	} else {
-		for _, p := range m.selectedPRs() {
-			for _, key := range p.JiraKeys(m.jiraPattern) {
-				seen[key] = true
-			}
-		}
+	refs := m.sequenceRefs
+	if refs == nil {
+		refs = m.currentReferences()
 	}
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
+	refs = m.relatedReferences(refs, "jira")
+	keys := []string{}
+	seen := map[string]bool{}
+	for _, r := range refs {
+		if r.Key != "" && !seen[r.Key] {
+			seen[r.Key] = true
+			keys = append(keys, r.Key)
+		}
 	}
 	sort.Strings(keys)
 	return keys
@@ -194,13 +175,7 @@ func (m Model) jiraActionKey(k string) (tea.Model, tea.Cmd) {
 		} else {
 			m.sequenceNotice = "Ingen entydig overgang for denne hurtigtasten. Velg fra listen."
 		}
-	default:
-		if len(k) == 1 && k[0] >= '1' && k[0] <= '9' {
-			index := int(k[0] - '1')
-			if index < len(state.choices) {
-				choice = state.choices[index]
-			}
-		}
+
 	}
 	if choice == "" {
 		return m, nil

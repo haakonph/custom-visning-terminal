@@ -1,49 +1,64 @@
 package tui
 
-const shortcuts = "j/k ↑/↓ velg · h/l ←/→ fane · d detaljer · Space marker · r relatert · v visning · t koble · e åpne · a handling · / søk · ? hjelp · R oppdater · q avslutt"
-const helpText = `Hurtigtaster (i navigasjonsmodus)
+const shortcuts = "j/k ↑/↓ velg · h/l ←/→ fane · d detaljer · Space marker · r relatert · v visning · t koble · e åpne · a handling · / søk · ? hjelp · Ctrl+C avslutt"
+const helpText = `Hurtigtaster
 j/k / ↑/↓   Naviger opp/ned
-h/l / ←/→   Forrige/neste fane (oppgaver: forrige/neste oppgave)
-d           Detaljer (Mattermost: tråd)
-Space       Marker/fjern markering av PR eller Jira-sak
-Shift+↑/↓   Utvid markering fra aktiv rad, inkludert neste/forrige rad
-x           Fjern alle markeringer (beholder søk og filtre)
-/           Søk/filtrer; Enter beholder, Esc avbryter søk
-?           Vis/lukk denne hjelpen
-Esc         Avbryt sekvens, lukk detaljer eller fjern markeringer
-z           Utsett: positivt heltall, så h timer / d dager / D kl. 06
-Z           Vis utsatte; z endrer tidspunkt, u gjenoppretter
+h/l / ←/→   Forrige/neste fane; oppgaver: forrige/neste oppgave
+d           Detaljer; chat: tråd
+Space       Marker/fjern markering, i alle fem typer
+Shift+↑/↓   Utvid markeringen med aktiv og neste/forrige rad
+x           Fjern alle markeringer; behold søk og filtre
+/           Søk/filtrer; Enter beholder søket, Esc avbryter
+?           Vis/lukk hjelp
+Esc         Avbryt sekvens, lukk detaljer eller fjern markering
+z           Utsett: positivt heltall + h timer / d kalenderdager
+            m er ekstra enhet: kalenderdager kl. 06 (tidligere D)
 
-Starttast + ting: o oppgave, g GitHub, t Jira, a Copilot, c Mattermost
-vo/vg/vt/va/vc  Gå til visningsside
-rt / rg     Relatert Jira fra PR / relaterte PR-er fra Jira
-rc          Mattermost-omtaler av aktiv PR
-to / tn     Koble valgte PR-er/Jira-saker til aktiv / ny intern oppgave
-ee / en     Åpne PR-er i standardeditor / åpne i nettleser
-etn / egn   Åpne tilknyttede Jira-saker / relaterte lastede PR-er i nettleser
-ac          Rediger valgte PR-er som Markdown og send til Mattermost
-atf         Flytt tilknyttede Jira-saker: velg faktisk overgang
-atfq        Flytt til QA (også direkte fra GitHub, uten visningsbytte)
-atfu/atfa/atff  Under arbeid / avklaring / ferdig
-atm / atr   Tilordne Jira til meg / fjern meg som ansvarlig
-            I Jira kan a + f/m/r brukes uten t
-            f viser liste; j/k + Enter eller 1–9 velger overgang
-            q/u/a/f velger entydig status; Esc avbryter før utføring
-            Alle valgte PR-ers Jira-nøkler dedupliseres
-            Mislykket flervalg kan ha oppdatert tidligere saker
+Ting: o oppgaver · g GitHub · t Jira · a AI/Copilot · c chat/Mattermost
+vo/vg/vt/va/vc  Visningsside
+ro/rg/rt/ra/rc  Relaterte elementer av valgt type
+                Flere treff vises i en søkbar valgliste
+                Velg og fortsett med r/e/a/t, eller Enter for å gå dit
+to/tg/tt/ta/tc  Koble til valgte mål av typen; Enter lagrer lokalt
+                Space og Shift+↑/↓ velger flere kilder og mål
+ee/en           Editor (IntelliJ) / nettleser
+e + ting + e/n  Følg relasjon(er), åpne i editor/nettleser
+ac/aa/ad        Melding / lokalt arkiv / slett lokal oppgave/referanse
+atf             Flytt tilhørende Jira-saker; velg faktisk overgang
+atfq/atfu       QA / under arbeid
+atfa/atff       Avklaring / ferdig
+atm/atr         Tilordne meg / fjern meg som ansvarlig
+af/am/ar        Samme Jira-handlinger direkte på Jira-saker
+                Målene tas fra valget ved starten av sekvensen
+                q/u/a/f kan skrives mens overganger lastes
+                Esc avbryter før utføring; feil stopper resten
+                Tidligere saker i flervalget kan være oppdatert
 
-Oppgaver: d detaljer, ad fjern referanse i detaljer / slett oppgave i liste
-          aa arkiver/gjenopprett, A bytt aktiv/arkiv, E endre tittel, n ny
-Copilot:  D diagnostikk, ee IntelliJ
-Mattermost: A innlogging, d tråd, H eldre meldinger, R synk
-Jira:     f hurtigfiltre, : JQL, s lagre søk; Space markerer saker
-R         Oppdater aktiv visning / prøv GitHub-oppstart igjen
-1–4       GitHub-fane; 1–9 Jira-fane
-, / P     Innstillinger
-Enter     Åpne valgt element (oppgaver: detaljer)
-q/Ctrl+C  Avslutt (q er QA bare inne i flyttesekvensen)
+Handlingsnavn vinner ved kollisjon: aa arkiv, ac melding
+a:a… / a:c…     : velger uttrykkelig AI/chat som relatert mål
+Eksempler: atgc, etn, a:ac, atgtfq (hver ting følger én relasjon)
 
-Snarveier som ikke støttes for valgt element gir en melding.
-Tekstfelt, snooze, editorvalg og dialoger beholder egen tastaturstyring.
+Tillegg for funksjoner som ikke var definert i listen:
+au              Oppdater/synkroniser aktiv visning eller detaljer
+an/ae           Ny intern oppgave fra valget / endre oppgavetittel
+as/ax           Lagre Jira-søk / nullstill hurtigfiltre og egen JQL
+vs/vi/vr        Innstillinger / Copilot-diagnostikk / forrige visning
+vf/vj           Jira-hurtigfiltre / JQL-redigering
+vz/az           Vis utsatte / hent tilbake valgte utsatte elementer
+vb              Lokalt arkiv; aa gjenoppretter valgte elementer
+vk              Velg/overvåk Mattermost-kanaler
+al/ap           Chat-innlogging med passord+TOTP / PAT
+av/aw/ab        Merk kanal lest / slutt å overvåke / tøm lokal chatkonto
+ah/aj/ak        Eldre chatmeldinger / rull en halv side ned/opp
+el              Velg lenker fra valgte elementer
+ev             Velg editor med j/k + Enter (IntelliJ, VS Code, egendefinert)
+Ctrl+C          Avslutt og kanseller bakgrunnsarbeid
+Enter           Bekreft i dialoger, valglister og tekstfelt
+
+Gamle enkelttaster og nummer-/Tab-snarveier er fjernet.
+Tekstfelt mottar bokstavene som tekst; de starter ikke tastsekvenser.
+Koblinger og arkivering er lokale. ad sletter ikke eksterne ressurser.
+AI-sesjoner uten HTTPS-adresse åpnes i editor, ikke nettleser.
+Jira-status må være tilgjengelig og entydig; andre ansvarlige fjernes ikke.
 UNKNOWN betyr at GitHub ikke har levert en status.
 Delvis oppdatering beholder cache og tidspunkt for siste fulle synk.`

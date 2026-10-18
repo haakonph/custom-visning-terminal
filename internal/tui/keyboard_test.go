@@ -134,7 +134,7 @@ func TestJiraSelectionLinkingAndDetails(t *testing.T) {
 	m := jiraModel(t)
 	m.jira.rows = []jira.Issue{{Key: "APP-1", Title: "One", URL: "https://jira.example/browse/APP-1", Description: "Details"}, {Key: "APP-2", Title: "Two", URL: "https://jira.example/browse/APP-2"}}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
-	m, _ = sequence(m, "tn")
+	m, _ = sequence(m, "an")
 	if len(m.tasks.items) != 1 || len(m.tasks.items[0].References) != 2 {
 		t.Fatal("Jira multiselect not linked")
 	}
@@ -153,6 +153,7 @@ func TestJiraSelectionLinkingAndDetails(t *testing.T) {
 func TestTaskArchiveRestoreAndDetailsDoNotDelete(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_TASKS", t.TempDir()+"/tasks.json")
 	m := New(context.Background(), nil, nil)
+	m.entities.path = t.TempDir() + "/links.sqlite"
 	defer m.cancel()
 	m.tasks.active = true
 	m.tasks.items = []model.Task{{Title: "Keep", References: []model.TaskReference{{Key: "APP-1"}}}}
@@ -165,8 +166,8 @@ func TestTaskArchiveRestoreAndDetailsDoNotDelete(t *testing.T) {
 	if len(m.tasks.visibleTasks()) != 0 {
 		t.Fatal("not archived")
 	}
-	m, _ = sequence(m, "Aaa")
-	m, _ = sequence(m, "A")
+	m, _ = sequence(m, "vb")
+	m, _ = sequence(m, "aa")
 	if len(m.tasks.visibleTasks()) != 1 || m.tasks.items[0].Archived {
 		t.Fatal("not restored")
 	}
