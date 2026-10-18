@@ -134,7 +134,7 @@ func TestBootstrapLoadsCacheBeforeRefresh(t *testing.T) {
 	source := &fakeSource{}
 	m := New(context.Background(), source, store)
 	defer m.cancel()
-	msg := m.Init()()
+	msg := m.bootstrap()()
 	m, cmd := update(m, msg)
 	if cmd == nil || len(m.filtered()) != 1 || source.calls != 0 || m.snapshot.User != "alice" {
 		t.Fatal("cache was not displayed before API refresh")
@@ -149,7 +149,7 @@ func TestBootstrapErrorAndRetry(t *testing.T) {
 	source := &fakeSource{err: errors.New("auth missing")}
 	m := New(context.Background(), source, nil)
 	defer m.cancel()
-	m, _ = update(m, m.Init()())
+	m, _ = update(m, m.bootstrap()())
 	if m.notice != "auth missing" || m.booting {
 		t.Fatal("auth error missing")
 	}
@@ -228,8 +228,46 @@ func TestOfflineStartupUsesCredentialScopedCache(t *testing.T) {
 	source := &fakeSource{err: errors.New("offline")}
 	m := New(context.Background(), source, store)
 	defer m.cancel()
-	msg := m.Init()().(bootMsg)
+	msg := m.bootstrap()().(bootMsg)
 	if msg.err != nil || msg.snapshot.User != "alice" || len(msg.snapshot.Datasets[0].PRs) != 1 {
 		t.Fatalf("offline cache unavailable: %+v", msg)
+	}
+}
+
+func TestHelpScrollAndSmallWindows(t *testing.T) {
+	m := snoozeReady(t)
+	m = press(m, "?")
+	for _, size := range [][2]int{{120, 30}, {40, 10}, {8, 3}, {1, 1}} {
+		m, _ = update(m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		for range 50 {
+			m = press(m, "j")
+		}
+		view := m.View()
+		if !view.AltScreen || len(strings.Split(view.Content, "\n")) > size[1] {
+			t.Fatal("help exceeds window height")
+		}
+		for _, line := range strings.Split(view.Content, "\n") {
+			if ansi.StringWidth(line) > size[0] {
+				t.Fatal("help exceeds window width")
+			}
+		}
+	}
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 10})
+	if !strings.Contains(m.View().Content, "Partial refreshes") {
+		t.Fatal("cannot reach the end of help")
+	}
+	for range 50 {
+		m = press(m, "k")
+	}
+	if !strings.Contains(m.View().Content, "Snooze:") {
+		t.Fatal("cannot return to the start of help")
+	}
+	m = press(m, "zZ")
+	if m.snoozes.input || m.snoozes.active {
+		t.Fatal("help keys changed snoozes")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.help {
+		t.Fatal("Esc did not close help")
 	}
 }

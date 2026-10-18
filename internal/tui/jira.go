@@ -11,9 +11,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
 type jiraState struct {
+	snoozes               *snoozeState
 	client                *jira.Client
 	config                jira.Config
 	configPath            string
@@ -48,7 +50,7 @@ func (m Model) WithJira(client *jira.Client, direct bool) Model {
 	input.CharLimit = 8192
 	path := jira.ConfigPath()
 	config, err := jira.LoadConfig(path)
-	state := &jiraState{client: client, config: config, configPath: path, configOK: err == nil, input: input}
+	state := &jiraState{snoozes: m.snoozes, client: client, config: config, configPath: path, configOK: err == nil, input: input}
 	state.filters.Project = os.Getenv("JIRA_PROJECT")
 	state.tabs = []jira.Query{
 		{Name: "Mine", JQL: "assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC"},
@@ -103,12 +105,18 @@ func (m *Model) refreshJira() tea.Cmd {
 	}
 }
 func (j *jiraState) filtered() []jira.Issue {
+	visible := make([]jira.Issue, 0, len(j.rows))
+	for _, r := range j.rows {
+		if !j.snoozes.hidden(snooze.Identity("jira", r.URL)) {
+			visible = append(visible, r)
+		}
+	}
 	if j.mode != "local" && j.input.Prompt != "/ " {
-		return j.rows
+		return visible
 	}
 	term := strings.ToLower(strings.TrimSpace(j.input.Value()))
 	var rows []jira.Issue
-	for _, r := range j.rows {
+	for _, r := range visible {
 		if strings.Contains(strings.ToLower(strings.Join([]string{r.Key, r.Title, r.Status, r.Priority, r.Assignee, r.Project, r.Type, strings.Join(r.Labels, " ")}, " ")), term) {
 			rows = append(rows, r)
 		}
@@ -315,6 +323,7 @@ func (m Model) jiraView() tea.View {
 		tabs = append(tabs, label)
 	}
 	lines = append(lines, strings.Join(tabs, "  "))
+	lines = append(lines, m.snoozeLines()...)
 	sync := "aldri"
 	if !j.synced.IsZero() {
 		sync = j.synced.Local().Format("2006-01-02 15:04:05")

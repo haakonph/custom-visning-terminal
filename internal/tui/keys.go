@@ -1,7 +1,10 @@
 package tui
 
-const shortcuts = "T oppgaver • t ny fra valgt • a legg til • Space select • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
-const helpText = `T           Open tasks; Tab selects the task used by a
+const shortcuts = "z snooze • Z vis utsatte • T oppgaver • t ny fra valgt • a legg til • Space select • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
+const helpText = `z           Snooze: positive integer, then h hours / d calendar days / D days at 06:00
+            Backspace edits; Esc cancels. Only in navigation mode.
+Z           All deferred items; z reschedules, u restores, Esc returns
+T           Open tasks; Tab selects the task used by a
 t           Create a task wrapping the selected Jira issue / PR
 a           Add selected Jira issue / PR to current task
 c           Go to Copilot sessions (local history and telemetry)
