@@ -10,18 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
-type storedSession struct {
-	Meta   map[string]any   `json:"metadata"`
-	Events map[string]Event `json:"events"`
-}
-type diskStore struct {
-	Version  int                       `json:"version"`
-	Sessions map[string]*storedSession `json:"sessions"`
-	Traces   map[string]string         `json:"traces"`
-}
+type storedSession = model.CopilotStoredSession
+type diskStore = model.CopilotStore
 
 func hash(v any) string {
 	b, _ := json.Marshal(v)
@@ -128,7 +122,7 @@ func (s *Service) saveLocked() error {
 	if !s.dirty {
 		return nil
 	}
-	if err := storage.Save(s.options.StorePath, s.data); err != nil {
+	if err := storage.Save(s.options.StorePath, s.storageSnapshot()); err != nil {
 		return err
 	}
 	s.dirty = false
@@ -371,4 +365,14 @@ func (s *Service) Detail(ctx context.Context, id string) (Detail, error) {
 	}
 	sort.SliceStable(result.Events, func(i, j int) bool { return result.Events[i].Time < result.Events[j].Time })
 	return result, nil
+}
+
+// storageSnapshot materializes the same summaries used by the existing views.
+func (s *Service) storageSnapshot() diskStore {
+	data := s.data
+	data.Summaries = make(map[string]Session, len(data.Sessions))
+	for id, session := range data.Sessions {
+		data.Summaries[id] = s.summaryLocked(id, session)
+	}
+	return data
 }

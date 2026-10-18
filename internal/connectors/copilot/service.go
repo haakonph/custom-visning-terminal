@@ -116,7 +116,7 @@ func New(o Options) (*Service, error) {
 		return nil, storeReadError(readPath, "invalid or unreadable store; check format, path and permissions")
 	}
 	if err == nil {
-		if err = storage.Migrate(o.StorePath, s.data); err != nil {
+		if err = storage.Migrate(o.StorePath, s.storageSnapshot()); err != nil {
 			return nil, err
 		}
 	}

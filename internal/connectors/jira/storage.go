@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
@@ -112,11 +112,7 @@ func SaveConfig(path string, c Config) error {
 	return appconfig.Update(path, map[string]any{"jira": c})
 }
 
-type Cached struct {
-	Query    string
-	Issues   []Issue
-	SyncedAt time.Time
-}
+type Cached = model.JiraCache
 
 func (c *Client) cachePath(query string) string {
 	dir, err := os.UserCacheDir()

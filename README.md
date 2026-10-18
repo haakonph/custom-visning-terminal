@@ -645,26 +645,69 @@ normal and race-enabled tests, `go vet`, formatting checks, and a build. New Git
 integration tests use temporary local repositories and offline URL rewrites;
 they need neither GitHub credentials nor private repository access.
 
-### SQLite-lagring og import av eksisterende data
+### Strukturert SQLite-lagring med sqlc
 
-GitHub- og Jira-cache, oppgaver, Copilot-historikk og lokale repo-/worktree-oversikter
-lagres i SQLite. Hvert tidligere JSON-datalager får en database i samme mappe,
-med `.sqlite` i stedet for `.json`. Data beholdes som JSON-dokumenter inne i SQLite,
-med atomiske transaksjoner og private filrettigheter. Ingen separat databasetjener
-eller CGO kreves. Databaseskjemaet ligger i `internal/storage/schema.sql` og
-bygges inn i programmet med `go:embed`.
+GitHub, Jira, Copilot og lokale brukerdata lagres i egne, strukturerte tabeller.
+Dagens visninger og config-lagring er uendret. SQL-filer er kilden til skjema og
+spørringer; sqlc **v1.30.0** genererer de typede Go-modellene og spørringsmetodene.
+Generert kode er sjekket inn, så vanlig bygging krever verken sqlc eller CGO.
 
-Ved første lesing importeres eksisterende JSON-data etter validering. De gamle
-filene beholdes uendret som sikkerhetskopi; etter import er SQLite autoritativ.
-En skadet database gir feil fremfor å falle tilbake til en utdatert sikkerhetskopi.
-Ta sikkerhetskopi av `.sqlite`-filene når appen er avsluttet. Gamle JSON-kopier kan
-inneholde historiske data og må eventuelt slettes manuelt når importen er kontrollert.
+```text
+internal/storage/
+├── migrations/  # nummererte, innebygde SQL-migreringer
+├── queries/     # SQL-spørringer med sqlc-navn
+├── dbgen/       # generert Go-kode; skal ikke redigeres manuelt
+├── github.go    # mapping mellom eksisterende modeller og tabeller
+├── jira.go
+├── copilot.go
+└── local.go
+sqlc.yaml        # generatoroppsett, separat fra appens config
+```
 
-`CUSTOM_VISNING_TASKS` og `COPILOT_STORE_PATH` støtter fortsatt gamle JSON-stier;
-disse peker nå på en SQLite-fil ved siden av JSON-filen. Eksplisitte `.sqlite`,
-`.sqlite3` og `.db`-stier brukes direkte; andre filnavn får `.sqlite` lagt til.
-Konfigurasjonslagringen fra `main` beholdes som JSON. Miljøvariabler og Copilots
-kildeformat (`workspace.yaml`/`events.jsonl`) er uendret.
+Installer sqlc v1.30.0 fra https://sqlc.dev/ og kjør `make generate` etter endringer
+i SQL-filene. `make check-generated` og CI kontrollerer at generert kode følger
+SQL-kildene. Nye skjemaendringer legges i neste nummererte migrering; migreringer
+som er tatt i bruk, endres ikke. `schema_migrations` registrerer utførte versjoner.
+En database med nyere skjema enn programmet støtter, avvises uten dataskriving.
+
+| Område | Tabeller |
+| --- | --- |
+| GitHub | `accounts`, `github_repositories`, `github_pull_requests`, `github_labels`, `github_pull_request_reviewers`, `sync_state`, `github_view_memberships` |
+| Jira | `jira_projects`, `jira_issues`, `jira_labels`, `jira_queries`, `jira_query_memberships` |
+| Copilot | `copilot_sessions`, `copilot_events`, `copilot_traces`, `copilot_usage` |
+| Lokalt | `tasks`, `task_references`, `snoozes`, `local_repositories`, `local_worktrees` |
+
+PR-er lagres én gang i hvert kontolager og knyttes til faner med egne rader som
+bevarer rekkefølgen. Jira beholder JQL-rekkefølgen på samme måte. Copilot har
+kolonner for sammendraget som dagens oversikt beregner, og egne hendelses- og
+forbruksrader. Fleksibel Copilot-metadata og rå hendelsesdata kan fortsatt være
+JSON; hele domenedatasett lagres ikke lenger som JSON-dokumenter. SQL-viewen
+`overview_items` gir en felles projeksjon for databaseinspeksjon; appen får ingen
+ny felles visning.
+
+Eksisterende lagringsgrenser beholdes: GitHub-cache er isolert etter konto/token,
+Jira-cache etter server/token/spørring, mens lokale brukerdata er separate fra
+cache. Tabellene ligger derfor i eksisterende SQLite-filer, ikke i én ny felles
+fil. Dette bevarer også eksisterende miljøoverstyringer og muligheten til å
+slette cache uten å slette oppgaver, snooze og Copilot-historikk. Fremmednøkler er
+aktivert, og en oppdatering av et datasett og relasjonene skjer atomisk.
+Oppgavereferanser beholder provider, URL og visningssnapshot uten harde
+fremmednøkler til provider-cache, slik at de overlever tømming av cache.
+
+Gamle JSON-filer leses og valideres før første import, og beholdes uendret som
+sikkerhetskopi. SQLite-filer fra den første lagringsversjonen med `documents`
+importeres også: dokumentet fjernes først når de strukturerte radene er committet.
+Ved konverteringsfeil rulles hele dataimporten tilbake. Den tomme `documents`-
+tabellen beholdes som kompatibilitet for import; nye data skrives aldri dit.
+Et initialiseringsmerke gjør at et tomt datasett ikke importeres på nytt fra gamle
+filer. En skadet database gir feil fremfor å hente en utdatert JSON-sikkerhetskopi.
+Ta sikkerhetskopi av `.sqlite`-filene når appen er avsluttet.
+
+`CUSTOM_VISNING_TASKS`, `CUSTOM_VISNING_SNOOZE` og `COPILOT_STORE_PATH` støtter
+fortsatt gamle JSON-stier. Databasen ligger ved siden av filen med `.sqlite` i
+stedet for `.json`. Eksplisitte `.sqlite`, `.sqlite3` og `.db`-stier brukes direkte;
+andre filnavn får `.sqlite` lagt til. Mapper opprettes med 0700 og databaser med
+0600. Konfigurasjonen fra `main` og Copilots kildefiler endres ikke.
 
 ### Lokal snooze
 
@@ -690,12 +733,12 @@ Kalenderberegning bruker maskinens lokale tidssone. Ved et manglende klokkeslett
 under sommertidsovergangen flyttes tiden frem med gapet. Ved et klokkeslett som
 forekommer to ganger velges første forekomst. Timer er alltid medgått tid.
 
-Data lagres separat fra nettverkscache i `custom-visning/snooze.json` under
+Data lagres separat fra nettverkscache i `custom-visning/snooze.sqlite` under
 brukerens konfigurasjonsmappe (`CUSTOM_VISNING_SNOOZE` kan overstyre filstien).
-Filen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
-midlertidig fil med 0600-rettigheter og atomisk rename, med 0700 på nye mapper.
+Tabellen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
+SQLite-transaksjon, med 0600 på databasefilen og 0700 på nye mapper.
 Lagringsfeil vises, og raden skjules først når lagringen har lykkes. En skadet
-snooze-fil blokkerer nye lagringer til filen er rettet og programmet startet på nytt.
+snooze-database blokkerer nye lagringer til lageret er rettet og programmet startet på nytt.
 
 ## Send PR-er til Mattermost
 
