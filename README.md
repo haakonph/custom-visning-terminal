@@ -670,6 +670,45 @@ SQL-kildene. Nye skjemaendringer legges i neste nummererte migrering; migreringe
 som er tatt i bruk, endres ikke. `schema_migrations` registrerer utførte versjoner.
 En database med nyere skjema enn programmet støtter, avvises uten dataskriving.
 
+#### Automatisk skjemadokumentasjon
+
+Kjør `npm run db:docs` etter en migreringsendring og commit både
+[`docs/database/schema.md`](docs/database/schema.md) og
+[`docs/database/schema.sql`](docs/database/schema.sql). Kommandoen krever Node/npm
+og Go-versjonen fra `go.mod`; `npm install`, SQLite CLI og nye npm-pakker trengs
+ikke. Den kjører den samme migreringsmotoren som appen, mot en isolert SQLite-database
+i minnet. Brukerdata og lokale databasefiler berøres ikke.
+
+`schema.md` inneholder et Mermaid ER-diagram med primær- og fremmednøkler.
+`schema.sql` inneholder hele det resulterende skjemaet, inkludert views, eksplisitte
+indekser, triggere og migreringstabellen, uten data eller SQLite-interne objekter.
+SQL-filen er fasiten for constraints og kardinalitet; diagrammets relasjoner er
+konservative. Genereringen har stabil sortering og ingen tidsstempler.
+
+- `npm run db:docs:check` kontrollerer filene uten å endre dem og feiler også ved manglende filer.
+- `go test ./cmd/db-docs ./internal/storage` tester migrering, determinisme,
+  SQL-gjenoppretting, fremmednøkler og kontroll av utdatert dokumentasjon.
+- `node --test scripts/schema-report.test.mjs` tester PR-rapport og størrelsesgrenser.
+
+Workflowen `Database documentation` kjører på relevante PR-endringer, inkludert
+migreringer, og på `main`. Ved PR sammenlignes det genererte SQL-skjemaet med
+migreringene på gjeldende `main`, ikke med dokumentasjonen som ligger der.
+Revisjoner før SQLite ble innført får et eksplisitt tomt sammenligningsgrunnlag.
+Manglende eller ødelagte migreringer etter innføringen skal gi feil.
+CI laster opp skjemadiff, Mermaid-diagram og SQL-filer som artifact før kontrollen
+av inncommittet dokumentasjon. Kjør kommandoen lokalt og commit endringene selv;
+GitHub Actions committer aldri.
+
+Workflowen `Database documentation comment` oppdaterer én kommentar per PR,
+også når dokumentasjonskontrollen feiler. Lange differ avkortes i kommentaren;
+SQL-filene i artifactet gir hele grunnlaget. Kommentering bruker `workflow_run`
+og kjører bare kode fra standardgrenen, uten utsjekking eller kjøring av PR-kode.
+Denne workflowen må derfor være flettet inn i `main` før automatisk kommentering
+blir aktiv, også for fork-PR-er. Genereringsjobben har bare `contents: read`;
+kommentarjobben har bare `actions: read` og `pull-requests: write` og kontrollerer
+at rapporten fortsatt gjelder PR-ens siste commit. Repoets Actions-innstillinger
+må tillate disse rettighetene.
+
 | Område | Tabeller |
 | --- | --- |
 | GitHub | `accounts`, `github_repositories`, `github_pull_requests`, `github_labels`, `github_pull_request_reviewers`, `sync_state`, `github_view_memberships` |

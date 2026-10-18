@@ -1,0 +1,8 @@
+{
+  "name": "custom-visning-terminal-dev",
+  "private": true,
+  "scripts": {
+    "db:docs": "go run ./cmd/db-docs",
+    "db:docs:check": "go run ./cmd/db-docs --check"
+  }
+}

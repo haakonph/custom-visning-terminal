@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -73,14 +74,18 @@ func open(path string) (*sql.DB, error) {
 }
 
 func applyMigrations(db *sql.DB) error {
-	bootstrap, err := migrations.ReadFile("migrations/000_versions.sql")
+	return applyMigrationsFrom(db, migrations)
+}
+
+func applyMigrationsFrom(db *sql.DB, source fs.FS) error {
+	bootstrap, err := fs.ReadFile(source, "migrations/000_versions.sql")
 	if err != nil {
 		return err
 	}
 	if _, err = db.Exec(string(bootstrap)); err != nil {
 		return err
 	}
-	entries, err := migrations.ReadDir("migrations")
+	entries, err := fs.ReadDir(source, "migrations")
 	if err != nil {
 		return err
 	}
@@ -105,7 +110,7 @@ func applyMigrations(db *sql.DB) error {
 		if version <= current {
 			continue
 		}
-		script, err := migrations.ReadFile("migrations/" + entry.Name())
+		script, err := fs.ReadFile(source, "migrations/"+entry.Name())
 		if err != nil {
 			return err
 		}
