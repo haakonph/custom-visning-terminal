@@ -2,25 +2,20 @@
 package snooze
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
-type Entry struct {
-	ID    string    `json:"id"`
-	Kind  string    `json:"kind"`
-	Title string    `json:"title"`
-	URL   string    `json:"url,omitempty"`
-	Until time.Time `json:"until"`
-}
+type Entry = model.SnoozeEntry
 
 // Identity includes the service and server (including a Jira installation path).
 func Identity(kind, link string) string {
@@ -106,14 +101,11 @@ type Store struct{ Path string }
 
 func (s Store) Load() (map[string]Entry, error) {
 	entries := map[string]Entry{}
-	b, err := os.ReadFile(s.Path)
+	err := storage.Load(s.Path, &entries)
 	if errors.Is(err, os.ErrNotExist) {
 		return entries, nil
 	}
 	if err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(b, &entries); err != nil {
 		return nil, err
 	}
 	for id, e := range entries {
@@ -121,32 +113,14 @@ func (s Store) Load() (map[string]Entry, error) {
 			return nil, fmt.Errorf("ugyldig snooze-data")
 		}
 	}
+	if err := storage.Migrate(s.Path, entries); err != nil {
+		return nil, err
+	}
 	return entries, nil
 }
 
 func (s Store) Save(entries map[string]Entry) error {
-	if s.Path == "" {
-		return errors.New("mangler filsti")
-	}
-	if err := os.MkdirAll(filepath.Dir(s.Path), 0700); err != nil {
-		return err
-	}
-	f, err := os.CreateTemp(filepath.Dir(s.Path), ".snooze-*.json")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	if err = json.NewEncoder(f).Encode(entries); err == nil {
-		err = f.Sync()
-	}
-	closeErr := f.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	return os.Rename(f.Name(), s.Path)
+	return storage.Save(s.Path, entries)
 }
 
 func Active(entries map[string]Entry, now time.Time) []Entry {

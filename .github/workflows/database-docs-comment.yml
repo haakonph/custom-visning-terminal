@@ -1,0 +1,68 @@
+# Runs trusted code from the default branch; never checks out or executes PR code.
+name: Database documentation comment
+on:
+  workflow_run:
+    workflows: ['Database documentation']
+    types: [completed]
+permissions: {}
+concurrency:
+  group: database-docs-comment-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            // GitHub can omit pull_requests for runs originating from forks.
+            const candidates = run.pull_requests.length ? run.pull_requests :
+              await github.paginate(github.rest.pulls.list, {
+                ...context.repo, state: 'open', base: 'main',
+                head: `${run.head_repository.owner.login}:${run.head_branch}`
+              });
+            const matching = candidates.find(p => p.head.sha === run.head_sha);
+            if (!matching) {
+              core.warning('No matching PR for this workflow commit; no comment published.');
+              return;
+            }
+            const prNumber = matching.number;
+            const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: prNumber});
+            if (pr.state !== 'open' || pr.base.ref !== 'main' || pr.head.sha !== run.head_sha ||
+                pr.head.repo?.full_name !== run.head_repository.full_name) return;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: run.id
+            });
+            const artifact = artifacts.find(a => a.name === 'sqlite-schema-report' && !a.expired);
+            if (!artifact) { core.warning('No report artifact; see generation job failure.'); return; }
+            const {data} = await github.rest.actions.downloadArtifact({
+              ...context.repo, artifact_id: artifact.id, archive_format: 'zip'
+            });
+            // Treat artifact contents strictly as data, never as executable code.
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const os = require('node:os');
+            const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'schema-report-'));
+            try {
+              fs.writeFileSync(path.join(dir, 'report.zip'), Buffer.from(data));
+              const {execFileSync} = require('node:child_process');
+              const body = execFileSync('unzip', ['-p', path.join(dir, 'report.zip'), 'schema-report.md'], {
+                encoding: 'utf8', maxBuffer: 256 * 1024
+              });
+              if (!body.startsWith('<!-- sqlite-schema-docs -->') || body.length > 60000) {
+                throw new Error('Invalid schema report');
+              }
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                ...context.repo, issue_number: prNumber
+              });
+              const previous = comments.find(c => c.user.login === 'github-actions[bot]' &&
+                c.body?.startsWith('<!-- sqlite-schema-docs -->'));
+              if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
+              else await github.rest.issues.createComment({...context.repo, issue_number: prNumber, body});
+            } finally { fs.rmSync(dir, {recursive: true, force: true}); }

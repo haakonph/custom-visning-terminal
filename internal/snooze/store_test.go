@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 	"time"
 )
 
@@ -66,14 +68,14 @@ func TestStoreRestartExpiryAndPermissions(t *testing.T) {
 	if len(Active(loaded, now.Add(time.Hour))) != 0 {
 		t.Fatal("deadline must expire at equality")
 	}
-	info, err := os.Stat(s.Path)
+	info, err := os.Stat(storage.Path(s.Path))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm() != 0600 {
 		t.Fatal(info.Mode())
 	}
-	if err := os.WriteFile(s.Path, []byte("broken"), 0600); err != nil {
+	if err := os.WriteFile(storage.Path(s.Path), []byte("broken"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Load(); err == nil {
@@ -88,5 +90,28 @@ func TestServiceAndServerIdentity(t *testing.T) {
 	}
 	if a != Identity("jira", "https://ONE.example/jira/browse/ABC-1/?foo=bar#x") {
 		t.Fatal("identity is not canonical")
+	}
+}
+
+func TestLegacySnoozeMigrationPreservesOriginal(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snooze.json")
+	original := `{"task:a":{"id":"task:a","kind":"task","title":"Later","until":"2026-10-20T12:00:00Z"}}`
+	if err := os.WriteFile(path, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{Path: path}
+	entries, err := store.Load()
+	if err != nil || entries["task:a"].Title != "Later" {
+		t.Fatal(entries, err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != original {
+		t.Fatal("legacy snooze changed")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	entries, err = store.Load()
+	if err != nil || entries["task:a"].Kind != "task" {
+		t.Fatal(entries, err)
 	}
 }

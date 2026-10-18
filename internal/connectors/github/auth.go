@@ -23,9 +23,22 @@ func ResolveToken(ctx context.Context, getenv func(string) string, run TokenRunn
 	return strings.TrimSpace(string(data)), nil
 }
 func Token(ctx context.Context) (string, error) {
+	return tokenWithEnv(ctx, os.Getenv)
+}
+
+// UpdateToken prefers the dedicated release credential. Fallback is used only
+// when it is absent, never after an authentication or permission failure.
+func UpdateToken(ctx context.Context) (string, error) {
+	if token := strings.TrimSpace(os.Getenv("CUSTOM_VISNING_UPDATE_TOKEN")); token != "" {
+		return token, nil
+	}
+	return tokenWithEnv(ctx, os.Getenv)
+}
+
+func tokenWithEnv(ctx context.Context, getenv func(string) string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return ResolveToken(ctx, os.Getenv, func(ctx context.Context) ([]byte, error) {
+	return ResolveToken(ctx, getenv, func(ctx context.Context) ([]byte, error) {
 		return exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com").Output()
 	})
 }

@@ -438,3 +438,30 @@ func TestGitOperationPreventsUpdate(t *testing.T) {
 		t.Fatalf("operation not preserved: %+v", got)
 	}
 }
+
+func TestLegacyLocalStorageMigration(t *testing.T) {
+	dir := t.TempDir()
+	repoJSON := `{"org/repo":"/old/repo"}`
+	treeJSON := `{"org/repo#7":{"path":"/old/worktree","head":"abc"}}`
+	for name, data := range map[string]string{"repositories.json": repoJSON, "worktrees.json": treeJSON} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w, err := New(dir, Defaults())
+	if err != nil || w.Repositories.mappings["org/repo"] != "/old/repo" || w.entries["org/repo#7"].Path != "/old/worktree" {
+		t.Fatal(w, err)
+	}
+	for name, data := range map[string]string{"repositories.json": repoJSON, "worktrees.json": treeJSON} {
+		if b, _ := os.ReadFile(filepath.Join(dir, name)); string(b) != data {
+			t.Fatal("legacy metadata modified")
+		}
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w, err = New(dir, Defaults())
+	if err != nil || w.entries["org/repo#7"].Head != "abc" || w.Repositories.mappings["org/repo"] != "/old/repo" {
+		t.Fatal(w, err)
+	}
+}

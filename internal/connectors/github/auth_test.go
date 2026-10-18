@@ -33,3 +33,17 @@ func TestResolveToken(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateTokenPriority(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_UPDATE_TOKEN", " dedicated-release-token ")
+	t.Setenv("GITHUB_TOKEN", "dashboard-token")
+	token, err := UpdateToken(context.Background())
+	if err != nil || token != "dedicated-release-token" {
+		t.Fatalf("dedicated token: %q %v", token, err)
+	}
+	t.Setenv("CUSTOM_VISNING_UPDATE_TOKEN", " ")
+	token, err = UpdateToken(context.Background())
+	if err != nil || token != "dashboard-token" {
+		t.Fatalf("fallback token: %q %v", token, err)
+	}
+}
