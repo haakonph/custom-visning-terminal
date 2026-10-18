@@ -1,6 +1,5 @@
-# Prosjektinstruksjoner
+Før du starter sikre at du er på site versjon av main.
+Alltid push endringene på en bransh og lag pr.
+Alltid push endringene.
 
-- Dette prosjektet er https://github.com/haakonph/custom-visning-terminal.
-- Gjør alle prosjektendringer på en egen gren.
-- Push alltid grenen og opprett en pull request (PR) etter prosjektendringer. Ikke stopp ved lokale endringer eller commits. Brukeren har forhåndsgodkjent push og opprettelse av PR.
-- Ikke push endringer direkte til hovedgrenen.
+Hensikten med denne appen er at jeg skal ha oversikt over alt jeg jobber med og finne fram til det på en enkel måte.
