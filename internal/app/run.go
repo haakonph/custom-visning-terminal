@@ -23,7 +23,9 @@ func Run(ctx context.Context, stderr io.Writer) error { return RunMode(ctx, stde
 func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	return RunProviders(ctx, stderr, startJira, false)
 }
-func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error {
+func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error { return RunProvidersVersion(ctx, stderr, startJira, startCopilot, "dev") }
+
+func RunProvidersVersion(ctx context.Context, stderr io.Writer, startJira, startCopilot bool, version string) error {
 	if err := jira.Migrate(); err != nil {
 		return fmt.Errorf("configuration migration: %w", err)
 	}
@@ -54,7 +56,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		}
 	}()
 	if startCopilot {
-		dashboard := tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
+		dashboard := tui.New(ctx, nil, nil).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
 		return runDashboard(ctx, dashboard)
 	}
 
@@ -90,7 +92,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	} else {
 		persistence = store
 	}
-	dashboard := tui.New(ctx, client, persistence).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
+	dashboard := tui.New(ctx, client, persistence).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
 	if endpoint := os.Getenv("MATTERMOST_WEBHOOK_URL"); endpoint != "" {
 		sender, err := mattermost.New(endpoint)
 		if err != nil {
