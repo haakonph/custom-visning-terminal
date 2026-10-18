@@ -15,6 +15,8 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+ detail *detailState
+ detailSequence uint64
 	settings        settingsState
 	snoozes         *snoozeState
 	mattermost      *mattermostState

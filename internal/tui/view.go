@@ -44,6 +44,7 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+ if m.detail != nil { return m.detailView() }
 	if m.mattermost != nil && m.mattermost.active {
 		return m.mattermostView()
 	}

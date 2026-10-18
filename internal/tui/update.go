@@ -15,6 +15,25 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+ if result, ok := msg.(detailMsg); ok {
+  if m.detail != nil && m.detail.request == result.request { m.detail.loading=false; m.detail.data=result.data; m.detail.err=result.err }
+  return m,nil
+ }
+ if m.detail != nil {
+  if result, ok := msg.(openMsg); ok { m.detail.err = result.err; return m, nil }
+  if key, ok := msg.(tea.KeyPressMsg); ok {
+   switch key.String() {
+   case "esc": m.detail=nil
+   case "q", "ctrl+c": m.cancel(); return m,tea.Quit
+   case "j", "down": m.detail.offset=min(m.detail.offset+1,max(0,len(m.detailLines())-max(1,m.height)))
+   case "k", "up": m.detail.offset=max(0,m.detail.offset-1)
+   case "r": if !m.detail.loading { return m,m.loadDetails() }
+   case "enter": pr, opener, ctx := m.detail.pr,m.open,m.ctx; return m,func() tea.Msg { return openMsg{err:opener(ctx,pr.URL)} }
+   }
+   return m,nil
+  }
+ }
+
 	if handled, cmd := m.mattermostMessage(msg); handled {
 		return m, cmd
 	}
@@ -254,7 +273,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.chosen[p.Key()] = p
 				}
 			}
-		case "m":
+		case "d":
+   rows := m.filtered(); if len(rows)>0 { m.detail=&detailState{pr:rows[m.selected]}; return m,m.loadDetails() }
+  case "m":
 			return m, m.composeMattermost()
 		case "o":
 			return m, m.openLocal("")
