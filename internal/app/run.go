@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/cache"
@@ -22,6 +23,14 @@ func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
 	return RunProviders(ctx, stderr, startJira, false)
 }
 func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error {
+	var jiraPattern *regexp.Regexp
+	if value := os.Getenv("JIRA_PATTERN"); value != "" {
+		var err error
+		jiraPattern, err = regexp.Compile(value)
+		if err != nil {
+			return fmt.Errorf("invalid JIRA_PATTERN: %w", err)
+		}
+	}
 	copilotOptions, copilotErr := copilot.OptionsFromEnv()
 	if copilotErr != nil {
 		return copilotErr
@@ -37,7 +46,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		}
 	}()
 	if startCopilot {
-		dashboard := tui.New(ctx, nil, nil).WithCopilot(copilotClient, true)
+		dashboard := tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
 		return runDashboard(ctx, dashboard)
 	}
 
@@ -50,7 +59,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	token, err := github.Token(ctx)
 	if err != nil {
 		if jiraClient != nil {
-			_, runErr := tea.NewProgram(tui.New(ctx, nil, nil).WithJira(jiraClient, true).WithCopilot(copilotClient, false), tea.WithContext(ctx)).Run()
+			_, runErr := tea.NewProgram(tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithJira(jiraClient, true).WithCopilot(copilotClient, false), tea.WithContext(ctx)).Run()
 			return runErr
 		}
 		return errors.Join(err, jiraErr)
@@ -69,7 +78,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	} else {
 		persistence = store
 	}
-	dashboard := tui.New(ctx, client, persistence).WithCopilot(copilotClient, false)
+	dashboard := tui.New(ctx, client, persistence).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
 	configPath, dataDir, localErr := local.Directories()
 	if localErr == nil {
 		var config local.Config

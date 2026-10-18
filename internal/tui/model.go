@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"regexp"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
@@ -20,6 +21,7 @@ type Model struct {
 	local           *localState
 	jira            *jiraState
 	jiraActive      bool
+	jiraPattern     *regexp.Regexp
 	relatedKey      string
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -129,4 +131,10 @@ func (m *Model) persist() tea.Cmd {
 	m.dirty = false
 	snap, store := m.snapshot, m.cache
 	return func() tea.Msg { return cacheMsg{err: store.Save(snap)} }
+}
+
+// WithJiraPattern selects the issue-key pattern used for PR links and navigation.
+func (m Model) WithJiraPattern(pattern *regexp.Regexp) Model {
+	m.jiraPattern = pattern
+	return m
 }

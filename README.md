@@ -236,6 +236,7 @@ brukes. Jira under en context path, for eksempel `/jira`, støttes.
 export JIRA_BASE_URL="https://jira.example.no/jira"
 # Sett JIRA_TOKEN gjennom din vanlige hemmelighetshåndtering.
 export JIRA_PROJECT="APP"  # valgfritt standard prosjektfilter
+export JIRA_PATTERN='KAKE-[0-9]{3,5}'  # valgfritt mønster for Jira-nøkler i PR-er
 custom-visning --jira
 # Fra kildekoden:
 go run ./cmd/custom-visning --jira
@@ -295,6 +296,15 @@ Tabellen viser saksnøkkel, prioritet, status, tittel, ansvarlig og alder.
 På smale terminaler prioriteres saksnøkkel, status og tittel. Under tabellen vises
 prosjekt, sakstype, ansvarlig, frist, labels og et kort utdrag av beskrivelsen.
 Full beskrivelse finnes via Enter i Jira.
+
+`JIRA_PATTERN` er et Go-regulært uttrykk som brukes til å finne Jira-nøkler i
+PR-tittel, beskrivelse og branchnavn, både i detaljvisningen og ved navigasjon
+mellom relaterte PR-er og Jira-saker. Eksemplet over godtar `KAKE-123` til
+`KAKE-12345`, men ikke 2 eller 6 sifre, andre prefikser eller treff inni ord.
+Uten variabelen (eller med tom verdi) brukes standardmønsteret
+`[A-Z][A-Z0-9_]*-[0-9]+`. Ugyldige uttrykk gir en feil ved oppstart.
+For samme mønster i Copilot, sett også
+`COPILOT_JIRA_PATTERN='KAKE-[0-9]{3,5}'`.
 
 Lagrede søk ligger i `filepath.Join(os.UserConfigDir(), "custom-visning", "jira.json")`.
 Bruk `JIRA_CONFIG` for å velge en annen fil. Tokenet lagres aldri i denne filen.
