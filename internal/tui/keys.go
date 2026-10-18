@@ -1,6 +1,6 @@
 package tui
 
-const shortcuts = ", innstillinger • z snooze • Z vis utsatte • T oppgaver • t ny fra valgt • a legg til • Space select • m Mattermost • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
+const shortcuts = ", innstillinger • z snooze • Z vis utsatte • T oppgaver • t ny fra valgt • a legg til • Space select • m Mattermost • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • d detaljer • Enter open • r refresh • / filter • ? help • q quit"
 const helpText = `, / P       Open app settings
 z           Snooze: positive integer, then h hours / d calendar days / D days at 06:00
             Backspace edits; Esc cancels. Only in navigation mode.
@@ -22,7 +22,7 @@ Space       Toggle PR selection (persists across views and filters)
 m           Edit selected PRs as Markdown in Vim and send to Mattermost
 o / O       Open selected PRs in default editor / choose editor
             Without selection, use highlighted PR
-Enter       Open selected PRs in browser (one tab per PR)
+d / Enter   PR details (files, comments, checks) / open selected PRs in browser
 r           Refresh current view
 /           Filter repository, title, author, label or team
 Enter       Keep filter and return to navigation

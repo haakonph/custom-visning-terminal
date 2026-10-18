@@ -849,6 +849,15 @@ flere Jira-nøkler brukes bare PR-lenkene.
 Ved sendefeil beholdes utkastet. Appen forsøker ikke automatisk på nytt;
 ved nettverksfeil bør du sjekke kanalen før du sender igjen.
 
+### GitHub-detaljer
+
+Trykk `d` på en markert PR for å se endrede filer som et mappetre (med
+endringstype, tillegg/slettinger og tidligere navn), kommentarer og reviews,
+og status og resultat for hver enkelt Actions-sjekk på gjeldende PR-head.
+`j`/`k` eller piltastene blar, `r` henter detaljene på nytt, `Enter` åpner PR-en
+på GitHub, og `Esc` går tilbake til listen. Hvis et API-endepunkt ikke er
+tilgjengelig, vises en advarsel sammen med detaljene som kunne lastes.
+
 ## Les Mattermost-kanaler
 
 Sett `MATTERMOST_SERVER=https://chat.example.org` og `MATTERMOST_USERNAME` og
