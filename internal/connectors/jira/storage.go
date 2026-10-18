@@ -7,7 +7,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
+
+	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 )
 
 type Query struct {
@@ -16,39 +19,65 @@ type Query struct {
 }
 type Config struct {
 	Queries []Query `json:"queries"`
+	Pattern string  `json:"pattern,omitempty"`
+	BaseURL string  `json:"base_url,omitempty"`
+	Project string  `json:"project,omitempty"`
 }
 
-func ConfigPath() string {
-	if path := os.Getenv("JIRA_CONFIG"); path != "" {
-		return path
-	}
-	dir, err := os.UserConfigDir()
+func ConfigPath() string { return appconfig.Path() }
+
+// Migrate imports legacy Jira settings once, leaving the original file intact.
+func Migrate() error {
+	doc, err := appconfig.Read(ConfigPath())
 	if err != nil {
-		return ""
+		return err
 	}
-	return filepath.Join(dir, "custom-visning", "jira.json")
+	if _, ok := doc["jira"]; ok {
+		return nil
+	}
+	path := os.Getenv("JIRA_CONFIG")
+	if path == "" {
+		dir, err := os.UserConfigDir()
+		if err != nil {
+			return err
+		}
+		path = filepath.Join(dir, "custom-visning", "jira.json")
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var c Config
+	if err := json.Unmarshal(data, &c); err != nil {
+		return err
+	}
+	if err := validateConfig(c); err != nil {
+		return err
+	}
+	return SaveConfig(ConfigPath(), c)
 }
 func LoadConfig(path string) (Config, error) {
 	var c Config
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return c, nil
-	}
-	if err != nil {
+	if err := appconfig.Section(path, "jira", &c); err != nil {
 		return c, err
 	}
-	err = json.Unmarshal(data, &c)
-	if err != nil {
-		return Config{}, err
-	}
-	if err == nil {
-		for _, q := range c.Queries {
-			if q.Name == "" || q.JQL == "" {
-				return Config{}, errors.New("saved queries require name and JQL")
-			}
+	return c, validateConfig(c)
+}
+func validateConfig(c Config) error {
+	for _, q := range c.Queries {
+		if q.Name == "" || q.JQL == "" {
+			return errors.New("saved queries require name and JQL")
 		}
 	}
-	return c, err
+	if c.Pattern != "" {
+		if _, err := regexp.Compile(c.Pattern); err != nil {
+			return errors.New("invalid Jira pattern: " + err.Error())
+		}
+	}
+	return nil
 }
 func writeJSON(path string, v any) error {
 	if path == "" {
@@ -75,7 +104,12 @@ func writeJSON(path string, v any) error {
 	}
 	return os.Rename(f.Name(), path)
 }
-func SaveConfig(path string, c Config) error { return writeJSON(path, c) }
+func SaveConfig(path string, c Config) error {
+	if err := validateConfig(c); err != nil {
+		return err
+	}
+	return appconfig.Update(path, map[string]any{"jira": c})
+}
 
 type Cached struct {
 	Query    string

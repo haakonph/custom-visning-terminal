@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"regexp"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
@@ -14,6 +15,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	settings        settingsState
 	snoozes         *snoozeState
 	tasks           taskState
 	copilot         *copilotState
@@ -21,6 +23,7 @@ type Model struct {
 	local           *localState
 	jira            *jiraState
 	jiraActive      bool
+	jiraPattern     *regexp.Regexp
 	relatedKey      string
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -63,7 +66,9 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	s := newSnooze()
 	tasks := newTasks()
 	tasks.snoozes = s
-	return Model{snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m := Model{snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m.loadJiraPattern()
+	return m
 }
 func (m Model) initProviders() tea.Cmd {
 	if m.copilotActive {
@@ -134,4 +139,12 @@ func (m *Model) persist() tea.Cmd {
 	m.dirty = false
 	snap, store := m.snapshot, m.cache
 	return func() tea.Msg { return cacheMsg{err: store.Save(snap)} }
+}
+
+// WithJiraPattern selects the issue-key pattern used for PR links and navigation.
+func (m Model) WithJiraPattern(pattern *regexp.Regexp) Model {
+	if pattern != nil {
+		m.jiraPattern = pattern
+	}
+	return m
 }

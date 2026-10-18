@@ -44,6 +44,9 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.settings.active {
+		return m.settingsView()
+	}
 	if m.snoozes != nil && m.snoozes.active {
 		return m.snoozeView()
 	}
@@ -134,7 +137,7 @@ func (m Model) View() tea.View {
 		}
 		if len(rows) > 0 {
 			p := rows[m.selected]
-			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(), ", ")+" · l relaterte saker")
+			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
 			detail := fmt.Sprintf(" %d/%d · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), strings.Join(p.RequestedTeams, ", "), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 		}

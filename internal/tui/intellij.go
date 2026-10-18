@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,7 +56,16 @@ func openIntelliJ(ctx context.Context, session copilot.Session) error {
 	if err != nil {
 		return err
 	}
-	launch := ideaCommand(runtime.GOOS, os.Getenv("COPILOT_IDEA_COMMAND"), project)
+	var settings struct {
+		Command string `json:"intellij_command"`
+	}
+	if err := appconfig.Section(appconfig.Path(), "copilot", &settings); err != nil {
+		return err
+	}
+	if override := os.Getenv("COPILOT_IDEA_COMMAND"); override != "" {
+		settings.Command = override
+	}
+	launch := ideaCommand(runtime.GOOS, settings.Command, project)
 	if launch.wait {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
