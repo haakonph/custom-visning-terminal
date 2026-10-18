@@ -47,6 +47,9 @@ func (m Model) View() tea.View {
 	if m.detail != nil {
 		return m.detailView()
 	}
+	if m.mmReader != nil && m.mmReader.active {
+		return m.mmReaderView()
+	}
 	if m.mattermost != nil && m.mattermost.active {
 		return m.mattermostView()
 	}
@@ -146,6 +149,9 @@ func (m Model) View() tea.View {
 			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
 			detail := fmt.Sprintf(" %d/%d · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), strings.Join(p.RequestedTeams, ", "), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
+			if m.mmReader != nil {
+				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · v vis referanser · M kanaler", m.mmMentionCount(p.URL)))
+			}
 		}
 	}
 	if m.local != nil && len(m.local.results) > 0 {
@@ -158,7 +164,7 @@ func (m Model) View() tea.View {
 			lines = append(lines, warning.Render(clean(message)))
 		}
 	}
-	lines = append(lines, muted.Render("g GitHub · J Jira · c Copilot · "+shortcuts))
+	lines = append(lines, muted.Render("g GitHub · J Jira · c Copilot · M Mattermost · "+shortcuts))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}

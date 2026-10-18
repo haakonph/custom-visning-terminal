@@ -17,6 +17,7 @@ type Cache interface {
 type Model struct {
 	detail          *detailState
 	detailSequence  uint64
+	mmReader        *mattermostReader
 	settings        settingsState
 	snoozes         *snoozeState
 	mattermost      *mattermostState
@@ -83,6 +84,9 @@ func (m Model) initProviders() tea.Cmd {
 			return tea.Batch(m.refreshJira(), m.bootstrap())
 		}
 		return m.refreshJira()
+	}
+	if m.source == nil {
+		return nil
 	}
 	return m.bootstrap()
 }

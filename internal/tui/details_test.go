@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -32,4 +34,28 @@ func TestDetailTreeAndStaleResult(t *testing.T) {
 	m.width = 1
 	m.height = 1
 	_ = m.detailView()
+}
+
+// Exercise both providers through the shared Update/View dispatch after merging.
+func TestDetailsFromMattermostPRRoundTrip(t *testing.T) {
+	m := readerModel(t)
+	m, _ = update(m, key('g'))
+	m, _ = update(m, key('d'))
+	if m.detail == nil || m.detail.pr.Number != 1 || !strings.Contains(m.View().Content, "Endrede filer") {
+		t.Fatal("linked PR did not open GitHub details")
+	}
+	data := m.mmReader.data
+	m, _ = update(m, mmResult{data: data, authenticated: true})
+	if m.detail == nil || m.mmReader.active {
+		t.Fatal("Mattermost background refresh displaced details")
+	}
+	m, _ = update(m, key('M'))
+	if m.mmReader.active {
+		t.Fatal("detail view leaked navigation keys")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m, _ = update(m, key('v'))
+	if m.detail != nil || !m.mmReader.active || !m.mmReader.mentions {
+		t.Fatal("could not return from GitHub details to Mattermost references")
+	}
 }

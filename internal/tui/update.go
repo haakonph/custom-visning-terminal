@@ -51,6 +51,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if handled, cmd := m.mmMessage(msg); handled {
+		return m, cmd
+	}
 	if handled, cmd := m.mattermostMessage(msg); handled {
 		return m, cmd
 	}

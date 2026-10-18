@@ -857,3 +857,13 @@ og status og resultat for hver enkelt Actions-sjekk på gjeldende PR-head.
 `j`/`k` eller piltastene blar, `r` henter detaljene på nytt, `Enter` åpner PR-en
 på GitHub, og `Esc` går tilbake til listen. Hvis et API-endepunkt ikke er
 tilgjengelig, vises en advarsel sammen med detaljene som kunne lastes.
+
+## Les Mattermost-kanaler
+
+Sett `MATTERMOST_SERVER=https://chat.example.org` og `MATTERMOST_USERNAME` og
+start appen. `M` åpner Mattermost, `a` logger inn med passord/TOTP, `p` bruker PAT,
+og `+` velger kanaler. Sesjoner lagres i OS-nøkkelringen når den er tilgjengelig;
+meldinger og kanalvalg i SQLite gir offline-lesing. `g` går fra en melding til en
+cachet GitHub-PR, og `v` i GitHub viser Mattermost-referansene tilbake.
+
+Se [Mattermost-oppsett, tastatursnarveier og begrensninger](docs/mattermost.md).

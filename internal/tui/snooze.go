@@ -59,7 +59,9 @@ func snoozeTimer() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return snoozeTick{} })
 }
 
-func (m Model) Init() tea.Cmd { return tea.Batch(m.initProviders(), snoozeTimer()) }
+func (m Model) Init() tea.Cmd {
+	return tea.Batch(m.initProviders(), snoozeTimer(), m.mmStart(), mmTimer())
+}
 
 func (m Model) snoozeLines() []string {
 	s := m.snoozes

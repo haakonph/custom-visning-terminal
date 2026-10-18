@@ -176,6 +176,45 @@ type LocalWorktree struct {
 	Head     string
 }
 
+type MattermostAccount struct {
+	Server string
+	UserID string
+}
+
+type MattermostChannel struct {
+	Server      string
+	UserID      string
+	ID          string
+	TeamID      string
+	Name        string
+	DisplayName string
+	Selected    int64
+	SyncedAt    int64
+	ReadAt      int64
+	LastSyncAt  int64
+}
+
+type MattermostPost struct {
+	Server    string
+	UserID    string
+	ID        string
+	ChannelID string
+	RootID    string
+	SenderID  string
+	Author    string
+	Message   string
+	CreatedAt int64
+	UpdatedAt int64
+	DeletedAt int64
+}
+
+type MattermostPrMention struct {
+	Server string
+	UserID string
+	PostID string
+	PrUrl  string
+}
+
 type OverviewItem struct {
 	Provider     string
 	ItemID       string
