@@ -605,7 +605,8 @@ GitHub- og Jira-cache, oppgaver, Copilot-historikk og lokale repo-/worktree-over
 lagres i SQLite. Hvert tidligere JSON-datalager får en database i samme mappe,
 med `.sqlite` i stedet for `.json`. Data beholdes som JSON-dokumenter inne i SQLite,
 med atomiske transaksjoner og private filrettigheter. Ingen separat databasetjener
-eller CGO kreves.
+eller CGO kreves. Databaseskjemaet ligger i `internal/storage/schema.sql` og
+bygges inn i programmet med `go:embed`.
 
 Ved første lesing importeres eksisterende JSON-data etter validering. De gamle
 filene beholdes uendret som sikkerhetskopi; etter import er SQLite autoritativ.

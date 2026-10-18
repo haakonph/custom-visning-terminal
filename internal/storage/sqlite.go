@@ -5,6 +5,7 @@ package storage
 import (
 	"bytes"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,9 @@ import (
 
 	_ "modernc.org/sqlite"
 )
+
+//go:embed schema.sql
+var schema string
 
 // Path maps an old JSON data path to its SQLite replacement. Explicit database
 // paths are used as supplied, so environment overrides can select either form.
@@ -55,7 +59,7 @@ func open(path string) (*sql.DB, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err = db.Exec(`CREATE TABLE IF NOT EXISTS documents (id INTEGER PRIMARY KEY CHECK (id = 1), payload BLOB NOT NULL)`); err != nil {
+	if _, err = db.Exec(schema); err != nil {
 		db.Close()
 		return nil, err
 	}
