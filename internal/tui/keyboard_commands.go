@@ -197,6 +197,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		return m.showEntities("Arkiv · aa gjenopprett", "archive", rows, nil)
 	case "i":
 		if m.copilot != nil {
+			m.rememberProvider("copilot")
 			m.snoozes.active = false
 			m.detail = nil
 			m.tasks.active = false
@@ -211,6 +212,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		}
 	case "f", "j":
 		if m.jira != nil {
+			m.rememberProvider("jira")
 			m.snoozes.active = false
 			m.detail = nil
 			m.jira.detail = nil
@@ -228,6 +230,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		}
 	case "k":
 		if m.mmReader != nil {
+			m.rememberProvider("mattermost")
 			m.snoozes.active = false
 			m.tasks.active = false
 			m.jiraActive = false
@@ -246,10 +249,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		m.sequenceNotice = "Visningen " + kind + " er ikke konfigurert"
 		return m, nil
 	}
-	current := m.visibleProvider()
-	if current != "dialog" && current != "deferred" && current != kind {
-		m.previousProvider = current
-	}
+	m.rememberProvider(kind)
 	m.dialog = nil
 	m.detail = nil
 	m.tasks.active = false
@@ -324,6 +324,14 @@ func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
 	if len(refs) > 0 {
 		title = refs[0].Title
 	}
+	m.rememberProvider("task")
+	m.jiraActive = false
+	m.copilotActive = false
+	if m.mmReader != nil {
+		m.mmReader.active = false
+	}
+	m.snoozes.active = false
+	m.detail = nil
 	m.tasks.items = append(m.tasks.items, model.Task{Title: title, References: append([]model.TaskReference(nil), refs...)})
 	m.tasks.selected = len(m.tasks.items) - 1
 	m.tasks.row = 0

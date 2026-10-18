@@ -109,6 +109,15 @@ func (m Model) visibleProvider() string {
 	if m.snoozes != nil && m.snoozes.active {
 		return "deferred"
 	}
+	return m.baseProvider()
+}
+func (m *Model) rememberProvider(target string) {
+	current := m.baseProvider()
+	if current != target {
+		m.previousProvider = current
+	}
+}
+func (m Model) baseProvider() string {
 	if m.mmReader != nil && m.mmReader.active {
 		return "mattermost"
 	}
@@ -250,7 +259,13 @@ func sortedRefs(values map[string]model.TaskReference) []model.TaskReference {
 }
 func (m *Model) currentReferences() []model.TaskReference {
 	kind := m.visibleProvider()
-
+	if kind == "github" && m.detail != nil && len(m.chosen) == 0 {
+		return []model.TaskReference{prRef(m.detail.pr)}
+	}
+	if kind == "jira" && m.jira.detail != nil && len(m.jiraChosen) == 0 {
+		r := m.jira.detail
+		return []model.TaskReference{{Provider: "jira", URL: r.URL, Key: r.Key, Title: r.Title}}
+	}
 	if kind == "github" {
 		var refs []model.TaskReference
 		for _, p := range m.selectedPRs() {
@@ -539,6 +554,7 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 	if m.referenceArchived(r) || m.snoozes.hidden(refSnoozeID(r)) {
 		return m.showSnapshot(r)
 	}
+	m.rememberProvider(r.Provider)
 	m.snoozes.active = false
 	if m.jira != nil {
 		m.jira.detail = nil

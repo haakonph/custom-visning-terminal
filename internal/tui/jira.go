@@ -158,6 +158,14 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		j.rows = msg.rows
+		if j.detail != nil {
+			for _, issue := range msg.rows {
+				if issue.Key == j.detail.Key {
+					*j.detail = issue
+					break
+				}
+			}
+		}
 		j.synced = msg.at
 		j.notice = ""
 		j.clamp()

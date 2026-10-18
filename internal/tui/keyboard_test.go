@@ -133,12 +133,13 @@ func TestJiraSelectionLinkingAndDetails(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_TASKS", t.TempDir()+"/tasks.json")
 	m := jiraModel(t)
 	m.jira.rows = []jira.Issue{{Key: "APP-1", Title: "One", URL: "https://jira.example/browse/APP-1", Description: "Details"}, {Key: "APP-2", Title: "Two", URL: "https://jira.example/browse/APP-2"}}
+	m.jira.query = m.jira.currentQuery()
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	m, _ = sequence(m, "an")
 	if len(m.tasks.items) != 1 || len(m.tasks.items[0].References) != 2 {
 		t.Fatal("Jira multiselect not linked")
 	}
-	m.tasks.active = false
+	m, _ = sequence(m, "vr")
 	m.jira.selected = 0
 	m, _ = sequence(m, "d")
 	if m.jira.detail == nil || !strings.Contains(m.View().Content, "Details") {

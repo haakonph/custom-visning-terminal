@@ -364,3 +364,56 @@ func TestArchivedDetailsDoNotSelectAnotherVisibleRow(t *testing.T) {
 		t.Fatal("cannot restore from archived details")
 	}
 }
+
+func TestCreateTaskFromEveryProviderSwitchesAndKeepsEditorInput(t *testing.T) {
+	for _, thing := range []string{"g", "t", "a", "c", "o"} {
+		t.Run(thing, func(t *testing.T) {
+			m := unifiedModel(t)
+			m, _ = sequence(m, "v"+thing+"an")
+			if m.visibleProvider() != "task" {
+				t.Fatal("new task hidden behind source provider")
+			}
+			if !m.tasks.editing {
+				m, _ = sequence(m, "ae")
+			}
+			m.tasks.input.SetValue("")
+			m, _ = sequence(m, "atfqgc")
+			if !m.tasks.editing || m.tasks.input.Value() != "atfqgc" || m.sequence != "" {
+				t.Fatal("source provider stole task editor input")
+			}
+		})
+	}
+}
+func TestSpecialViewCommandsRememberSourcePage(t *testing.T) {
+	for _, command := range []string{"vi", "vf", "vj"} {
+		m := unifiedModel(t)
+		m, _ = sequence(m, command)
+		if m.jira != nil {
+			m.jira.mode = ""
+		}
+		m, _ = sequence(m, "vr")
+		if m.visibleProvider() != "github" {
+			t.Fatalf("%s lost previous page", command)
+		}
+	}
+}
+
+func TestOpenDetailsKeepActionTargetWhenListChanges(t *testing.T) {
+	m := unifiedModel(t)
+	m, _ = sequence(m, "d")
+	expected := m.detail.pr.URL
+	m.snapshot.Datasets[0].PRs = m.snapshot.Datasets[0].PRs[1:]
+	refs := m.currentReferences()
+	if len(refs) != 1 || refs[0].URL != expected {
+		t.Fatal("detail command fell back to another PR")
+	}
+	m.detail = nil
+	m.jiraActive = true
+	m, _ = sequence(m, "d")
+	key := m.jira.detail.Key
+	m.jira.rows = m.jira.rows[1:]
+	refs = m.currentReferences()
+	if len(refs) != 1 || refs[0].Key != key {
+		t.Fatal("detail command fell back to another Jira issue")
+	}
+}
