@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -64,33 +63,10 @@ func (m *Model) composeMattermost() tea.Cmd {
 		m.notice = "Sett MATTERMOST_WEBHOOK_URL for å sende til Mattermost"
 		return nil
 	}
-	rows := []model.PullRequest{}
-	for _, p := range m.chosen {
-		rows = append(rows, p)
-	}
+	rows := m.selectedPRs()
 	if len(rows) == 0 {
-		visible := m.filtered()
-		if len(visible) == 0 {
-			return nil
-		}
-		rows = append(rows, visible[m.selected])
+		return nil
 	}
-	// Resolve selections against the newest available dashboard data.
-	for i, p := range rows {
-		for _, d := range m.snapshot.Datasets {
-			for _, fresh := range d.PRs {
-				if fresh.Key() == p.Key() && !fresh.UpdatedAt.Before(rows[i].UpdatedAt) {
-					rows[i] = fresh
-				}
-			}
-		}
-	}
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].Repository == rows[j].Repository {
-			return rows[i].Number < rows[j].Number
-		}
-		return rows[i].Repository < rows[j].Repository
-	})
 	var issueURL func(string) string
 	if m.jira != nil {
 		issueURL = m.jira.client.IssueURL

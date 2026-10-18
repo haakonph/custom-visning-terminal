@@ -6,8 +6,8 @@ z           Snooze: positive integer, then h hours / d calendar days / D days at
             Backspace edits; Esc cancels. Only in navigation mode.
 Z           All deferred items; z reschedules, u restores, Esc returns
 T           Open tasks; Tab selects the task used by a
-t           Create a task wrapping the selected Jira issue / PR
-a           Add selected Jira issue / PR to current task
+t           Create a task wrapping the selected Jira issue / PRs
+a           Add selected Jira issue / PRs to current task
 c           Go to Copilot sessions (local history and telemetry)
 g           Go to GitHub (navigation mode)
 J (Shift+j) Go to Jira (navigation mode)
@@ -18,10 +18,11 @@ l           Navigate to related Jira issues / loaded GitHub PRs
 4  Team Review Requests (all accessible memberships)
 j/k or ↑/↓  Select pull request
 Space       Toggle PR selection (persists across views and filters)
+            PR commands use all selected PRs; otherwise the highlighted PR
 m           Edit selected PRs as Markdown in Vim and send to Mattermost
 o / O       Open selected PRs in default editor / choose editor
             Without selection, use highlighted PR
-Enter       Open pull request in browser
+Enter       Open selected PRs in browser (one tab per PR)
 r           Refresh current view
 /           Filter repository, title, author, label or team
 Enter       Keep filter and return to navigation
