@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 func TestRoundTripAndAccountIsolation(t *testing.T) {
@@ -30,7 +31,7 @@ func TestRoundTripAndAccountIsolation(t *testing.T) {
 	if err != nil || len(other.Datasets[model.Open].PRs) != 0 {
 		t.Fatal("account cache leaked")
 	}
-	info, err := os.Stat(store.path("alice"))
+	info, err := os.Stat(storage.Path(store.path("alice")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,5 +111,29 @@ func TestCredentialScopedCacheContainsNoToken(t *testing.T) {
 	otherSnap, err := other.Load("")
 	if err != nil || otherSnap.User != "" {
 		t.Fatal("credential scopes mixed")
+	}
+}
+
+func TestLegacyCacheMigration(t *testing.T) {
+	store := &Store{Dir: t.TempDir()}
+	path := store.path("alice")
+	original := `{"version":1,"user":"alice"}`
+	if err := os.WriteFile(path, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if snap, err := store.Load("alice"); err != nil || snap.User != "alice" {
+		t.Fatal(snap, err)
+	}
+	if _, err := os.Stat(storage.Path(path)); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != original {
+		t.Fatal("legacy cache changed")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if snap, err := store.Load("alice"); err != nil || snap.User != "alice" {
+		t.Fatal(snap, err)
 	}
 }

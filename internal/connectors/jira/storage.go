@@ -8,9 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type Query struct {
@@ -111,11 +112,7 @@ func SaveConfig(path string, c Config) error {
 	return appconfig.Update(path, map[string]any{"jira": c})
 }
 
-type Cached struct {
-	Query    string
-	Issues   []Issue
-	SyncedAt time.Time
-}
+type Cached = model.JiraCache
 
 func (c *Client) cachePath(query string) string {
 	dir, err := os.UserCacheDir()
@@ -127,14 +124,16 @@ func (c *Client) cachePath(query string) string {
 }
 func (c *Client) LoadCache(query string) (Cached, error) {
 	var data Cached
-	b, err := os.ReadFile(c.cachePath(query))
+	err := storage.Load(c.cachePath(query), &data)
 	if err != nil {
 		return data, err
 	}
-	err = json.Unmarshal(b, &data)
-	if err == nil && data.Query != query {
+	if data.Query != query {
 		return Cached{}, errors.New("cache query mismatch")
 	}
-	return data, err
+	if err = storage.Migrate(c.cachePath(query), data); err != nil {
+		return Cached{}, err
+	}
+	return data, nil
 }
-func (c *Client) SaveCache(data Cached) error { return writeJSON(c.cachePath(data.Query), data) }
+func (c *Client) SaveCache(data Cached) error { return storage.Save(c.cachePath(data.Query), data) }

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type taskState struct {
@@ -38,12 +38,12 @@ func newTasks() taskState {
 			t.path = filepath.Join(dir, "custom-visning", "tasks.json")
 		}
 	}
-	data, err := os.ReadFile(t.path)
+	err := storage.Load(t.path, &t.items)
 	if errors.Is(err, os.ErrNotExist) {
 		return t
 	}
 	if err == nil {
-		err = json.Unmarshal(data, &t.items)
+		err = storage.Migrate(t.path, t.items)
 	}
 	if err != nil {
 		t.items = nil
@@ -57,31 +57,7 @@ func (t *taskState) save() error {
 	if t.loadFailed {
 		return errors.New("oppgaver kunne ikke leses")
 	}
-	err := func() error {
-		if t.path == "" {
-			return errors.New("missing path")
-		}
-		if err := os.MkdirAll(filepath.Dir(t.path), 0700); err != nil {
-			return err
-		}
-		f, err := os.CreateTemp(filepath.Dir(t.path), ".tasks-*.json")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(f.Name())
-		if err = json.NewEncoder(f).Encode(t.items); err != nil {
-			f.Close()
-			return err
-		}
-		if err = f.Sync(); err != nil {
-			f.Close()
-			return err
-		}
-		if err = f.Close(); err != nil {
-			return err
-		}
-		return os.Rename(f.Name(), t.path)
-	}()
+	err := storage.Save(t.path, t.items)
 	if err != nil {
 		t.notice = "Kunne ikke lagre oppgaver; endringene finnes kun i minnet"
 	} else {

@@ -211,3 +211,25 @@ func TestTaskPanelsResizeAndEmptySearch(t *testing.T) {
 		t.Fatal("empty search must not act on hidden task")
 	}
 }
+
+func TestLegacyTasksMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	t.Setenv("CUSTOM_VISNING_TASKS", path)
+	original := `[{"title":"Existing task","references":[{"provider":"jira","key":"ABC-1","url":"https://jira.example/browse/ABC-1"}]}]`
+	if err := os.WriteFile(path, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+	tasks := newTasks()
+	if tasks.loadFailed || len(tasks.items) != 1 || len(tasks.items[0].References) != 1 {
+		t.Fatal(tasks)
+	}
+	tasks.items[0].Title = "Updated"
+	tasks.save()
+	if b, _ := os.ReadFile(path); string(b) != original {
+		t.Fatal("legacy tasks changed")
+	}
+	reloaded := newTasks()
+	if reloaded.loadFailed || reloaded.items[0].Title != "Updated" {
+		t.Fatal("database not used after migration")
+	}
+}

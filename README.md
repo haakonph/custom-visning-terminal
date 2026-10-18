@@ -53,6 +53,8 @@ Fra mappen med de nedlastede filene:
 ```bash
 shasum -a 256 -c checksums.txt
 tar -xzf custom-visning_Darwin_arm64.tar.gz
+# Hvis macOS har satt quarantine på den verifiserte binæren:
+xattr -d com.apple.quarantine custom-visning
 mkdir -p "$HOME/.local/bin"
 install -m 755 custom-visning "$HOME/.local/bin/custom-visning"
 export PATH="$HOME/.local/bin:$PATH"
@@ -62,7 +64,45 @@ custom-visning
 
 Legg PATH-linjen i `~/.zshrc` for senere økter. Første versjon distribuerer kun
 macOS arm64. Binæren er ikke Apple-signert eller notarized; følg macOS sin
-vanlige godkjenning for nedlastet programvare ved behov.
+vanlige godkjenning for nedlastet programvare ved behov. `xattr -d` over
+fjerner quarantine-attributtet fra den utpakkede binæren etter kontroll av
+sjekksummen. Hvis attributtet mangler, kan macOS vise «No such xattr»;
+da kan du fortsette installasjonen.
+
+## Sjekke og laste ned oppdateringer
+
+```bash
+custom-visning --check-update
+custom-visning --update
+```
+
+`--check-update` viser installert versjon og siste stabile release. `--update`
+spør før den laster ned arkivet for maskinens operativsystem og arkitektur til
+arbeidsmappen. Bare macOS arm64 har publiserte releasearkiver foreløpig.
+Arkivet kontrolleres mot SHA-256 i releasens `checksums.txt` før det lagres.
+Eksisterende filer overskrives ikke, og ufullstendige eller avviste nedlastinger
+fjernes. Pakk ut og installer arkivet som beskrevet over; programmet erstatter
+ikke sin egen kjørende binær. Kommandoene starter ikke dashboardet.
+
+Oppdateringer bruker et eget token fra **`CUSTOM_VISNING_UPDATE_TOKEN`**.
+Sett det i miljøet via din vanlige lokale hemmelighetshåndtering. Tokenet trenger
+bare lesetilgang til releaser i `haakonph/custom-visning-terminal`: for et
+fine-grained PAT velger du repositoryet og **Contents: read**. Ingen
+skriverettigheter eller organisasjonsrettigheter er nødvendig for oppdateringer.
+Tokenet lagres ikke av programmet og skal ikke legges i kildekode eller config.
+
+Hvis det egne tokenet mangler eller er tomt, brukes `GITHUB_TOKEN`, deretter
+`gh auth token --hostname github.com` som reserve. Et eksplisitt token som blir
+avvist utløser ingen overgang til en annen identitet. Dashboardet fortsetter å
+bruke sin eksisterende autentisering, uavhengig av oppdateringstokenet.
+Tokenet sendes bare til GitHub API, og fjernes ved videresending til
+nedlastingslagring. API-feilbodyer og tokenverdier vises ikke.
+
+Versjonene sammenlignes som identiteter: prosjektet publiserer både tagger og
+`main-<run>.<attempt>-<sha>`, mens branchbygg heter `build-<sha>`.
+Ved forskjell vises begge versjonene, slik at du selv kan vurdere om du vil
+laste ned siste stabile release. Dette kan også være en eldre release enn et
+lokalt bygg. Sjekk og nedlasting skjer bare når du kjører kommandoene over.
 
 ## Laste ned bygg fra en branch
 
@@ -138,7 +178,7 @@ Cachen ligger i `filepath.Join(os.UserCacheDir(), "custom-visning")`:
 - macOS: `~/Library/Caches/custom-visning/`
 - Linux: `$XDG_CACHE_HOME/custom-visning/`, normalt `~/.cache/custom-visning/`
 
-Hver autentisering har en egen JSON-fil, navngitt med et SHA-256-fingeravtrykk.
+Hver autentisering har en egen SQLite-database, navngitt med et SHA-256-fingeravtrykk.
 Selve tokenet lagres ikke. Filen inneholder verifisert brukernavn, PR-data og siste
 fullførte synkronisering per visning. Tokenbytte gir ny cache. Første oppstart
 krever nettverk for identiteten. Senere oppstarter viser cache umiddelbart, også
@@ -147,7 +187,7 @@ fortsatt innlogging. Korrupte/ukjente cacheversjoner ignoreres med en melding.
 
 Cachemapper opprettes med `0700`, filer med `0600`. Cachen inneholder privat
 PR-metadata i klartekst: slett cachemappen for å fjerne lokale data. Skriving skjer
-via en midlertidig fil i samme mappe, `fsync` og atomisk rename. Skriving er
+i atomiske SQLite-transaksjoner. Skriving er
 serialisert og samles opp for å unngå at eldre svar overskriver nyere snapshots.
 
 REST Search API brukes til oppdagelse med alle sider frem til GitHubs grense på
@@ -317,7 +357,9 @@ IntelliJ-launcher). Lister og editorargumenter redigeres som JSON, for eksempel
 Jira-mønsteret tas i bruk med en gang. Tom verdi gjenoppretter
 `[A-Z][A-Z0-9_]*-[0-9]+`. Øvrige innstillinger tas i bruk etter omstart.
 Miljøvariabler overstyrer filverdiene ved oppstart, så fjern eksempelvis
-`JIRA_PATTERN` for å bruke det lagrede mønsteret. Token settes fortsatt via
+`JIRA_PATTERN` for å bruke det lagrede mønsteret. Trykk `?` i innstillingssiden for rullbar hjelp til GitHub-innlogging, Jira-PAT
+og Mattermost-webhook, inkludert trygg innlesing i Bash. Jira-serverfeltet viser
+eksempeladressen `https://jira.example.no/jira`. Token settes fortsatt via
 miljøet og lagres ikke av innstillingssiden. Oppgaver, snooze-data, sesjonshistorikk
 og cacher er datafiler og holdes adskilt fra innstillingene.
 
@@ -399,7 +441,7 @@ Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
 - `T` går tilbake til forrige provider-visning. `Esc` går først til listen,
   deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
 
-Oppgavene lagres atomisk i `custom-visning/tasks.json` under operativsystemets
+Oppgavene lagres atomisk i `custom-visning/tasks.sqlite` under operativsystemets
 konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS`). Filen er lokal for
 OS-brukeren og deles mellom appens GitHub/Jira-kontoer; den inneholder titler og
 lenker, ingen tokens. Ta vare på filen som brukerdata, ikke som cache.
@@ -428,16 +470,17 @@ kilden inneholder dem. Det lokale Copilot-filformatet er ikke en stabil offentli
 API; ukjente hendelser beholdes og ugyldige poster rapporteres i diagnostikk.
 Kildemappene og filene endres aldri; symlinker følges ikke.
 
-Terminalen har et eget datalager i `os.UserConfigDir()/custom-visning-terminal/copilot.json`
-(på macOS normalt `~/Library/Application Support/custom-visning-terminal/copilot.json`,
-på Linux normalt `~/.config/custom-visning-terminal/copilot.json`). Lagrede sesjoner,
+Terminalen har et eget datalager i `os.UserConfigDir()/custom-visning-terminal/copilot.sqlite`
+(på macOS normalt `~/Library/Application Support/custom-visning-terminal/copilot.sqlite`,
+på Linux normalt `~/.config/custom-visning-terminal/copilot.sqlite`). Lagrede sesjoner,
 inkludert mottatt telemetri, beholdes mellom oppstarter, også om kildefilene fjernes.
-Filen erstattes atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
+Databasen oppdateres atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
 Lageret er separat fra både GitHub-cachen og den andre appens database.
 
 Hvis appen melder `could not read Copilot store`, viser feilmeldingen hvilken
 fil som ikke kan leses. Filen beholdes urørt. Kontroller filsti og lesetilgang;
-ugyldig eller ufullstendig JSON må gjenopprettes fra en sikkerhetskopi. For å
+en skadet SQLite-database eller ugyldig/ufullstendig JSON ved import må
+gjenopprettes fra en sikkerhetskopi. For å
 starte med et separat lager uten å endre originalen, sett `COPILOT_STORE_PATH`
 til en ny, absolutt filsti. Lokal sesjonshistorikk importeres på nytt når
 innsamling er aktivert; telemetri som bare finnes i det gamle lageret følger
@@ -478,7 +521,7 @@ Disse miljøvariablene styrer terminalappen; start den på nytt etter endringer:
 | Variabel | Standard | Bruk |
 | --- | --- | --- |
 | `COPILOT_SESSION_ROOT` | `~/.copilot/session-state` | Absolutt sti til historikkmappen; en egendefinert verdi må være ferdig ekspandert |
-| `COPILOT_STORE_PATH` | Se datalagerstien ovenfor | Absolutt sti til terminalens eget JSON-lager |
+| `COPILOT_STORE_PATH` | Se datalagerstien ovenfor | Absolutt sti til terminalens eget SQLite-lager (eldre JSON-stier støttes) |
 | `COPILOT_OTLP_PORT` | `4318` | Lokal mottakerport |
 | `COPILOT_COLLECTION_ENABLED` | `true` | `false` stopper filimport og mottaker; lagret historikk kan leses |
 | `COPILOT_CAPTURE_CONTENT` | `true` | `false` utelater innhold, argumenter/resultater, feiltekst og rådata fra nye lagrede observasjoner |
@@ -577,14 +620,14 @@ mapping/cache, new bare clone. New storage defaults to:
 ├── repos/owner/repo.git/
 ├── worktrees/owner/repo/pr-142/
 ├── worktrees/owner/repo/pr-156/
-├── repositories.json
-└── worktrees.json
+├── repositories.sqlite
+└── worktrees.sqlite
 ```
 
 Linux respects an absolute `XDG_DATA_HOME`; macOS and Windows use
 `os.UserConfigDir()/custom-visning` for data. These files contain paths and Git
 identities, never authentication tokens. PR dashboard snapshots continue to use
-the existing account-scoped JSON cache independently.
+the existing account-scoped SQLite cache independently.
 
 New worktrees use detached HEADs and share their repository's Git objects.
 Missing commits are fetched from the base repository's `refs/pull/NUMBER/head`,
@@ -634,7 +677,7 @@ rendering. A failed PR does not stop the remaining selection.
 - **Interrupted preparation:** quitting cancels Git processes; temporary clone
   staging directories are removed. A partially created worktree is preserved
   and may require manual metadata repair. An editor already launched stays open.
-- **Configuration/cache parse error:** fix the indicated JSON file and restart.
+- **Configuration/cache parse error:** fix the indicated configuration JSON file, or restore the affected SQLite database from backup, and restart.
   Repository/worktree paths are validated before reuse. Do not edit state files
   or operate on the same worktree from multiple dashboard processes concurrently;
   serialization applies within a running application.
@@ -644,6 +687,108 @@ normal and race-enabled tests, `go vet`, formatting checks, and a build. New Git
 integration tests use temporary local repositories and offline URL rewrites;
 they need neither GitHub credentials nor private repository access.
 
+### Strukturert SQLite-lagring med sqlc
+
+GitHub, Jira, Copilot og lokale brukerdata lagres i egne, strukturerte tabeller.
+Dagens visninger og config-lagring er uendret. SQL-filer er kilden til skjema og
+spørringer; sqlc **v1.30.0** genererer de typede Go-modellene og spørringsmetodene.
+Generert kode er sjekket inn, så vanlig bygging krever verken sqlc eller CGO.
+
+```text
+internal/storage/
+├── migrations/  # nummererte, innebygde SQL-migreringer
+├── queries/     # SQL-spørringer med sqlc-navn
+├── dbgen/       # generert Go-kode; skal ikke redigeres manuelt
+├── github.go    # mapping mellom eksisterende modeller og tabeller
+├── jira.go
+├── copilot.go
+└── local.go
+sqlc.yaml        # generatoroppsett, separat fra appens config
+```
+
+Installer sqlc v1.30.0 fra https://sqlc.dev/ og kjør `make generate` etter endringer
+i SQL-filene. `make check-generated` og CI kontrollerer at generert kode følger
+SQL-kildene. Nye skjemaendringer legges i neste nummererte migrering; migreringer
+som er tatt i bruk, endres ikke. `schema_migrations` registrerer utførte versjoner.
+En database med nyere skjema enn programmet støtter, avvises uten dataskriving.
+
+#### Automatisk skjemadokumentasjon
+
+Kjør `npm run db:docs` etter en migreringsendring og commit både
+[`docs/database/schema.md`](docs/database/schema.md) og
+[`docs/database/schema.sql`](docs/database/schema.sql). Kommandoen krever Node/npm
+og Go-versjonen fra `go.mod`; `npm install`, SQLite CLI og nye npm-pakker trengs
+ikke. Den kjører den samme migreringsmotoren som appen, mot en isolert SQLite-database
+i minnet. Brukerdata og lokale databasefiler berøres ikke.
+
+`schema.md` inneholder et Mermaid ER-diagram med primær- og fremmednøkler.
+`schema.sql` inneholder hele det resulterende skjemaet, inkludert views, eksplisitte
+indekser, triggere og migreringstabellen, uten data eller SQLite-interne objekter.
+SQL-filen er fasiten for constraints og kardinalitet; diagrammets relasjoner er
+konservative. Genereringen har stabil sortering og ingen tidsstempler.
+
+- `npm run db:docs:check` kontrollerer filene uten å endre dem og feiler også ved manglende filer.
+- `go test ./cmd/db-docs ./internal/storage` tester migrering, determinisme,
+  SQL-gjenoppretting, fremmednøkler og kontroll av utdatert dokumentasjon.
+- `node --test scripts/schema-report.test.mjs` tester PR-rapport og størrelsesgrenser.
+
+Workflowen `Database documentation` kjører på relevante PR-endringer, inkludert
+migreringer, og på `main`. Ved PR sammenlignes det genererte SQL-skjemaet med
+migreringene på gjeldende `main`, ikke med dokumentasjonen som ligger der.
+Revisjoner før SQLite ble innført får et eksplisitt tomt sammenligningsgrunnlag.
+Manglende eller ødelagte migreringer etter innføringen skal gi feil.
+CI laster opp skjemadiff, Mermaid-diagram og SQL-filer som artifact før kontrollen
+av inncommittet dokumentasjon. Kjør kommandoen lokalt og commit endringene selv;
+GitHub Actions committer aldri.
+
+Workflowen `Database documentation comment` oppdaterer én kommentar per PR,
+også når dokumentasjonskontrollen feiler. Lange differ avkortes i kommentaren;
+SQL-filene i artifactet gir hele grunnlaget. Kommentering bruker `workflow_run`
+og kjører bare kode fra standardgrenen, uten utsjekking eller kjøring av PR-kode.
+Denne workflowen må derfor være flettet inn i `main` før automatisk kommentering
+blir aktiv, også for fork-PR-er. Genereringsjobben har bare `contents: read`;
+kommentarjobben har bare `actions: read` og `pull-requests: write` og kontrollerer
+at rapporten fortsatt gjelder PR-ens siste commit. Repoets Actions-innstillinger
+må tillate disse rettighetene.
+
+| Område | Tabeller |
+| --- | --- |
+| GitHub | `accounts`, `github_repositories`, `github_pull_requests`, `github_labels`, `github_pull_request_reviewers`, `sync_state`, `github_view_memberships` |
+| Jira | `jira_projects`, `jira_issues`, `jira_labels`, `jira_queries`, `jira_query_memberships` |
+| Copilot | `copilot_sessions`, `copilot_events`, `copilot_traces`, `copilot_usage` |
+| Lokalt | `tasks`, `task_references`, `snoozes`, `local_repositories`, `local_worktrees` |
+
+PR-er lagres én gang i hvert kontolager og knyttes til faner med egne rader som
+bevarer rekkefølgen. Jira beholder JQL-rekkefølgen på samme måte. Copilot har
+kolonner for sammendraget som dagens oversikt beregner, og egne hendelses- og
+forbruksrader. Fleksibel Copilot-metadata og rå hendelsesdata kan fortsatt være
+JSON; hele domenedatasett lagres ikke lenger som JSON-dokumenter. SQL-viewen
+`overview_items` gir en felles projeksjon for databaseinspeksjon; appen får ingen
+ny felles visning.
+
+Eksisterende lagringsgrenser beholdes: GitHub-cache er isolert etter konto/token,
+Jira-cache etter server/token/spørring, mens lokale brukerdata er separate fra
+cache. Tabellene ligger derfor i eksisterende SQLite-filer, ikke i én ny felles
+fil. Dette bevarer også eksisterende miljøoverstyringer og muligheten til å
+slette cache uten å slette oppgaver, snooze og Copilot-historikk. Fremmednøkler er
+aktivert, og en oppdatering av et datasett og relasjonene skjer atomisk.
+Oppgavereferanser beholder provider, URL og visningssnapshot uten harde
+fremmednøkler til provider-cache, slik at de overlever tømming av cache.
+
+Gamle JSON-filer leses og valideres før første import, og beholdes uendret som
+sikkerhetskopi. SQLite-filer fra den første lagringsversjonen med `documents`
+importeres også: dokumentet fjernes først når de strukturerte radene er committet.
+Ved konverteringsfeil rulles hele dataimporten tilbake. Den tomme `documents`-
+tabellen beholdes som kompatibilitet for import; nye data skrives aldri dit.
+Et initialiseringsmerke gjør at et tomt datasett ikke importeres på nytt fra gamle
+filer. En skadet database gir feil fremfor å hente en utdatert JSON-sikkerhetskopi.
+Ta sikkerhetskopi av `.sqlite`-filene når appen er avsluttet.
+
+`CUSTOM_VISNING_TASKS`, `CUSTOM_VISNING_SNOOZE` og `COPILOT_STORE_PATH` støtter
+fortsatt gamle JSON-stier. Databasen ligger ved siden av filen med `.sqlite` i
+stedet for `.json`. Eksplisitte `.sqlite`, `.sqlite3` og `.db`-stier brukes direkte;
+andre filnavn får `.sqlite` lagt til. Mapper opprettes med 0700 og databaser med
+0600. Konfigurasjonen fra `main` og Copilots kildefiler endres ikke.
 
 ### Lokal snooze
 
@@ -669,12 +814,12 @@ Kalenderberegning bruker maskinens lokale tidssone. Ved et manglende klokkeslett
 under sommertidsovergangen flyttes tiden frem med gapet. Ved et klokkeslett som
 forekommer to ganger velges første forekomst. Timer er alltid medgått tid.
 
-Data lagres separat fra nettverkscache i `custom-visning/snooze.json` under
+Data lagres separat fra nettverkscache i `custom-visning/snooze.sqlite` under
 brukerens konfigurasjonsmappe (`CUSTOM_VISNING_SNOOZE` kan overstyre filstien).
-Filen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
-midlertidig fil med 0600-rettigheter og atomisk rename, med 0700 på nye mapper.
+Tabellen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
+SQLite-transaksjon, med 0600 på databasefilen og 0700 på nye mapper.
 Lagringsfeil vises, og raden skjules først når lagringen har lykkes. En skadet
-snooze-fil blokkerer nye lagringer til filen er rettet og programmet startet på nytt.
+snooze-database blokkerer nye lagringer til lageret er rettet og programmet startet på nytt.
 
 ## Send PR-er til Mattermost
 

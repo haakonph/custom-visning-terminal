@@ -13,15 +13,13 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
 var issueKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*-[1-9][0-9]*$`)
 
-type Issue struct {
-	Key, URL, Title, Status, Priority, Assignee, Project, Type, Description, Due string
-	Labels                                                                       []string
-	Updated                                                                      time.Time
-}
+type Issue = model.JiraIssue
 type Client struct {
 	base  *url.URL
 	token string
