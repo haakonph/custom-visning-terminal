@@ -352,3 +352,24 @@ func TestEmptySnapshotDoesNotResurrectLegacyTasks(t *testing.T) {
 		t.Fatal(loaded, err)
 	}
 }
+
+func TestLatestObservationWinsWhenPRUpdateTimeIsUnchanged(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "github.sqlite")
+	at := time.Now().UTC()
+	fresh := model.PullRequest{URL: "https://github.com/o/r/pull/1", UpdatedAt: at, CI: model.Pass}
+	stale := fresh
+	stale.CI = model.Pending
+	snap := model.Snapshot{Version: 1, User: "alice"}
+	snap.Datasets[model.Open] = model.Dataset{PRs: []model.PullRequest{fresh}, SyncedAt: at}
+	snap.Datasets[model.Reviews] = model.Dataset{PRs: []model.PullRequest{stale}, SyncedAt: at.Add(-time.Hour)}
+	if err := Save(path, snap); err != nil {
+		t.Fatal(err)
+	}
+	var loaded model.Snapshot
+	if err := Load(path, &loaded); err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Datasets[model.Open].PRs[0].CI != model.Pass || loaded.Datasets[model.Reviews].PRs[0].CI != model.Pass {
+		t.Fatal("older observation replaced the shared PR")
+	}
+}

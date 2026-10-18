@@ -38,12 +38,14 @@ func writeGitHub(ctx context.Context, q *dbgen.Queries, s model.Snapshot) error 
 		return err
 	}
 	prs := map[string]model.PullRequest{}
+	observed := map[string]time.Time{}
 	for _, d := range s.Datasets {
 		for _, p := range d.PRs {
 			key := prKey(p)
 			old, ok := prs[key]
-			if !ok || !old.UpdatedAt.After(p.UpdatedAt) {
+			if !ok || p.UpdatedAt.After(old.UpdatedAt) || (p.UpdatedAt.Equal(old.UpdatedAt) && !observed[key].After(d.SyncedAt)) {
 				prs[key] = p
+				observed[key] = d.SyncedAt
 			}
 		}
 	}
