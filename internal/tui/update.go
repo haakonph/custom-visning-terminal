@@ -14,6 +14,46 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.localMessage(msg); handled {
+		return m, cmd
+	}
+	if _, ok := msg.(copilotOpenMsg); ok {
+		return m.updateCopilot(msg)
+	}
+	if _, ok := msg.(copilotResult); ok {
+		return m.updateCopilot(msg)
+	}
+	if _, ok := msg.(copilotTick); ok {
+		return m.updateCopilot(msg)
+	}
+	if m.copilotActive {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		default:
+			return m.updateCopilot(msg)
+		}
+	}
+
+	if key, ok := msg.(tea.KeyPressMsg); ok && m.local != nil && m.local.choosing {
+		switch key.String() {
+		case "1":
+			m.local.choosing = false
+			return m, m.openLocal("intellij")
+		case "2":
+			m.local.choosing = false
+			return m, m.openLocal("vscode")
+		case "3":
+			m.local.choosing = false
+			return m, m.openLocal("custom")
+		case "esc":
+			m.local.choosing = false
+			return m, nil
+		case "ctrl+c", "q":
+			m.cancel()
+			return m, tea.Quit
+		}
+		return m, nil
+	}
 	if key, ok := msg.(tea.KeyPressMsg); ok {
 		if m.tasks.active {
 			return m.updateTasks(key)
@@ -29,6 +69,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "t", "a":
 				return m.collectTask(key.String() == "t")
+			case "c":
+				return m.switchCopilot()
 			case "l":
 				return m.navigateRelated()
 			case "g":
@@ -75,6 +117,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = max(1, msg.Height)
 		m.input.SetWidth(max(1, m.width-4))
 		m.tasks.input.SetWidth(max(1, m.width-10))
+		if m.copilot != nil {
+			m.copilot.input.SetWidth(max(1, m.width-4))
+		}
 		if m.jira != nil {
 			m.jira.input.SetWidth(max(1, m.width-4))
 		}
@@ -91,6 +136,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for view := model.Open; view < model.ViewCount; view++ {
 			cmds = append(cmds, m.refresh(view))
 		}
+		cmds = append(cmds, m.refreshLocal())
 		return m, tea.Batch(cmds...)
 	case refreshMsg:
 		m.loading[msg.view] = false
@@ -123,7 +169,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.clamp()
 		}
-		return m, m.persist()
+		return m, tea.Batch(m.persist(), m.refreshLocal())
 	case cacheMsg:
 		m.saving = false
 		if msg.err != nil {
@@ -162,6 +208,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch key {
 
+		case "space", " ":
+			if m.local != nil {
+				rows := m.filtered()
+				if len(rows) > 0 {
+					p := rows[m.selected]
+					if _, ok := m.local.chosen[p.Key()]; ok {
+						delete(m.local.chosen, p.Key())
+					} else {
+						m.local.chosen[p.Key()] = p
+					}
+				}
+			}
+		case "o":
+			return m, m.openLocal("")
+		case "O":
+			if m.local != nil {
+				m.local.choosing = true
+			}
 		case "q":
 			m.cancel()
 			return m, tea.Quit

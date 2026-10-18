@@ -15,6 +15,9 @@ type Cache interface {
 }
 type Model struct {
 	tasks           taskState
+	copilot         *copilotState
+	copilotActive   bool
+	local           *localState
 	jira            *jiraState
 	jiraActive      bool
 	relatedKey      string
@@ -58,6 +61,9 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	return Model{tasks: newTasks(), ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 }
 func (m Model) Init() tea.Cmd {
+	if m.copilotActive {
+		return m.refreshCopilot()
+	}
 	if m.jiraActive {
 		if m.source != nil {
 			return tea.Batch(m.refreshJira(), m.bootstrap())
