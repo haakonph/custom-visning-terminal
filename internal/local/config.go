@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 )
 
 type Editor struct {
@@ -32,7 +34,7 @@ func Directories() (config, data string, err error) {
 	if err != nil {
 		return
 	}
-	config = filepath.Join(config, "custom-visning", "config.json")
+	config = appconfig.Path()
 	if runtime.GOOS == "linux" {
 		data = os.Getenv("XDG_DATA_HOME")
 		if !filepath.IsAbs(data) {
@@ -56,7 +58,7 @@ func LoadConfig(path string) (Config, error) {
 	c := Defaults()
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return c, writeJSON(path, c)
+		return c, appconfig.Update(path, map[string]any{"repository_paths": c.RepositoryPaths, "editors": c.Editors})
 	}
 	if err != nil {
 		return c, err

@@ -14,7 +14,7 @@ func (m Model) relatedPRs(key string) []model.PullRequest {
 	}
 	var matched []model.PullRequest
 	for _, p := range rows {
-		if p.HasJiraKey(key) {
+		if p.HasJiraKey(key, m.jiraPattern) {
 			matched = append(matched, p)
 		}
 	}
@@ -47,7 +47,7 @@ func (m Model) navigateRelated() (tea.Model, tea.Cmd) {
 	if len(rows) == 0 {
 		return m, nil
 	}
-	keys := rows[m.selected].JiraKeys()
+	keys := rows[m.selected].JiraKeys(m.jiraPattern)
 	if len(keys) == 0 {
 		m.notice = "Ingen Jira-nøkler i PR-tittel, beskrivelse eller branchnavn"
 		return m, nil

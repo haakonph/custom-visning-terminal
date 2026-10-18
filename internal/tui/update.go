@@ -18,6 +18,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if handled, cmd := m.mattermostMessage(msg); handled {
 		return m, cmd
 	}
+	if m.settings.active {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		default:
+			return m.updateSettings(msg)
+		}
+	}
 	if m.help && !m.tasks.active && !m.jiraActive && !m.copilotActive {
 		if key, ok := msg.(tea.KeyPressMsg); ok {
 			switch key.String() {
@@ -48,6 +55,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if _, ok := msg.(copilotTick); ok {
 		return m.updateCopilot(msg)
+	}
+	if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == "," && !m.tasks.active && !m.filtering && (m.jira == nil || m.jira.mode == "") && (m.copilot == nil || !m.copilot.filtering) {
+		return m.openSettings()
 	}
 	if m.copilotActive {
 		switch msg.(type) {
@@ -87,6 +97,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !editing {
 			switch key.String() {
+			case "P", ",":
+				return m.openSettings()
 			case "T":
 				m.tasks.active = true
 				m.tasks.selectVisible()

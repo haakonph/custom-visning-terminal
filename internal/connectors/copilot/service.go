@@ -14,13 +14,18 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 )
 
 type Options struct {
-	SessionRoot, StorePath               string
-	Port                                 int
-	Enabled, CaptureContent, ShowContent bool
-	JiraPattern                          string
+	SessionRoot    string `json:"session_root"`
+	StorePath      string `json:"store_path"`
+	Port           int    `json:"port"`
+	Enabled        bool   `json:"enabled"`
+	CaptureContent bool   `json:"capture_content"`
+	ShowContent    bool   `json:"show_content"`
+	JiraPattern    string `json:"jira_pattern"`
 }
 
 func DefaultOptions() (Options, error) {
@@ -37,6 +42,9 @@ func DefaultOptions() (Options, error) {
 func OptionsFromEnv() (Options, error) {
 	o, err := DefaultOptions()
 	if err != nil {
+		return o, err
+	}
+	if err := appconfig.Section(appconfig.Path(), "copilot", &o); err != nil {
 		return o, err
 	}
 	for key, target := range map[string]*string{"COPILOT_SESSION_ROOT": &o.SessionRoot, "COPILOT_STORE_PATH": &o.StorePath, "COPILOT_JIRA_PATTERN": &o.JiraPattern} {

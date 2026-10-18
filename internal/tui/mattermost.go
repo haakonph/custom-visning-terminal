@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -38,12 +39,12 @@ func markdownLink(title, link string) string {
 	link = strings.NewReplacer("(", "%28", ")", "%29", " ", "%20").Replace(link)
 	return "[" + title + "](" + link + ")"
 }
-func mattermostText(rows []model.PullRequest, issueURL func(string) string) string {
+func mattermostText(rows []model.PullRequest, issueURL func(string) string, patterns ...*regexp.Regexp) string {
 	var lines []string
 	common := ""
 	for i, p := range rows {
 		lines = append(lines, markdownLink(p.Title, p.URL))
-		keys := p.JiraKeys()
+		keys := p.JiraKeys(patterns...)
 		if len(keys) != 1 {
 			common = ""
 			issueURL = nil
@@ -95,7 +96,7 @@ func (m *Model) composeMattermost() tea.Cmd {
 		issueURL = m.jira.client.IssueURL
 	}
 	s := m.mattermost
-	s.text = mattermostText(rows, issueURL)
+	s.text = mattermostText(rows, issueURL, m.jiraPattern)
 	s.active = true
 	s.offset = 0
 	s.notice = ""

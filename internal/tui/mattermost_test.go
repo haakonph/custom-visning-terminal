@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -142,5 +143,18 @@ func TestComposeMattermostUsesSelectionAndFreshData(t *testing.T) {
 	m.composeMattermost()
 	if m.mattermost.text != "[Add endpoint](https://github.com/acme/api/pull/2)" {
 		t.Fatal(m.mattermost.text)
+	}
+}
+
+func TestMattermostRespectsConfiguredJiraPattern(t *testing.T) {
+	rows := []model.PullRequest{{Title: "ABC-1 fix", URL: "https://github.com/a/b/pull/1"}}
+	text := mattermostText(rows, func(key string) string { return "https://jira.example/browse/" + key }, regexp.MustCompile(`ABC-[0-9]{3,5}`))
+	if strings.Contains(text, "jira.example") {
+		t.Fatal("ignored configured Jira pattern: " + text)
+	}
+	rows[0].Title = "ABC-123 fix"
+	text = mattermostText(rows, func(key string) string { return "https://jira.example/browse/" + key }, regexp.MustCompile(`ABC-[0-9]{3,5}`))
+	if !strings.Contains(text, "[ABC-123](https://jira.example/browse/ABC-123)") {
+		t.Fatal(text)
 	}
 }
