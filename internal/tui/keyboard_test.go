@@ -203,3 +203,14 @@ func TestShortcutPromptsFitTerminal(t *testing.T) {
 		m.jiraAction = nil
 	}
 }
+
+func TestJiraMultiselectSnooze(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_SNOOZE", t.TempDir()+"/snooze.json")
+	m := jiraModel(t)
+	m.jira.rows = []jira.Issue{{Key: "APP-1", URL: "https://jira.example/browse/APP-1"}, {Key: "APP-2", URL: "https://jira.example/browse/APP-2"}}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+	m, _ = sequence(m, "z2h")
+	if len(m.snoozes.entries) != 2 || len(m.jiraChosen) != 0 || len(m.jira.filtered()) != 0 {
+		t.Fatal("Jira snooze did not use and clear multiselection")
+	}
+}

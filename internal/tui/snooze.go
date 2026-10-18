@@ -261,6 +261,13 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				return true, nil
 			}
 			for _, e := range batch {
+				if e.Kind == "jira" {
+					for key, issue := range m.jiraChosen {
+						if issue.URL == e.URL {
+							delete(m.jiraChosen, key)
+						}
+					}
+				}
 				if e.Kind == "github" {
 					for key, p := range m.chosen {
 						if p.URL == e.URL {
@@ -331,7 +338,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.notice = "Kunne ikke lese snooze: " + s.loadErr.Error()
 			return true, nil
 		}
-		if !m.tasks.active && !m.jiraActive {
+		if !m.tasks.active {
 			s.targets = nil
 			for _, ref := range m.taskReferences() {
 				s.targets = append(s.targets, snooze.Entry{ID: snooze.Identity(ref.Provider, ref.URL), Kind: ref.Provider, Title: ref.Title, URL: ref.URL})
