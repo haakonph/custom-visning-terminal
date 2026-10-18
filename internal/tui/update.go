@@ -15,6 +15,9 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.mattermostMessage(msg); handled {
+		return m, cmd
+	}
 	if m.help && !m.tasks.active && !m.jiraActive && !m.copilotActive {
 		if key, ok := msg.(tea.KeyPressMsg); ok {
 			switch key.String() {
@@ -230,17 +233,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key {
 
 		case "space", " ":
-			if m.local != nil {
-				rows := m.filtered()
-				if len(rows) > 0 {
-					p := rows[m.selected]
-					if _, ok := m.local.chosen[p.Key()]; ok {
-						delete(m.local.chosen, p.Key())
-					} else {
-						m.local.chosen[p.Key()] = p
-					}
+			rows := m.filtered()
+			if len(rows) > 0 {
+				p := rows[m.selected]
+				if _, ok := m.chosen[p.Key()]; ok {
+					delete(m.chosen, p.Key())
+				} else {
+					m.chosen[p.Key()] = p
 				}
 			}
+		case "m":
+			return m, m.composeMattermost()
 		case "o":
 			return m, m.openLocal("")
 		case "O":

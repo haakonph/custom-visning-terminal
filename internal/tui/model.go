@@ -15,6 +15,8 @@ type Cache interface {
 }
 type Model struct {
 	snoozes         *snoozeState
+	mattermost      *mattermostState
+	chosen          map[string]model.PullRequest
 	tasks           taskState
 	copilot         *copilotState
 	copilotActive   bool
@@ -63,7 +65,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	s := newSnooze()
 	tasks := newTasks()
 	tasks.snoozes = s
-	return Model{snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	return Model{chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 }
 func (m Model) initProviders() tea.Cmd {
 	if m.copilotActive {

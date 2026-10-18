@@ -13,6 +13,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/tui"
 )
@@ -70,6 +71,14 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		persistence = store
 	}
 	dashboard := tui.New(ctx, client, persistence).WithCopilot(copilotClient, false)
+	if endpoint := os.Getenv("MATTERMOST_WEBHOOK_URL"); endpoint != "" {
+		sender, err := mattermost.New(endpoint)
+		if err != nil {
+			fmt.Fprintln(stderr, "Mattermost unavailable:", err)
+		} else {
+			dashboard = dashboard.WithMattermost(sender)
+		}
+	}
 	configPath, dataDir, localErr := local.Directories()
 	if localErr == nil {
 		var config local.Config
