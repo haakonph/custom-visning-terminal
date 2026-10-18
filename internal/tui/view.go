@@ -95,16 +95,26 @@ func (m Model) View() tea.View {
 		state = "authenticating…"
 	}
 	lines = append(lines, muted.Render(fmt.Sprintf(" %s · last full sync: %s", state, sync)))
+	if m.local != nil && m.local.running > 0 {
+		lines = append(lines, fmt.Sprintf(" Worktrees: %d preparing/queued · %d completed", m.local.running+len(m.local.queue), len(m.local.results)))
+	}
 	if m.filtering || m.input.Value() != "" {
 		lines = append(lines, m.input.View())
+	}
+	if m.local != nil && m.local.choosing {
+		lines = append(lines, " Open in: 1 IntelliJ IDEA · 2 VS Code · 3 custom · Esc cancel")
 	}
 	if m.help {
 		lines = append(lines, strings.Split(helpText, "\n")...)
 	} else {
 		rows := m.filtered()
 		lines = append(lines, m.row(model.PullRequest{}, true, false))
-		// Reserve room for a selected-PR detail line, warning and footer.
-		capacity := max(1, m.height-len(lines)-5)
+		// Reserve space for details, both warning sources, results and footer.
+		reserved := 6
+		if m.local != nil {
+			reserved += min(3, len(m.local.results))
+		}
+		capacity := max(1, m.height-len(lines)-reserved)
 		start := max(0, m.selected-capacity+1)
 		for i := start; i < min(len(rows), start+capacity); i++ {
 			lines = append(lines, m.row(rows[i], false, i == m.selected))
@@ -114,17 +124,20 @@ func (m Model) View() tea.View {
 		}
 		if len(rows) > 0 {
 			p := rows[m.selected]
-			lines = append(lines, " Jira: "+strings.Join(p.JiraKeys(), ", ")+" · l relaterte saker")
+			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(), ", ")+" · l relaterte saker")
 			detail := fmt.Sprintf(" %d/%d · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), strings.Join(p.RequestedTeams, ", "), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 		}
 	}
-	message := m.warnings[m.active]
-	if message == "" {
-		message = m.notice
+	if m.local != nil && len(m.local.results) > 0 {
+		for _, result := range m.local.results[max(0, len(m.local.results)-3):] {
+			lines = append(lines, warning.Render(clean(result)))
+		}
 	}
-	if message != "" {
-		lines = append(lines, warning.Render(clean(message)))
+	for _, message := range []string{m.warnings[m.active], m.notice} {
+		if message != "" {
+			lines = append(lines, warning.Render(clean(message)))
+		}
 	}
 	lines = append(lines, muted.Render("g GitHub · J Jira · c Copilot · "+shortcuts))
 	for i, line := range lines {
@@ -148,6 +161,11 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	columns := []column{}
 	number := fmt.Sprintf("#%d", p.Number)
 	title := p.Title
+	if m.local != nil {
+		if _, ok := m.local.chosen[p.Key()]; ok {
+			title = "[✓] " + title
+		}
+	}
 	if p.Draft {
 		title = "[draft] " + title
 	}
@@ -157,6 +175,10 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 		columns = []column{{"REPOSITORY", p.Repository, 16, false}, {"PR", number, 7, false}, {"TITLE", title, m.width - 34, false}, {"REVIEW", string(p.Review), 8, true}}
 	} else {
 		columns = []column{{"PR", number, 7, false}, {"TITLE", title, max(1, m.width-8), false}}
+	}
+	if m.width >= 120 {
+		columns[2].width -= 19
+		columns = append(columns, column{"LOCAL", m.localLabel(p), 18, false})
 	}
 	values := []string{}
 	for _, c := range columns {

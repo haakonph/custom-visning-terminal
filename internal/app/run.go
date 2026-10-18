@@ -13,6 +13,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/tui"
 )
 
@@ -69,6 +70,21 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		persistence = store
 	}
 	dashboard := tui.New(ctx, client, persistence).WithCopilot(copilotClient, false)
+	configPath, dataDir, localErr := local.Directories()
+	if localErr == nil {
+		var config local.Config
+		config, localErr = local.LoadConfig(configPath)
+		if localErr == nil {
+			var manager *local.WorktreeManager
+			manager, localErr = local.New(dataDir, config)
+			if localErr == nil {
+				dashboard = dashboard.WithLocal(manager, config.Editors)
+			}
+		}
+	}
+	if localErr != nil {
+		fmt.Fprintln(stderr, "Local worktrees unavailable:", localErr)
+	}
 	if jiraClient != nil {
 		dashboard = dashboard.WithJira(jiraClient, startJira)
 	}

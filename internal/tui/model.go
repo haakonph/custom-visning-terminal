@@ -16,6 +16,7 @@ type Cache interface {
 type Model struct {
 	copilot         *copilotState
 	copilotActive   bool
+	local           *localState
 	jira            *jiraState
 	jiraActive      bool
 	relatedKey      string
