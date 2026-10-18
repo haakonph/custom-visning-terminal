@@ -78,7 +78,7 @@ func TestMattermostSendRetainsDraftAndBlocksDuplicate(t *testing.T) {
 	m := ready(t).WithMattermost(sender)
 	m.mattermost.active = true
 	m.mattermost.text = "**edited draft**"
-	send := "ac"
+	send := "as"
 	m, cmd := sequence(m, send)
 	if cmd == nil || !m.mattermost.sending {
 		t.Fatal("send not started")
@@ -108,7 +108,7 @@ func TestMattermostNavigationAndEmptyDraft(t *testing.T) {
 	}
 	m.mattermost.active = true
 	m.mattermost.text = " \n"
-	m, cmd := sequence(m, "ac")
+	m, cmd := sequence(m, "as")
 	if cmd != nil || m.mattermost.sending {
 		t.Fatal("sent empty draft")
 	}

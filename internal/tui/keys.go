@@ -23,7 +23,7 @@ to/tg/tt/ta/tc  Koble til valgte mål av typen; Enter lagrer lokalt
                 Space og Shift+↑/↓ velger flere kilder og mål
 ee/en           Editor (IntelliJ) / nettleser
 e + ting + e/n  Følg relasjon(er), åpne i editor/nettleser
-ac/aa/ad        Melding / lokalt arkiv / slett lokal oppgave/referanse
+as/ak/ad        Melding / lokalt arkiv / slett lokal oppgave/referanse
 atf             Flytt tilhørende Jira-saker; velg faktisk overgang
 atfq/atfu       QA / under arbeid
 atfa/atff       Avklaring / ferdig
@@ -34,22 +34,21 @@ af/am/ar        Samme Jira-handlinger direkte på Jira-saker
                 Esc avbryter før utføring; feil stopper resten
                 Tidligere saker i flervalget kan være oppdatert
 
-Handlingsnavn vinner ved kollisjon: aa arkiv, ac melding
-a:a… / a:c…     : velger uttrykkelig AI/chat som relatert mål
-Eksempler: atgc, etn, a:ac, atgtfq (hver ting følger én relasjon)
+aa… / ac…       Følg AI/chat, avslutt med s melding eller k arkiv
+Eksempler: atgs, etn, aas, atgtfq (hver ting følger én relasjon)
 
 Tillegg for funksjoner som ikke var definert i listen:
 au              Oppdater/synkroniser aktiv visning eller detaljer
 an/ae           Ny intern oppgave fra valget / endre oppgavetittel
-as/ax           Lagre Jira-søk / nullstill hurtigfiltre og egen JQL
+aq/ax           Lagre Jira-søk / nullstill hurtigfiltre og egen JQL
 vs/vi/vr        Innstillinger / Copilot-diagnostikk / forrige visning
 vf/vj           Jira-hurtigfiltre / JQL-redigering
 vz/az           Vis utsatte / hent tilbake valgte utsatte elementer
-vb              Lokalt arkiv; aa gjenoppretter valgte elementer
+vb              Lokalt arkiv; ak gjenoppretter valgte elementer
 vk              Velg/overvåk Mattermost-kanaler
 al/ap           Chat-innlogging med passord+TOTP / PAT
 av/aw/ab        Merk kanal lest / slutt å overvåke / tøm lokal chatkonto
-ah/aj/ak        Eldre chatmeldinger / rull en halv side ned/opp
+ah/a↓/a↑        Eldre chatmeldinger / rull en halv side ned/opp
 el              Velg lenker fra valgte elementer
 ev             Velg editor med j/k + Enter (IntelliJ, VS Code, egendefinert)
 Ctrl+C          Avslutt og kanseller bakgrunnsarbeid

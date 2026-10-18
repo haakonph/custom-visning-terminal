@@ -67,11 +67,11 @@ lastes ned. `d` åpner hele tråden fra serveren og beholder svarene offline.
 | `/` | Filtrer meldinger lokalt |
 | `vk` / `aw` | Velg kanaler / slutt å overvåke aktiv kanal |
 | `d` | Vis tråd og svar |
-| `ah` / `aj` / `ak` | Eldre meldinger / rull halv side ned/opp |
+| `ah` / `a↓` / `a↑` | Eldre meldinger / rull halv side ned/opp |
 | `en` / `el` | Åpne meldingen i nettleser / velg lenke i meldinger |
 | `rg` / `rc` | Relaterte PR-er / relaterte chatmeldinger fra GitHub |
 | `to/tg/tt/ta/tc` | Koble valgte meldinger til valgte objekter lokalt |
-| `ac` / `aa` | Lag melding fra valget / arkiver lokalt |
+| `as` / `ak` | Lag melding fra valget / arkiver lokalt |
 | `av` / `au` | Merk kanal lest / synkroniser |
 | `al` / `ap` | Logg inn med passord/TOTP / PAT |
 | `ab`, så Enter | Tøm lokal chatcache og lagret sesjon |

@@ -774,7 +774,7 @@ func (m Model) mmReaderView() tea.View {
 	if s.mentions {
 		lines = append(lines, muted.Render("d åpner tråden; rc/rg følger relasjoner"))
 	}
-	lines = append(lines, muted.Render("j/k meldinger · h/l kanaler · vk overvåk · d tråd · ah eldre · aj/ak rull · en åpne · el lenker · rg PR · av lest · au synk · ab tøm · Esc tilbake"))
+	lines = append(lines, muted.Render("j/k meldinger · h/l kanaler · vk overvåk · d tråd · ah eldre · a↓/a↑ rull · en åpne · el lenker · rg PR · av lest · au synk · ab tøm · Esc tilbake"))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], max(1, m.width), "…")
 	}

@@ -298,7 +298,7 @@ prosjekter når prosjektfilter ikke er satt. Aktiv sprint krever Jira Software.
 | `/` | Filtrer lokalt blant hentede saker |
 | `vf` | Rediger kombinerbare hurtigfiltre i standardfaner |
 | `vj` | Rediger og kjør full JQL, inkludert ønsket `ORDER BY` |
-| `as` | Lagre gjeldende JQL med navn; samme navn erstatter eksisterende søk |
+| `aq` | Lagre gjeldende JQL med navn; samme navn erstatter eksisterende søk |
 | `x` | Fjern markeringer; søk og filtre beholdes |
 | `au` | Hent aktivt søk på nytt |
 | `Esc` | Avbryt redigering eller fjern lokalt tekstfilter |
@@ -421,7 +421,7 @@ Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
 - `an` lager en tom oppgave, `ae` redigerer tittelen, `Enter` lagrer og `Esc` avbryter
   tittelredigeringen. En tom oppgave kan fylles ut senere.
 - `d` viser detaljer. `ad` fjerner valgt kobling i detaljene, eller sletter oppgaven i listen.
-- `aa` arkiverer/gjenoppretter lokal oppgave. `vb` viser arkivet; `aa` gjenoppretter derfra.
+- `ak` arkiverer/gjenoppretter lokal oppgave. `vb` viser arkivet; `ak` gjenoppretter derfra.
 - `vg` / `vt` / `va` / `vc` går til ønsket visning. `Esc` går først til listen,
   deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
 
@@ -813,11 +813,11 @@ Installer Neovim, Vim eller vi (appen velger første tilgjengelige i den rekkef�
 
 1. Marker én eller flere PR-er med `Space`, også på tvers av faner og filtre.
    Uten markering brukes PR-en under markøren.
-2. Trykk `ac`. Meldingen åpnes ferdig utfylt som Markdown i Vim/Neovim.
+2. Trykk `as`. Meldingen åpnes ferdig utfylt som Markdown i Vim/Neovim.
 3. Trykk `i` for å redigere. Bruk `Esc` og `:wq` for å lagre og gå tilbake.
    `:cq` avbryter redigeringen og beholder forrige utkast.
 4. Se gjennom Markdown-teksten i terminalappen (`j/k` ruller), trykk `ee` for
-   å redigere videre, `ac` for å sende, eller `Esc` for å avbryte sendingen.
+   å redigere videre, `as` for å sende, eller `Esc` for å avbryte sendingen.
 
 Alle valgte PR-er sendes i **én melding**, med én lenke per linje:
 

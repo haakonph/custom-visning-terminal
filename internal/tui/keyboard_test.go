@@ -163,12 +163,12 @@ func TestTaskArchiveRestoreAndDetailsDoNotDelete(t *testing.T) {
 		t.Fatal("d deleted reference")
 	}
 	m.tasks.details = false
-	m, _ = sequence(m, "aa")
+	m, _ = sequence(m, "ak")
 	if len(m.tasks.visibleTasks()) != 0 {
 		t.Fatal("not archived")
 	}
 	m, _ = sequence(m, "vb")
-	m, _ = sequence(m, "aa")
+	m, _ = sequence(m, "ak")
 	if len(m.tasks.visibleTasks()) != 1 || m.tasks.items[0].Archived {
 		t.Fatal("not restored")
 	}

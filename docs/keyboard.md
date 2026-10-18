@@ -60,20 +60,20 @@ utvides aldri til et helt nettverk av indirekte sammenkoblede oppgaver.
 
 | Handling | Tast etter `a` |
 | --- | --- |
-| Rediger og send melding til konfigurert Mattermost-webhook | `c` |
-| Arkiver valgte elementer lokalt / gjenopprett fra arkivvisningen | `a` |
+| Rediger og send melding til konfigurert Mattermost-webhook | `s` |
+| Arkiver valgte elementer lokalt / gjenopprett fra arkivvisningen | `k` |
 | Slett intern oppgave eller valgte referanser i oppgavedetaljer | `d` |
 | Flytt Jira-saker: hent og velg faktisk overgang | `f` |
 | Tilordne Jira til meg | `m` |
 | Fjern min Jira-tilordning, uten å fjerne andre ansvarlige | `r` |
 
-`ac` lager et redigerbart Markdown-utkast fra valgte elementer uansett type.
-Inne i utkastet betyr `ee` rediger igjen og `ac` send. Teksten må bekreftes ved
+`as` lager et redigerbart Markdown-utkast fra valgte elementer uansett type.
+Inne i utkastet betyr `ee` rediger igjen og `as` send. Teksten må bekreftes ved
 å sende; åpning av utkastet sender ingen melding. Mottakeren er den konfigurerte
 webhook-kanalen, ikke automatisk kanalen til en markert chatmelding.
 
-`aa` skjuler elementene fra vanlige lister uten å endre eksterne systemer.
-`vb` viser det lokale arkivet, der `aa` gjenoppretter valgte elementer.
+`ak` skjuler elementene fra vanlige lister uten å endre eksterne systemer.
+`vb` viser det lokale arkivet, der `ak` gjenoppretter valgte elementer.
 `d` viser lagrede detaljer om arkiverte/utsatte elementer uten å velge en annen rad.
 Utsatt-visningen støtter også søk, flervalg og samlet gjenoppretting med `az`.
 `ad` sletter ikke PR-er, Jira-saker, AI-historikk eller chatmeldinger eksternt.
@@ -102,7 +102,7 @@ Eksempler:
 - `afq` / `am` / `ar` direkte i Jira: handling på valgte saker.
 - `etn`: tilhørende Jira-saker åpnes i nettleseren.
 - `eae`: tilhørende AI-sesjoners prosjekt åpnes i IntelliJ.
-- `atgc`: følg Jira, så GitHub, og lag melding om PR-ene som ble funnet.
+- `atgs`: følg Jira, så GitHub, og lag melding om PR-ene som ble funnet.
 - `aod`: slett den tilhørende interne oppgaven.
 - `to` fra AI/chat/Jira/GitHub: velg intern oppgave som skal få referansene.
 
@@ -122,7 +122,7 @@ Følgende utvider mønsteret for funksjoner som allerede fantes:
 | `au` | Oppdater/synkroniser aktiv visning eller detaljer; prøv GitHub-oppstart igjen |
 | `an` | Ny intern oppgave fra valgte elementer; på oppgavesiden en tom oppgave |
 | `ae` | Endre aktiv oppgaves tittel; `aoe` kan først finne en tilhørende oppgave |
-| `as` / `ax` | Lagre aktivt Jira-søk / nullstill Jira-hurtigfiltre og egen JQL |
+| `aq` / `ax` | Lagre aktivt Jira-søk / nullstill Jira-hurtigfiltre og egen JQL |
 | `vs` / `vr` | Innstillinger / forrige hovedvisning |
 | `vi` | Copilot-diagnostikk |
 | `vf` / `vj` | Jira-hurtigfiltre / egen JQL |
@@ -131,19 +131,17 @@ Følgende utvider mønsteret for funksjoner som allerede fantes:
 | `vk` | Velg hvilke Mattermost-kanaler som skal overvåkes |
 | `al` / `ap` | Chat-innlogging med passord/TOTP / PAT |
 | `av` / `aw` / `ab` | Merk kanal lest / slutt å overvåke / tøm lokal chatkonto og lagret sesjon |
-| `ah` / `aj` / `ak` | Eldre chatmeldinger / rull en halv side ned/opp |
+| `ah` / `a↓` / `a↑` | Eldre chatmeldinger / rull en halv side ned/opp |
 | `el` | Vis en liste over eksterne lenker i valgte elementer |
 | `ev` | Velg editor med j/k + Enter: IntelliJ, VS Code eller egendefinert |
 | `z` + tall + `m` | Utsett til kl. 06 etter antall kalenderdager, tidligere stor `D` |
 | `Ctrl+C` | Avslutt og kanseller bakgrunnsarbeid |
 | `Enter` | Bekreft valg/tekst i dialoger; ikke en snarvei i hovedlisten |
 
-`a` og `c` er både ting og handlinger i spesifikasjonen. Handlingen vinner:
-`aa` arkiverer og `ac` lager melding. Bruk `:` for et uttrykkelig relatert mål:
-`a:ac` følger AI og lager melding om sesjonene, og `a:cc` følger chat og lager
-melding om treffene. Man kan også først navigere med `ra`/`rc` og deretter utføre
-en handling. Kolonet starter ikke lenger JQL; det er kun en del av en pågående
-handlingssekvens.
+`a` og `c` velger AI og chat i kjeder. `s` avslutter med melding og `k` med
+arkivering. For eksempel følger `aas` AI og lager melding om sesjonene, mens
+`acs` følger chat og lager melding om treffene. `aak` og `ack` arkiverer de
+tilhørende AI-sesjonene og chatmeldingene. Det trengs ikke kolon i sekvensene.
 
 Listen definerte heller ikke om kobling, arkivering og sletting skulle endre
 systemene eksternt, hvilken chatkanal en melding skulle sendes til, hvordan

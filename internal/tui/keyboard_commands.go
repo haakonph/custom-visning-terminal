@@ -17,19 +17,13 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 		if prefix == "e" && k == "e" {
 			return m, m.editMattermost()
 		}
-		if prefix == "a" && k == "c" {
+		if prefix == "a" && k == "s" {
 			_, cmd := m.mattermostMessage(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 			return m, cmd
 		}
 		return m.unavailable()
 	}
 	op := prefix[:1]
-	// a and c are both entity and action names. Colon explicitly selects an
-	// entity; without it aa/ac retain the actions specified by the user.
-	if op == "a" && k == ":" {
-		m.sequence = prefix + ":"
-		return m, nil
-	}
 	if op == "v" {
 		return m.viewProvider(k)
 	}
@@ -60,16 +54,16 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 		}
 		return m.unavailable()
 	}
-	if op == "a" && !strings.HasSuffix(prefix, ":") {
+	if op == "a" {
 		switch k {
 		case "f", "m", "r":
 			if allProvider(refs, "jira") {
 				m.sequenceRefs = refs
 				return m.startJiraAction(k)
 			}
-		case "c":
+		case "s":
 			return m.composeReferences(refs)
-		case "a":
+		case "k":
 			return m.archiveReferences(refs)
 		case "d":
 			return m.deleteReferences(refs)
@@ -93,7 +87,7 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 				m.jira.input.Prompt = ""
 				return m, m.refreshJira()
 			}
-		case "s":
+		case "q":
 			if m.jira != nil && m.visibleProvider() == "jira" {
 				return m, m.jira.edit("name", "Lagre søk som: ", "")
 			}
@@ -121,10 +115,10 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 			if m.visibleProvider() == "mattermost" {
 				return m.dispatchKey("D")
 			}
-		case "j", "k":
+		case "down", "up":
 			if m.visibleProvider() == "mattermost" {
 				delta := max(1, m.height/2)
-				if k == "k" {
+				if k == "up" {
 					delta = -delta
 				}
 				m.mmReader.scroll = max(0, m.mmReader.scroll+delta)
@@ -194,7 +188,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 				rows = append(rows, taskRef(t))
 			}
 		}
-		return m.showEntities("Arkiv · aa gjenopprett", "archive", rows, nil)
+		return m.showEntities("Arkiv · ak gjenopprett", "archive", rows, nil)
 	case "i":
 		if m.copilot != nil {
 			m.rememberProvider("copilot")

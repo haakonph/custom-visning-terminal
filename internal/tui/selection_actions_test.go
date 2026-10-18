@@ -192,7 +192,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 			t.Setenv("PATH", t.TempDir()) // No interactive Vim process in tests.
 			sender := &fakeMessageSender{}
 			m = m.WithMattermost(sender)
-			m, _ = sequence(m, "ac")
+			m, _ = sequence(m, "as")
 			if !m.mattermost.active {
 				t.Fatal("Mattermost draft not opened")
 			}
@@ -204,7 +204,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 				t.Fatalf("draft = %q, want %v", m.mattermost.text, expected)
 			}
 			draft := m.mattermost.text
-			m, cmd := sequence(m, "ac")
+			m, cmd := sequence(m, "as")
 			if cmd == nil {
 				t.Fatal("send command missing")
 			}

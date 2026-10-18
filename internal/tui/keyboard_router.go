@@ -386,7 +386,7 @@ func sequenceHint(prefix string) string {
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':
-		return "c melding · a arkiver · d slett · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel · : eksplisitt mål"
+		return "s melding · k arkiver · d slett · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
 	}
 	return fmt.Sprint(prefix)
 }

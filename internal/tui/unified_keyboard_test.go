@@ -133,7 +133,7 @@ func TestArchivesSurviveRestartForAllProviders(t *testing.T) {
 			m := unifiedModel(t)
 			m, _ = sequence(m, "v"+page)
 			origin := m.currentReferences()[0]
-			m, _ = sequence(m, "aa")
+			m, _ = sequence(m, "ak")
 			m.entities = newEntities()
 			if origin.Provider == "task" {
 				tasks := newTasks()
@@ -148,7 +148,7 @@ func TestArchivesSurviveRestartForAllProviders(t *testing.T) {
 			if m.dialog == nil {
 				t.Fatal("archive not visible")
 			}
-			m, _ = sequence(m, "aa")
+			m, _ = sequence(m, "ak")
 			if m.entities.archived(origin.Provider, origin.URL) {
 				t.Fatal("restore failed")
 			}
@@ -176,10 +176,10 @@ func TestLinkCancelAndWriteFailureNeverCreateEdges(t *testing.T) {
 		t.Fatal("failed save changed links")
 	}
 }
-func TestExplicitAIActionTargetAndGenericMessage(t *testing.T) {
+func TestAIActionTargetAndGenericMessage(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	m := unifiedModel(t).WithMattermost(&fakeMessageSender{})
-	m, _ = sequence(m, "a:ac")
+	m, _ = sequence(m, "aas")
 	if !m.mattermost.active || !strings.Contains(m.mattermost.text, "Session") {
 		t.Fatal("AI action target unavailable")
 	}
@@ -353,13 +353,13 @@ func TestDeferredSearchAndBulkRestoreRespectSelection(t *testing.T) {
 func TestArchivedDetailsDoNotSelectAnotherVisibleRow(t *testing.T) {
 	m := unifiedModel(t)
 	target := m.currentReferences()[0]
-	m, _ = sequence(m, "aa")
+	m, _ = sequence(m, "ak")
 	m, _ = sequence(m, "vb")
 	m, _ = sequence(m, "d")
 	if m.dialog == nil || m.dialog.mode != "snapshot" || refID(m.currentReferences()[0]) != refID(target) {
 		t.Fatal("archived details fell back to a different row")
 	}
-	m, _ = sequence(m, "aa")
+	m, _ = sequence(m, "ak")
 	if m.entities.archived(target.Provider, target.URL) {
 		t.Fatal("cannot restore from archived details")
 	}
@@ -415,5 +415,63 @@ func TestOpenDetailsKeepActionTargetWhenListChanges(t *testing.T) {
 	refs = m.currentReferences()
 	if len(refs) != 1 || refs[0].Key != key {
 		t.Fatal("detail command fell back to another Jira issue")
+	}
+}
+
+func TestAIAndChatAreUnambiguousActionTargets(t *testing.T) {
+	for _, thing := range []string{"a", "c"} {
+		for _, action := range []string{"s", "k"} {
+			t.Run(thing+action, func(t *testing.T) {
+				t.Setenv("PATH", t.TempDir())
+				m := unifiedModel(t).WithMattermost(&fakeMessageSender{})
+				m, cmd := sequence(m, "a"+thing)
+				if cmd != nil || m.sequence != "a"+thing || len(m.sequenceRefs) == 0 || !allProvider(m.sequenceRefs, provider(thing)) || m.mattermost.active || len(m.entities.data.Archived) != 0 {
+					t.Fatal("entity key executed an action instead of following its relation")
+				}
+				targets := append([]model.TaskReference(nil), m.sequenceRefs...)
+				m, _ = sequence(m, action)
+				if action == "s" {
+					if !m.mattermost.active || !strings.Contains(m.mattermost.text, targets[0].Title) {
+						t.Fatal("message did not use related targets")
+					}
+				} else if !reflect.DeepEqual(m.entities.data.Archived, targets) {
+					t.Fatal("archive did not use related targets")
+				}
+			})
+		}
+	}
+}
+
+func TestJiraQuerySaveDoesNotCollideWithSend(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	m := unifiedModel(t).WithMattermost(&fakeMessageSender{})
+	m, _ = sequence(m, "vtaq")
+	if m.jira.mode != "name" || m.mattermost.active {
+		t.Fatal("aq did not open query name input")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m, _ = sequence(m, "as")
+	if !m.mattermost.active || m.jira.mode != "" {
+		t.Fatal("as did not compose a message from Jira")
+	}
+}
+
+func TestChatScrollDoesNotCollideWithArchive(t *testing.T) {
+	m := unifiedModel(t)
+	m, _ = sequence(m, "vc")
+	m.height = 20
+	m, _ = sequence(m, "a")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	if m.mmReader.scroll != 10 {
+		t.Fatal("a down did not scroll half a page")
+	}
+	m, _ = sequence(m, "a")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyUp})
+	if m.mmReader.scroll != 0 {
+		t.Fatal("a up did not scroll half a page")
+	}
+	m, _ = sequence(m, "ak")
+	if len(m.entities.data.Archived) != 1 || m.entities.data.Archived[0].Provider != "mattermost" {
+		t.Fatal("ak did not archive chat message")
 	}
 }
