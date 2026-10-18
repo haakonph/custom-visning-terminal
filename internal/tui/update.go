@@ -17,6 +17,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
+	if _, ok := msg.(copilotOpenMsg); ok {
+		return m.updateCopilot(msg)
+	}
+	if _, ok := msg.(copilotResult); ok {
+		return m.updateCopilot(msg)
+	}
+	if _, ok := msg.(copilotTick); ok {
+		return m.updateCopilot(msg)
+	}
+	if m.copilotActive {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		default:
+			return m.updateCopilot(msg)
+		}
+	}
+
 	if key, ok := msg.(tea.KeyPressMsg); ok && m.local != nil && m.local.choosing {
 		switch key.String() {
 		case "1":
@@ -44,6 +61,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !editing {
 			switch key.String() {
+			case "c":
+				return m.switchCopilot()
 			case "l":
 				return m.navigateRelated()
 			case "g":
@@ -70,6 +89,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = max(1, msg.Width)
 		m.height = max(1, msg.Height)
 		m.input.SetWidth(max(1, m.width-4))
+		if m.copilot != nil {
+			m.copilot.input.SetWidth(max(1, m.width-4))
+		}
 		if m.jira != nil {
 			m.jira.input.SetWidth(max(1, m.width-4))
 		}

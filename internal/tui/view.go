@@ -44,6 +44,9 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.copilotActive {
+		return m.copilotView()
+	}
 	if m.jiraActive {
 		return m.jiraView()
 	}
@@ -136,7 +139,7 @@ func (m Model) View() tea.View {
 			lines = append(lines, warning.Render(clean(message)))
 		}
 	}
-	lines = append(lines, muted.Render("g GitHub · J Jira · "+shortcuts))
+	lines = append(lines, muted.Render("g GitHub · J Jira · c Copilot · "+shortcuts))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}

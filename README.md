@@ -320,6 +320,112 @@ Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
 
 Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
 
+
+## Copilot-sesjoner
+
+Terminalappen samler inn Copilot-data selv. Start med `custom-visning -copilot`
+(fra kildekode: `go run ./cmd/custom-visning -copilot`), eller trykk **c** fra
+GitHub/Jira. Ingen annen app, Node-server eller GitHub-token kreves for Copilot.
+Direkteoppstart bruker bare Copilot; start på vanlig måte for å bytte mellom
+øvrige konfigurerte integrasjoner.
+
+Appen leser `workspace.yaml` og `events.jsonl` fra `~/.copilot/session-state`,
+med de samme datakildene som Copilot-visningen i `custom-visning`. Den importerer
+historikken ved oppstart og leser nye data hvert andre sekund. Samtale,
+verktøyargumenter/resultater, feil, klient, modell, tokens og prosjekt vises når
+kilden inneholder dem. Det lokale Copilot-filformatet er ikke en stabil offentlig
+API; ukjente hendelser beholdes og ugyldige poster rapporteres i diagnostikk.
+Kildemappene og filene endres aldri; symlinker følges ikke.
+
+Terminalen har et eget datalager i `os.UserConfigDir()/custom-visning-terminal/copilot.json`
+(på macOS normalt `~/Library/Application Support/custom-visning-terminal/copilot.json`,
+på Linux normalt `~/.config/custom-visning-terminal/copilot.json`). Lagrede sesjoner,
+inkludert mottatt telemetri, beholdes mellom oppstarter, også om kildefilene fjernes.
+Filen erstattes atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
+Lageret er separat fra både GitHub-cachen og den andre appens database.
+
+### Egen OTLP-mottaker
+
+Mens terminalappen kjører, mottar den også OTLP på `127.0.0.1:4318`, via
+`/v1/traces`, `/v1/logs` og `/v1/metrics`. Både `http/json` og `http/protobuf`
+støttes; protobuf bruker OpenTelemetry sine genererte skjemaer. Ingen telemetri
+sendes videre. Mottakeren stopper når terminalappen avsluttes.
+
+For Copilot CLI, eller en IDE som arver disse miljøvariablene:
+
+```sh
+export COPILOT_OTEL_ENABLED=true
+export COPILOT_OTEL_CAPTURE_CONTENT=true
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+# Start copilot eller IDE-en fra dette miljøet.
+```
+
+I IntelliJ kan tilsvarende endpoint settes i Copilot-innstillingene for CLI-agenten.
+En IDE som allerede kjører, arver normalt ikke nye skallvariabler. Se Microsofts
+[oppsett for Copilot CLI-sesjonsdata](https://github.com/microsoft/copilot-intellij-feedback/wiki/Access-Copilot-CLI-Session-Data)
+og [OTel-veiledning](https://github.com/microsoft/copilot-intellij-feedback/wiki/Monitoring-Agent-Usage-with-OpenTelemetry).
+
+Hvis en annen app bruker port 4318, fortsetter lokal filimport med en synlig
+portfeil i diagnostikken. Sett for eksempel `COPILOT_OTLP_PORT=4319` for terminalen
+og pek Copilots exporter til `http://127.0.0.1:4319`. Begge appene kan lese de samme
+Copilot-filene uavhengig. En exporter sender til det endpointet du konfigurerer;
+appene deler ikke telemetri eller lagringsfiler.
+
+### Konfigurasjon og innhold
+
+Disse miljøvariablene styrer terminalappen; start den på nytt etter endringer:
+
+| Variabel | Standard | Bruk |
+| --- | --- | --- |
+| `COPILOT_SESSION_ROOT` | `~/.copilot/session-state` | Absolutt sti til historikkmappen; en egendefinert verdi må være ferdig ekspandert |
+| `COPILOT_STORE_PATH` | Se datalagerstien ovenfor | Absolutt sti til terminalens eget JSON-lager |
+| `COPILOT_OTLP_PORT` | `4318` | Lokal mottakerport |
+| `COPILOT_COLLECTION_ENABLED` | `true` | `false` stopper filimport og mottaker; lagret historikk kan leses |
+| `COPILOT_CAPTURE_CONTENT` | `true` | `false` utelater innhold, argumenter/resultater, feiltekst og rådata fra nye lagrede observasjoner |
+| `COPILOT_SHOW_CONTENT` | `true` | `false` skjuler innhold, sesjonsnavn og rådata, også fra tidligere lagret historikk |
+| `COPILOT_JIRA_PATTERN` | `[A-Z][A-Z0-9_]*-[1-9][0-9]*` | Jira-nøkler oppdages fra branch, metadata og brukerprompter |
+
+Prompter, svar og verktøyresultater kan inneholde hemmeligheter. Innhold er på som
+standard og lagres lokalt uten kryptering. Avslått innsamling eller innholdslagring
+sletter ikke tidligere lagret innhold. Bruk visningsinnstillingen for å skjule det;
+bruk et annet `COPILOT_STORE_PATH` for et separat lager. Innstillingene er uavhengige
+av innstillingene i andre apper. `COPILOT_API_URL` brukes ikke.
+
+Hendelser dedupliseres med stabil ID eller hash. Telemetri kobles via sesjons-ID og
+trace-ID; poster uten slike ID-er vises separat. Senere sesjons-ID kan samle en
+midlertidig `trace:…`-sesjon. Lokal `assistant.usage` prioriteres foran span- og
+metric-bruk; overordnede spans utelates når underordnede har bruk, og kumulative
+målinger summeres ikke som deltaer. Manglende verdier vises som ukjent.
+Fullført, feil og venting krever en eksplisitt hendelse. Ellers utledes aktivitet
+fra siste tidsstempel, med inaktiv etter to minutter.
+
+JSONL-poster er begrenset til 2 MiB, workspace til 1 MiB og OTLP-forespørsler til
+4 MiB (maks 20 000 normaliserte poster / 16 MiB). Komprimerte forespørsler støttes
+ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhold.
+
+- **/** søker på sesjon, repository, prosjekt, Jira, klient, modell og status.
+- **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
+- **i** åpner den valgte sesjonens prosjekt i IntelliJ fra listen eller detaljene.
+- **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
+- **d** viser diagnostikk; **Esc** går tilbake og fjerner søket.
+- **r** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
+- **g** og **J** bytter til GitHub/Jira når de er konfigurert.
+
+### Åpne IntelliJ fra en sesjon
+
+Trykk **i** i Copilot-visningen. Appen bruker første eksisterende lokale mappe av
+sesjonens prosjektrot, arbeidskatalog og Git-rot. IntelliJ åpner prosjektet eller
+aktiverer det hvis det allerede er åpent. Dette åpner prosjektet; den konkrete
+Copilot-chatten gjenåpnes ikke automatisk, siden sesjonsdataene ikke gir en støttet
+IDE-lenke til den.
+
+På macOS brukes `open -a "IntelliJ IDEA"`. På Linux brukes `idea`, og på Windows
+`idea64.exe`, fra PATH. Med JetBrains Toolbox, Community Edition eller en annen
+installasjonssti kan du sette `COPILOT_IDEA_COMMAND` til launcherens filsti, for
+eksempel `COPILOT_IDEA_COMMAND="/path with spaces/idea"`. Verdien er ett kjørbart
+program uten kommandolinjeflagg. Prosjektstien sendes som ett separat argument,
+uten shell. Manglende prosjektmappe eller launcher vises som en melding i appen.
 ## PR worktrees and editors
 
 Press **Space** to toggle PR selection. Selection survives filters, tabs and

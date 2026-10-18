@@ -1,7 +1,8 @@
 package tui
 
 const shortcuts = "Space select • o editor • O choose • l related • 1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit"
-const helpText = `g           Go to GitHub (navigation mode)
+const helpText = `c           Go to Copilot sessions (local history and telemetry)
+g           Go to GitHub (navigation mode)
 J (Shift+j) Go to Jira (navigation mode)
 l           Navigate to related Jira issues / loaded GitHub PRs
 1  My Open PRs (excluding drafts)

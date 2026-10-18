@@ -14,6 +14,8 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	copilot         *copilotState
+	copilotActive   bool
 	local           *localState
 	jira            *jiraState
 	jiraActive      bool
@@ -58,6 +60,9 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	return Model{ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 }
 func (m Model) Init() tea.Cmd {
+	if m.copilotActive {
+		return m.refreshCopilot()
+	}
 	if m.jiraActive {
 		if m.source != nil {
 			return tea.Batch(m.refreshJira(), m.bootstrap())
