@@ -46,7 +46,8 @@ go install ./cmd/custom-visning
 ## Installere release på macOS Apple Silicon
 
 Last ned `custom-visning_Darwin_arm64.tar.gz` og `checksums.txt` fra
-[Releases](https://github.com/haakonph/custom-visning-terminal/releases).
+[siste release](https://github.com/haakonph/custom-visning-terminal/releases/latest).
+Hver push til `main` publiserer automatisk en ny release etter beståtte sjekker.
 Fra mappen med de nedlastede filene:
 
 ```bash
@@ -62,6 +63,20 @@ custom-visning
 Legg PATH-linjen i `~/.zshrc` for senere økter. Første versjon distribuerer kun
 macOS arm64. Binæren er ikke Apple-signert eller notarized; følg macOS sin
 vanlige godkjenning for nedlastet programvare ved behov.
+
+## Laste ned bygg fra en branch
+
+Alle brancher bygges ved push. Åpne [CI i GitHub Actions](https://github.com/haakonph/custom-visning-terminal/actions/workflows/ci.yml),
+velg branchen i branch-filteret og åpne ønsket kjøring. Klikk **Last ned bygg**
+i sammendraget for **Build**, eller velg `custom-visning-Darwin-arm64-<commit>`
+under **Artifacts**. Du må være innlogget på GitHub for å laste ned artifacts.
+Byggene beholdes i 30 dager.
+
+Pakk ut artifact-ZIP-filen først. Den inneholder samme
+`custom-visning_Darwin_arm64.tar.gz` og `checksums.txt` som en release;
+følg installasjonstrinnene over. `custom-visning --version` viser
+`build-<commit>`, slik at du kan kontrollere hvilket bygg du kjører.
+PR-bygg bruker GitHubs test-merge-commit.
 
 ## Visninger og hurtigtaster
 
@@ -181,16 +196,18 @@ nettverk, `gh`-innlogging eller ekte token. De dekker autentiseringsprioritet,
 filtre, paginering, team, mapping, deduplisering, cache/korrupt cache,
 API-feil/retry, timeout/cancellation, TUI-navigasjon, filter og refresh.
 
-CI kjører separate jobber for test/race, vet/gofmt og build ved push til `main`,
+CI kjører separate jobber for test/race, vet/gofmt og build ved push til alle brancher,
 PR-er mot `main` og `merge_group`. Utdaterte PR-kjøringer kanselleres; merge queue
 kanselleres ikke av concurrency-regelen. CI har bare `contents: read` og ingen
 hemmeligheter. Go-versjonen hentes fra `go.mod`, med dependency/build-cache.
 
-Release-workflowen kjører ved push av `v*`-tagger og tester den taggede commiten
-før bygging. Den cross-kompilerer macOS arm64 uten CGO, bygger inn taggen i
-`--version`, lager arkiv og SHA256-checksums og publiserer GitHub Release med
-workflowens `GITHUB_TOKEN`. Bare publiseringsjobben har `contents: write`.
-Opprett og push en versjonstagg når en release er ønsket, for eksempel:
+Release-workflowen kjører ved push til `main` og ved push av `v*`-tagger.
+Den tester commiten før bygging, cross-kompilerer macOS arm64 uten CGO og lager
+arkiv og SHA256-checksums. Hvert main-bygg publiseres som siste GitHub Release med
+en unik versjon `main-<kjøringsnummer>.<forsøk>-<commit>`. Taggede releaser bruker
+taggen som versjon. Versjonen bygges inn i `--version`. Publisering bruker
+workflowens `GITHUB_TOKEN`; bare publiseringsjobben har `contents: write`.
+Du kan fortsatt opprette og pushe en versjonstagg, for eksempel:
 
 ```bash
 git tag v0.1.0

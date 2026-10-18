@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
   merge_group:
@@ -52,3 +52,31 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go build ./...
+      - name: Build macOS arm64 download
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist
+          version="build-${GITHUB_SHA::12}"
+          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o dist/custom-visning ./cmd/custom-visning
+          tar -czf dist/custom-visning_Darwin_arm64.tar.gz -C dist custom-visning -C "$GITHUB_WORKSPACE" README.md
+          cd dist
+          sha256sum custom-visning_Darwin_arm64.tar.gz > checksums.txt
+      - name: Upload macOS arm64 download
+        id: download
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-visning-Darwin-arm64-${{ github.sha }}
+          path: |
+            dist/custom-visning_Darwin_arm64.tar.gz
+            dist/checksums.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Link download
+        env:
+          DOWNLOAD_URL: ${{ steps.download.outputs.artifact-url }}
+        run: |
+          echo "### macOS Apple Silicon" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Last ned bygg (${GITHUB_SHA::12})]($DOWNLOAD_URL)" >> "$GITHUB_STEP_SUMMARY"
