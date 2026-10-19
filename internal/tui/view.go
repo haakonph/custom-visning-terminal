@@ -145,17 +145,16 @@ func (m Model) View() tea.View {
 		lines = append(lines, strings.Split(helpText, "\n")...)
 	} else {
 		rows := m.filtered()
-		lines = append(lines, m.row(model.PullRequest{}, true, false))
+		rowModel := m
+		rowModel.width = max(1, m.width-3)
+		lines = append(lines, "   "+rowModel.row(model.PullRequest{}, true, false))
 		// Reserve space for details, both warning sources, results and footer.
 		reserved := 7
 		if m.local != nil {
 			reserved += min(3, len(m.local.results))
 		}
 		capacity := max(1, m.height-len(lines)-reserved)
-		start := max(0, m.selected-capacity+1)
-		for i := start; i < min(len(rows), start+capacity); i++ {
-			lines = append(lines, m.row(rows[i], false, i == m.selected))
-		}
+		lines = append(lines, m.groupedPRLines(rows, capacity)...)
 		if len(rows) == 0 {
 			lines = append(lines, muted.Render(" No pull requests in this view."))
 		}

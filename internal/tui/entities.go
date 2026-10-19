@@ -611,11 +611,15 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 		m.input.SetValue("")
 		m.relatedKey = ""
 		for v, d := range m.snapshot.Datasets {
-			for i, p := range d.PRs {
+			for _, p := range d.PRs {
 				if p.URL == r.URL {
 					m.active = model.View(v)
-					m.selected = i
-					return m, nil
+					for i, visible := range m.filtered() {
+						if visible.URL == r.URL {
+							m.selected = i
+							return m, nil
+						}
+					}
 				}
 			}
 		}

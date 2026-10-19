@@ -322,7 +322,7 @@ func (m Model) filtered() []model.PullRequest {
 	rows = visible
 	filter := strings.ToLower(strings.TrimSpace(m.input.Value()))
 	if filter == "" {
-		return rows
+		return m.groupPRs(rows)
 	}
 	result := []model.PullRequest{}
 	for _, p := range rows {
@@ -331,7 +331,7 @@ func (m Model) filtered() []model.PullRequest {
 			result = append(result, p)
 		}
 	}
-	return result
+	return m.groupPRs(result)
 }
 func (m *Model) clamp() { m.selected = max(0, min(m.selected, len(m.filtered())-1)) }
 func openBrowser(ctx context.Context, link string) error {
