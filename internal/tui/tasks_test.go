@@ -20,6 +20,7 @@ func taskKey(m Model, key string) Model {
 }
 
 func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_LINKS", filepath.Join(t.TempDir(), "links.sqlite"))
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()

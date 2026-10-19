@@ -1,6 +1,6 @@
 package tui
 
-const shortcuts = "j/k ↑/↓ velg · h/l ←/→ fane · d detaljer · Space marker · r relatert · v visning · t koble · e åpne · a handling · / søk · ? hjelp · Ctrl+C avslutt"
+const shortcuts = "j/k ↑/↓ velg · h/l ←/→ fane · d detaljer · Space marker · r relatert · v visning · t koble · e åpne · a handling · / søk · vh oppsett · ? hjelp · Ctrl+C avslutt"
 const helpText = `Hurtigtaster
 j/k / ↑/↓   Naviger opp/ned
 h/l / ←/→   Forrige/neste fane; oppgaver: forrige/neste oppgave
@@ -44,6 +44,7 @@ au              Oppdater/synkroniser aktiv visning eller detaljer
 an/ae           Ny intern oppgave fra valget / endre oppgavetittel
 aq/ax           Lagre Jira-søk / nullstill hurtigfiltre og egen JQL
 vs/vi/vr        Innstillinger / Copilot-diagnostikk / forrige visning
+vh              Oppsettshjelp for aktiv side
 vf/vj           Jira-hurtigfiltre / JQL-redigering
 vz/az           Vis utsatte / hent tilbake valgte utsatte elementer
 vb              Lokalt arkiv; ak gjenoppretter valgte elementer

@@ -14,6 +14,7 @@ Gamle enkelttaster og tall-/Tab-snarveier er fjernet.
 | `d` | Detaljer; for en chatmelding åpnes tråden |
 | `/` | Søk eller filtrer i aktiv visning |
 | `?` | Vis tilgjengelige hurtigtaster |
+| `vh` | Oppsettshjelp for aktiv side; vises automatisk når en visning mangler oppsett |
 | `Space` | Marker eller fjern markering av aktiv rad |
 | `Shift+↑` / `Shift+↓` | Utvid markeringen med aktiv og neste/forrige rad |
 | `x` | Fjern alle markeringer uten å endre søk eller filtre |
@@ -152,3 +153,14 @@ avgrenset til interne oppgaver/referanser, meldinger bruker konfigurert webhook,
 flere treff gir valgliste, og manglende mål gir en synlig melding uten å velge et
 annet objekt. Ingen nye API-er for ekstern sletting, fjernarkivering eller
 endring av eksterne relasjoner er innført.
+
+## Oppsettshjelp
+
+Når en visning mangler konfigurasjon, åpnes en veiledning med steg i appen og
+utenfor appen. `vs` åpner relevante innstillinger; Esc returnerer til veiledningen.
+Enter prøver å åpne siden igjen. `vg`/`vt`/`va`/`vc` og `vo` bytter side, og
+j/k, piltaster eller PageUp/PageDown ruller veiledningen. Ctrl+C avslutter.
+
+Mattermost-server og brukernavn kan lagres i innstillingene og tas i bruk med
+Enter eller `vc` ved første oppsett. GitHub/Jira-token og webhook krever omstart
+fra terminalen der innloggingen eller miljøvariablene ble satt.

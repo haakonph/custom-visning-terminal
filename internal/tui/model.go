@@ -16,6 +16,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	setup            setupState
 	version          string
 	previousProvider string
 	entities         *entityState
@@ -105,6 +106,9 @@ func (m Model) initProviders() tea.Cmd {
 	return m.bootstrap()
 }
 func (m Model) bootstrap() tea.Cmd {
+	if m.source == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		// A credential-scoped cache supplies the previously verified identity,
 		// allowing immediate startup even when the network is unavailable.

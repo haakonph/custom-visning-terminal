@@ -3,11 +3,9 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,6 +15,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/tui"
 )
 
@@ -73,32 +72,26 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		jiraClient, jiraErr = jira.New(baseURL, os.Getenv("JIRA_TOKEN"))
 	}
 
-	token, err := github.Token(ctx)
-	if err != nil {
-		if jiraClient != nil {
-			runErr := runDashboard(ctx, tui.New(ctx, nil, nil).WithVersion(version).WithJiraPattern(jiraPattern).WithJira(jiraClient, true).WithCopilot(copilotClient, false))
-			return runErr
+	token, tokenErr := github.Token(ctx)
+	var source model.Source
+	var persistence tui.Cache
+	if tokenErr == nil {
+		client, err := github.New(token)
+		if err != nil {
+			return err
 		}
-		if mmConfig.Server != "" {
-			return runDashboard(ctx, tui.New(ctx, nil, nil).WithVersion(version).WithCopilot(copilotClient, false))
+		source = client
+		store, err := cache.Default(token)
+		if err != nil {
+			fmt.Fprintln(stderr, "Cache directory unavailable; running without disk cache")
+		} else {
+			persistence = store
 		}
-		return errors.Join(err, jiraErr)
 	}
 	if jiraErr != nil {
 		fmt.Fprintln(stderr, "Jira unavailable:", jiraErr)
 	}
-	client, err := github.New(token)
-	if err != nil {
-		return err
-	}
-	store, err := cache.Default(token)
-	var persistence tui.Cache
-	if err != nil {
-		fmt.Fprintln(stderr, "Cache directory unavailable; running without disk cache")
-	} else {
-		persistence = store
-	}
-	dashboard := tui.New(ctx, client, persistence).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
+	dashboard := tui.New(ctx, source, persistence).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
 	if endpoint := os.Getenv("MATTERMOST_WEBHOOK_URL"); endpoint != "" {
 		sender, err := mattermost.New(endpoint)
 		if err != nil {
@@ -123,38 +116,26 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		fmt.Fprintln(stderr, "Local worktrees unavailable:", localErr)
 	}
 	if jiraClient != nil {
-		dashboard = dashboard.WithJira(jiraClient, startJira)
+		dashboard = dashboard.WithJira(jiraClient, startJira || source == nil)
+	}
+	if startJira && jiraClient == nil {
+		dashboard = dashboard.WithSetup("jira")
+	} else if source == nil && jiraClient == nil && (mmConfig.Server == "" || mmConfig.Username == "") {
+		kind := "github"
+		if mmConfig.Server != "" || mmConfig.Username != "" {
+			kind = "mattermost"
+		}
+		dashboard = dashboard.WithSetup(kind)
 	}
 	return runDashboard(ctx, dashboard)
 }
 
 func runDashboard(ctx context.Context, dashboard tui.Model) error {
-	mmConfig, err := mattermost.LoadConfig()
+	configured, err := dashboard.WithMattermostConfig()
 	if err != nil {
-		return err
-	}
-	if mmConfig.Server != "" {
-		if mmConfig.Username == "" {
-			return errors.New("MATTERMOST_USERNAME or mattermost.username in config.json is required")
-		}
-		api, err := mattermost.NewAPI(mmConfig.Server)
-		if err != nil {
-			return err
-		}
-		api.ExpectAccount(mmConfig.Username)
-		cacheDir, err := os.UserCacheDir()
-		if err != nil {
-			return err
-		}
-		path := filepath.Join(cacheDir, "custom-visning", "mattermost.sqlite")
-		service, err := mattermost.OpenService(api, path, mmConfig.Server, mmConfig.Username)
-		if err != nil {
-			return fmt.Errorf("Mattermost cache: %w", err)
-		}
-		if err = mattermost.SaveConfig(mmConfig); err != nil {
-			return fmt.Errorf("Mattermost configuration: %w", err)
-		}
-		dashboard = dashboard.WithMattermostReader(service, api, mattermost.Keychain{Server: mmConfig.Server, Account: mmConfig.Username}, mmConfig.Username, os.Getenv("MATTERMOST_TOKEN"))
+		dashboard = dashboard.WithSetupProblem("mattermost", "Kunne ikke klargjøre Mattermost: "+err.Error())
+	} else {
+		dashboard = configured
 	}
 
 	_, err = tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()

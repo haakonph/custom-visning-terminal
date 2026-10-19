@@ -5,7 +5,13 @@ GitHub. Den eksisterende incoming-webhooken for sending av PR-lenker er uendret.
 
 ## Oppsett og autentisering
 
-Start med server og Mattermost-brukernavn (ikke e-postadresse):
+Start `custom-visning`, og åpne chat med `vc`. Når oppsett mangler, vises
+oppsettshjelpen. Velg `vs`, fyll ut **Mattermost · serveradresse** og
+**Mattermost · brukernavn** (ikke e-postadresse), og trykk Esc. Enter eller `vc`
+tar førstegangsoppsettet i bruk uten omstart. Endring av en allerede tilkoblet
+konto krever omstart. `vh` åpner oppsettshjelpen igjen fra en visning.
+
+Alternativt kan server og brukernavn settes før oppstart:
 
 ```sh
 export MATTERMOST_SERVER=https://chat.example.org

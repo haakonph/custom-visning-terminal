@@ -41,6 +41,8 @@ var settingFields = []settingField{
 	{"Copilot · vis innhold", "copilot.show_content", "bool"},
 	{"Copilot · Jira-mønster", "copilot.jira_pattern", "regex"},
 	{"Copilot · IntelliJ-launcher", "copilot.intellij_command", "string"},
+	{"Mattermost · serveradresse", "mattermost.server", "url"},
+	{"Mattermost · brukernavn", "mattermost.username", "string"},
 }
 
 type settingsState struct {
@@ -292,6 +294,9 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s.editing = false
 			s.input.Blur()
 			s.notice = "Lagret. Øvrige innstillinger tas i bruk etter omstart."
+			if strings.HasPrefix(field.path, "mattermost.") && m.mmReader == nil {
+				s.notice = "Lagret. Esc tilbake og vc tar førstegangsoppsettet i bruk uten omstart."
+			}
 			if err := s.loadValues(); err != nil {
 				s.notice = err.Error()
 			}
@@ -347,7 +352,11 @@ var settingsTokenHelp = []string{
 	"Kjør custom-visning --jira fra samme terminal.",
 	"Samme Bash-kommando kan brukes med GITHUB_TOKEN i stedet for JIRA_TOKEN.",
 	"",
-	"Mattermost: Opprett en incoming-webhook for ønsket kanal.",
+	"Mattermost-lesing: Sett serveradresse og brukernavn i innstillingene.",
+	"Åpne chat med vc; al logger inn med passord/TOTP, ap bruker PAT.",
+	"Første oppsett kan tas i bruk med vc uten omstart; kontobytte krever omstart.",
+	"",
+	"Mattermost-sending: Opprett en incoming-webhook for ønsket kanal.",
 	"Sett MATTERMOST_WEBHOOK_URL til hele HTTPS-adressen via samme metode.",
 	"Webhook-adressen inneholder en hemmelighet og behandles som et token.",
 	"",

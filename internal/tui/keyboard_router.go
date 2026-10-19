@@ -70,6 +70,10 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		return result, cmd, true
 	}
+	if m.setup.provider != "" && !m.settings.active && !m.help {
+		next, cmd := m.updateSetup(k)
+		return next, cmd, true
+	}
 	if m.help {
 		switch k {
 		case "?", "esc":
@@ -382,7 +386,7 @@ func sequenceHint(prefix string) string {
 	case 't':
 		return "o oppgaver · g GitHub · t Jira · a AI · c chat (velg koblingsmål)"
 	case 'v':
-		return "o/g/t/a/c visning · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler"
+		return "o/g/t/a/c visning · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler · h oppsett"
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -828,4 +830,33 @@ func openMattermostBrowser(ctx context.Context, link string) error {
 		return errors.New("invalid web URL")
 	}
 	return launchBrowser(ctx, link)
+}
+
+// WithMattermostConfig prepares local state only; authentication runs as a command.
+// A partial setup remains editable in settings and does not prevent app startup.
+func (m Model) WithMattermostConfig() (Model, error) {
+	c, err := mm.LoadConfig()
+	if err != nil {
+		return m, err
+	}
+	if c.Server == "" || c.Username == "" {
+		return m, nil
+	}
+	api, err := mm.NewAPI(c.Server)
+	if err != nil {
+		return m, err
+	}
+	api.ExpectAccount(c.Username)
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return m, err
+	}
+	service, err := mm.OpenService(api, filepath.Join(cacheDir, "custom-visning", "mattermost.sqlite"), c.Server, c.Username)
+	if err != nil {
+		return m, err
+	}
+	if err := mm.SaveConfig(c); err != nil {
+		return m, err
+	}
+	return m.WithMattermostReader(service, api, mm.Keychain{Server: c.Server, Account: c.Username}, c.Username, os.Getenv("MATTERMOST_TOKEN")), nil
 }
