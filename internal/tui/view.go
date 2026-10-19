@@ -147,7 +147,7 @@ func (m Model) View() tea.View {
 		rows := m.filtered()
 		lines = append(lines, m.row(model.PullRequest{}, true, false))
 		// Reserve space for details, both warning sources, results and footer.
-		reserved := 6
+		reserved := 7
 		if m.local != nil {
 			reserved += min(3, len(m.local.results))
 		}
@@ -161,6 +161,7 @@ func (m Model) View() tea.View {
 		}
 		if len(rows) > 0 {
 			p := rows[m.selected]
+			lines = append(lines, muted.Render(clean(" "+reviewSummaryLabel(p))))
 			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
 			detail := fmt.Sprintf(" %d/%d · merge: %s · automerge: %s · queue: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, autoMergeLabel(p), queueLabel(p), strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
@@ -210,12 +211,12 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	jira := strings.Join(p.JiraKeys(m.jiraPattern), ", ")
 	repository := m.githubName(p.Repository)
 	if m.width >= 100 {
-		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 8, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"QUEUE", queueLabel(p), 14, false}}
+		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"QUEUE", queueLabel(p), 14, false}}
 		if m.width >= 140 {
 			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})
 		}
 	} else if m.width >= 60 {
-		columns = []column{{"REPOSITORY", repository, 14, false}, {"PR", number, 6, false}, {"JIRA", jira, 12, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 8, true}}
+		columns = []column{{"REPOSITORY", repository, 14, false}, {"PR", number, 6, false}, {"JIRA", jira, 12, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}}
 	} else {
 		columns = []column{{"PR", number, 6, false}, {"JIRA", jira, min(12, max(0, m.width/4)), false}, {"TITLE", title, 1, false}}
 	}

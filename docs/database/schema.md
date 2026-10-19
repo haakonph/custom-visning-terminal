@@ -130,6 +130,15 @@ erDiagram
         INTEGER account_id FK
         TEXT name
     }
+    github_review_summaries {
+        TEXT pull_request_id PK,FK
+        INTEGER approved
+        INTEGER changes
+        INTEGER pending
+        INTEGER pending_teams
+        INTEGER complete
+        INTEGER fallback
+    }
     github_view_memberships {
         INTEGER view_id PK,FK
         INTEGER position PK
@@ -259,6 +268,7 @@ erDiagram
     github_pull_requests |o..o{ github_pull_request_reviewers : fk_0
     github_repositories |o..o{ github_pull_requests : fk_0
     accounts |o..o{ github_repositories : fk_0
+    github_pull_requests |o..o{ github_review_summaries : fk_0
     github_pull_requests |o..o{ github_view_memberships : fk_0
     sync_state |o..o{ github_view_memberships : fk_1
     jira_projects |o..o{ jira_issues : fk_0

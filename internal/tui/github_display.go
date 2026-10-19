@@ -77,3 +77,28 @@ func queueLabel(p model.PullRequest) string {
 	}
 	return state
 }
+
+func reviewSummaryLabel(p model.PullRequest) string {
+	state := p.Review
+	if state == "" {
+		state = model.Unknown
+	}
+	label := "Review: " + string(state)
+	s := p.ReviewSummary
+	if s == nil {
+		return label
+	}
+	if s.Fallback {
+		label += " (vurderinger)"
+	} else {
+		label += " (GitHub)"
+	}
+	label += fmt.Sprintf(" · %d godkjent · %d endringer · %d venter", s.Approved, s.Changes, s.Pending)
+	if s.PendingTeams > 0 {
+		label += fmt.Sprintf(" · %d team venter", s.PendingTeams)
+	}
+	if !s.Complete {
+		label += " · delvis opptelling"
+	}
+	return label
+}

@@ -230,6 +230,22 @@ PR hentes; større lister markeres delvise. Ved GraphQL-/tilgangsfeil beholdes
 søkeresultatene med eksplisitt ukjente statuser og advarsel. Resultater sorteres
 lokalt etter sist oppdatert og dedupliseres på URL.
 
+Review-status bruker GitHubs `reviewDecision` når den finnes. For PR-er uten
+samlet status, for eksempel stablede PR-er mot brancher uten review-regler,
+brukes `latestOpinionatedReviews`: siste gjeldende vurdering per reviewer.
+`CHANGES` har forrang over `APPROVED`; uten vurderinger vises `PENDING` ved
+utestående forespørsler, ellers `NO REVIEW`. Kommentarer erstatter ikke en
+vurdering, og tilbaketrukne reviews teller ikke. Godkjenninger arves ikke fra
+andre PR-er i stacken og betyr ikke at alle mergekrav er oppfylt.
+
+Under tabellen og i detaljvisningen vises antall godkjenninger, endringsønsker
+og utestående forespørsler. Teamforespørsler telles separat. Ny review-forespørsel
+til en som allerede har godkjent telles som ventende i tillegg til vurderingen.
+Status fra individuelle vurderinger merkes `(vurderinger)`, mens GitHubs samlede
+status merkes `(GitHub)`. Review-opptellingen lagres i cachen. Opptil 100 reviewere
+og 100 forespørsler leses per PR; manglende eller avkortede data markeres som
+delvis opptelling, og fallback-statusen forblir `UNKNOWN`.
+
 Ufullstendige søk, feil på en senere side, utilgjengelige team eller ufullstendig
 berikelse markeres som delvise. Cachede rader beholdes, og tidspunktet for siste
 fullstendige synkronisering flyttes ikke. Dette kan inkludere PR-er som siden er

@@ -69,3 +69,30 @@ func TestTeamReviewHidesCachedOwnPRs(t *testing.T) {
 		t.Fatal("own PR hidden outside Team Review")
 	}
 }
+
+func TestReviewSummaryRendering(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	m.width = 180
+	p := model.PullRequest{Title: "Stacked PR", Review: model.ChangesRequested, ReviewSummary: &model.ReviewSummary{Approved: 2, Changes: 1, Pending: 1, PendingTeams: 1, Complete: true, Fallback: true}}
+	m.detail = &detailState{pr: p}
+	text := strings.Join(m.detailLines(), "\n")
+	for _, want := range []string{"Review: CHANGES (vurderinger)", "2 godkjent · 1 endringer · 1 venter", "1 team venter", "GitHubs regler avgjør"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q: %s", want, text)
+		}
+	}
+	p.ReviewSummary.Fallback = false
+	p.ReviewSummary.Complete = false
+	if label := reviewSummaryLabel(p); !strings.Contains(label, "(GitHub)") || !strings.Contains(label, "delvis opptelling") {
+		t.Fatal(label)
+	}
+	p.Review = model.NoReview
+	p.ReviewSummary = nil
+	for _, width := range []int{60, 100, 140} {
+		m.width = width
+		if row := ansi.Strip(m.row(p, false, false)); !strings.Contains(row, "NO REVIEW") {
+			t.Fatal(row)
+		}
+	}
+}

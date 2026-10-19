@@ -144,6 +144,16 @@ type GithubRepository struct {
 	Name      string
 }
 
+type GithubReviewSummary struct {
+	PullRequestID string
+	Approved      int64
+	Changes       int64
+	Pending       int64
+	PendingTeams  int64
+	Complete      int64
+	Fallback      int64
+}
+
 type GithubViewMembership struct {
 	ViewID        int64
 	Position      int64

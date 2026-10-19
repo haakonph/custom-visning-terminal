@@ -47,6 +47,10 @@ func (m Model) detailLines() []string {
 	d := m.detail
 	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(d.pr.Repository), d.pr.Number, d.pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", ""}
 	lines = append(lines, "Jira: "+strings.Join(d.pr.JiraKeys(m.jiraPattern), ", "), "Automerge: "+autoMergeLabel(d.pr)+" · Queue: "+queueLabel(d.pr))
+	lines = append(lines, reviewSummaryLabel(d.pr))
+	if d.pr.ReviewSummary != nil && d.pr.ReviewSummary.Fallback {
+		lines = append(lines, "Vurderingene gjelder denne PR-en. GitHubs regler avgjør om den kan merges.")
+	}
 	if d.loading {
 		lines = append(lines, "Laster detaljer …")
 	}
