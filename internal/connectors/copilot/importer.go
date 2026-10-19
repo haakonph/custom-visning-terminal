@@ -156,6 +156,9 @@ func (s *Service) Scan(ctx context.Context) {
 	if !s.options.Enabled || ctx.Err() != nil {
 		return
 	}
+	if s.load() != nil {
+		return
+	}
 	root, err := os.Lstat(s.options.SessionRoot)
 	if errors.Is(err, os.ErrNotExist) {
 		return

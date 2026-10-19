@@ -43,6 +43,10 @@ make build
 go install ./cmd/custom-visning
 ```
 
+For rask daglig oppstart fra en lokal utsjekk: kjør `make build` etter
+kodeendringer og start `./bin/custom-visning` direkte. `go run` må først
+kontrollere og eventuelt kompilere kildekoden før terminalvisningen starter.
+
 ## Installere release på macOS Apple Silicon
 
 Last ned `custom-visning_Darwin_arm64.tar.gz` og `checksums.txt` fra
@@ -448,7 +452,10 @@ Direkteoppstart bruker bare Copilot; start på vanlig måte for å bytte mellom
 
 Appen leser `workspace.yaml` og `events.jsonl` fra `~/.copilot/session-state`,
 med de samme datakildene som Copilot-visningen i `custom-visning`. Den importerer
-historikken ved oppstart og leser nye data hvert andre sekund. Samtale,
+historikken i bakgrunnen ved oppstart og leser nye data hvert andre sekund.
+Terminalvisningen venter ikke på at Copilot-lageret skal leses. Copilot viser
+lasting til historikken er klar; en lesefeil vises i Copilot uten å overskrive
+lageret eller hindre GitHub-/Jira-visningen i å starte. Samtale,
 verktøyargumenter/resultater, feil, klient, modell, tokens og prosjekt vises når
 kilden inneholder dem. Det lokale Copilot-filformatet er ikke en stabil offentlig
 API; ukjente hendelser beholdes og ugyldige poster rapporteres i diagnostikk.
