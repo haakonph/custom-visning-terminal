@@ -331,7 +331,7 @@ func TestCleanWorktreeAutomaticallyFastForwards(t *testing.T) {
 	if updated.Path != first.Path || updated.Head != p.HeadOID || updated.Outdated || updated.Modified {
 		t.Fatalf("not updated: %+v", updated)
 	}
-	if got := run(t, updated.Path, "symbolic-ref", "--short", "HEAD"); got != prBranch(p) {
+	if got := run(t, updated.Path, "symbolic-ref", "HEAD"); got != "refs/heads/"+prBranch(p) {
 		t.Fatalf("PR branch changed: %s", got)
 	}
 }
@@ -353,7 +353,7 @@ func TestLegacyDetachedWorktreeGetsBranchWithoutLosingFiles(t *testing.T) {
 	if err != nil || got.Path != first.Path || got.Head != first.Head || !got.Modified {
 		t.Fatalf("legacy checkout changed: %+v, %v", got, err)
 	}
-	if branch := run(t, got.Path, "symbolic-ref", "--short", "HEAD"); branch != prBranch(p) {
+	if branch := run(t, got.Path, "symbolic-ref", "HEAD"); branch != "refs/heads/"+prBranch(p) {
 		t.Fatalf("still detached: %s", branch)
 	}
 	if data, err := os.ReadFile(file); err != nil || string(data) != "keep me" {

@@ -241,6 +241,15 @@ func (w *WorktreeManager) reuse(ctx context.Context, p model.PullRequest, s Stat
 	if err != nil {
 		return s, err
 	}
+	if branch != "HEAD" {
+		if s.Modified || !s.Outdated || !commitPattern.MatchString(p.HeadOID) {
+			return s, w.remember(p, s)
+		}
+		if branch != "refs/heads/"+prBranch(p) {
+			s.Note = "on a user branch; update manually"
+			return s, w.remember(p, s)
+		}
+	}
 	for _, name := range []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_LOG", "BISECT_START", "rebase-merge", "rebase-apply", "sequencer"} {
 		marker, err := git(ctx, s.Path, "rev-parse", "--git-path", name)
 		if err != nil {
@@ -266,10 +275,6 @@ func (w *WorktreeManager) reuse(ctx context.Context, p model.PullRequest, s Stat
 		branch = "refs/heads/" + prBranch(p)
 	}
 	if s.Modified || !s.Outdated || !commitPattern.MatchString(p.HeadOID) {
-		return s, w.remember(p, s)
-	}
-	if branch != "refs/heads/"+prBranch(p) {
-		s.Note = "on a user branch; update manually"
 		return s, w.remember(p, s)
 	}
 	target, err := prCommit(ctx, s.Path, p)
