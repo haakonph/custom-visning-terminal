@@ -109,7 +109,7 @@ func (s Store) Load() (map[string]Entry, error) {
 		return nil, err
 	}
 	for id, e := range entries {
-		if id == "" || e.ID != id || e.Until.IsZero() || e.Until.Year() > 9999 || (e.Kind != "github" && e.Kind != "jira" && e.Kind != "task") {
+		if id == "" || e.ID != id || e.Until.IsZero() || e.Until.Year() > 9999 || (e.Kind != "github" && e.Kind != "jira" && e.Kind != "task" && e.Kind != "copilot" && e.Kind != "mattermost") {
 			return nil, fmt.Errorf("ugyldig snooze-data")
 		}
 	}

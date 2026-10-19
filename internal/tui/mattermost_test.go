@@ -78,12 +78,12 @@ func TestMattermostSendRetainsDraftAndBlocksDuplicate(t *testing.T) {
 	m := ready(t).WithMattermost(sender)
 	m.mattermost.active = true
 	m.mattermost.text = "**edited draft**"
-	send := tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
-	m, cmd := update(m, send)
+	send := "as"
+	m, cmd := sequence(m, send)
 	if cmd == nil || !m.mattermost.sending {
 		t.Fatal("send not started")
 	}
-	m, duplicate := update(m, send)
+	m, duplicate := sequence(m, send)
 	if duplicate != nil {
 		t.Fatal("duplicate send")
 	}
@@ -92,7 +92,7 @@ func TestMattermostSendRetainsDraftAndBlocksDuplicate(t *testing.T) {
 		t.Fatal("draft lost")
 	}
 	sender.err = nil
-	m, cmd = update(m, send)
+	m, cmd = sequence(m, send)
 	m, _ = update(m, cmd())
 	if m.mattermost.active || sender.calls != 2 || sender.text != "**edited draft**" {
 		t.Fatal("send failed")
@@ -108,7 +108,7 @@ func TestMattermostNavigationAndEmptyDraft(t *testing.T) {
 	}
 	m.mattermost.active = true
 	m.mattermost.text = " \n"
-	m, cmd := update(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+	m, cmd := sequence(m, "as")
 	if cmd != nil || m.mattermost.sending {
 		t.Fatal("sent empty draft")
 	}

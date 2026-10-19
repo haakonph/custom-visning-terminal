@@ -13,6 +13,9 @@ import (
 )
 
 type copilotState struct {
+	entities *entityState
+	snoozes  *snoozeState
+
 	client                              *copilot.Service
 	sessions                            []copilot.Session
 	detail                              *copilot.Detail
@@ -41,7 +44,7 @@ func (m Model) WithCopilot(client *copilot.Service, active bool) Model {
 	input.Prompt = "/ "
 	input.Placeholder = "session, repository, Jira, model, status"
 	input.CharLimit = 256
-	m.copilot = &copilotState{client: client, input: input, openIDE: openIntelliJ}
+	m.copilot = &copilotState{entities: m.entities, snoozes: m.snoozes, client: client, input: input, openIDE: openIntelliJ}
 	m.copilotActive = active
 	if active {
 		m.jiraActive = false
@@ -88,6 +91,10 @@ func (c *copilotState) rows() []copilot.Session {
 	q := strings.ToLower(strings.TrimSpace(c.input.Value()))
 	rows := []copilot.Session{}
 	for _, s := range c.sessions {
+		ref := copilotRef(s)
+		if c.entities.archived(ref.Provider, ref.URL) || (c.snoozes != nil && c.snoozes.hidden(refSnoozeID(ref))) {
+			continue
+		}
 		if strings.Contains(strings.ToLower(strings.Join([]string{s.ID, s.Name, s.Client, s.Repository, s.ProjectRoot, s.Branch, s.Jira, s.Model, s.Agent, s.Status}, " ")), q) {
 			rows = append(rows, s)
 		}
@@ -198,9 +205,9 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 			c.ideNotice = "Åpner prosjektet i IntelliJ…"
 			opener, ctx := c.openIDE, m.ctx
 			return m, func() tea.Msg { return copilotOpenMsg{err: opener(ctx, session)} }
-		case "r":
+		case "R":
 			return m, m.refreshCopilot()
-		case "d":
+		case "D":
 			c.diagnosticsOpen = !c.diagnosticsOpen
 			c.offset = 0
 		case "/":
@@ -251,7 +258,7 @@ func metric(n *int64) string {
 }
 func (m Model) copilotView() tea.View {
 	c := m.copilot
-	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" g GitHub · J Jira · , innstillinger · c Copilot · lokal historikk · egen OTLP-mottaker")}
+	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" vg GitHub · vt Jira · vs innstillinger · va Copilot · lokal historikk · egen OTLP-mottaker")}
 	body := []string{}
 	if c.diagnosticsOpen {
 		d := c.diagnostics
@@ -289,10 +296,13 @@ func (m Model) copilotView() tea.View {
 			} else {
 				line = clean(line)
 			}
+			if m.extraSelected(copilotRef(s), "copilot") {
+				line = "✓ " + line
+			}
 			body = append(body, line)
 		}
 		if len(rows) == 0 {
-			body = append(body, "Ingen Copilot-sesjoner. Start en Copilot CLI-sesjon; sjekk d for diagnostikk.")
+			body = append(body, "Ingen Copilot-sesjoner. Start en Copilot CLI-sesjon; sjekk vi for diagnostikk.")
 		}
 	}
 	if c.detail != nil || c.diagnosticsOpen {
@@ -314,7 +324,7 @@ func (m Model) copilotView() tea.View {
 	if c.notice != "" {
 		lines = append(lines, warning.Render(clean(c.notice)))
 	}
-	lines = append(lines, muted.Render(", innstillinger · i IntelliJ · Enter detaljer · j/k ↑/↓ · / søk · d diagnostikk · r oppdater · Esc tilbake · q avslutt"))
+	lines = append(lines, muted.Render("vs innstillinger · ee IntelliJ · d detaljer · j/k ↑/↓ · / søk · vi diagnostikk · au oppdater · Esc tilbake · Ctrl+C avslutt"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

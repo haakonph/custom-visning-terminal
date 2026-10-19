@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 func chooseAll(m Model) Model {
@@ -31,7 +29,7 @@ func TestBrowserOpensAllChosenDespiteFilterAndFailure(t *testing.T) {
 		}
 		return nil
 	}
-	_, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd := sequence(m, "en")
 	msg := cmd().(openMsg)
 	if len(urls) != 2 || urls[0] == urls[1] || msg.err == nil {
 		t.Fatalf("urls=%v error=%v", urls, msg.err)

@@ -37,6 +37,14 @@ func (m Model) selectedPRs() []model.PullRequest {
 
 func (m Model) taskReferences() []model.TaskReference {
 	if m.jiraActive {
+		if len(m.jiraChosen) > 0 {
+			var refs []model.TaskReference
+			for _, issue := range m.jiraChosen {
+				refs = append(refs, model.TaskReference{Provider: "jira", Key: issue.Key, URL: issue.URL, Title: issue.Title})
+			}
+			sort.Slice(refs, func(i, j int) bool { return refs[i].Key < refs[j].Key })
+			return refs
+		}
 		if ref, ok := m.taskReference(); ok {
 			return []model.TaskReference{ref}
 		}

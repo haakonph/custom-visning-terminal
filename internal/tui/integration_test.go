@@ -15,17 +15,17 @@ func TestWorktreeResultsAcrossCopilotAndTasks(t *testing.T) {
 	m, _ = update(m, key(' '))
 	m.local.running = 1
 	m.local.preparing[p.Key()] = true
-	m, _ = update(m, key('c'))
+	m, _ = sequence(m, "va")
 	m, _ = update(m, localResult{p: p, err: errors.New("editor unavailable")})
 	if !m.copilotActive || m.local.running != 0 || m.local.statuses[p.Key()].Error == "" {
 		t.Fatal("worktree result lost while Copilot was active")
 	}
-	m, _ = update(m, key('g'))
-	m, _ = update(m, key('t'))
+	m, _ = sequence(m, "vg")
+	m, _ = sequence(m, "an")
 	if !m.tasks.active || len(m.tasks.items) != 1 {
 		t.Fatal("task creation failed after returning from Copilot")
 	}
-	m, _ = update(m, key('e'))
+	m, _ = sequence(m, "ae")
 	title := m.tasks.input.Value()
 	m.local.running = 1
 	m, _ = update(m, localResult{p: p})
@@ -38,7 +38,7 @@ func TestWorktreeResultsAcrossCopilotAndTasks(t *testing.T) {
 		t.Fatal("task editor no longer receives input")
 	}
 	m.tasks.editing = false
-	m, _ = update(m, key('T'))
+	m, _ = sequence(m, "vg")
 	if m.tasks.active || m.copilotActive || len(m.local.chosen) != 1 {
 		t.Fatal("provider navigation lost PR selection")
 	}

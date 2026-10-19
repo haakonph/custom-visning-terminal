@@ -68,9 +68,9 @@ func (m Model) snoozeLines() []string {
 	if s == nil {
 		return nil
 	}
-	line := fmt.Sprintf(" %d utsatte · z snooze · Z vis", len(s.rows()))
+	line := fmt.Sprintf(" %d utsatte · z snooze · vz vis", len(s.rows()))
 	if s.input {
-		line = " Snooze: " + s.digits + "▏  h timer · d dager · D dager kl. 06 · Esc avbryt"
+		line = " Snooze: " + s.digits + "▏  h timer · d dager · m dager kl. 06 · Esc avbryt"
 	}
 	lines := []string{line}
 	if s.notice != "" {
@@ -231,8 +231,12 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				s.digits = s.digits[:len(s.digits)-1]
 			}
 			s.notice = ""
-		case "h", "d", "D":
-			at, err := snooze.Deadline(s.now().In(time.Local), s.digits, k)
+		case "h", "d", "m":
+			unit := k
+			if unit == "m" {
+				unit = "D"
+			}
+			at, err := snooze.Deadline(s.now().In(time.Local), s.digits, unit)
 			if err != nil {
 				s.notice = err.Error()
 				return true, nil
@@ -261,6 +265,13 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				return true, nil
 			}
 			for _, e := range batch {
+				if e.Kind == "jira" {
+					for key, issue := range m.jiraChosen {
+						if issue.URL == e.URL {
+							delete(m.jiraChosen, key)
+						}
+					}
+				}
 				if e.Kind == "github" {
 					for key, p := range m.chosen {
 						if p.URL == e.URL {
@@ -269,6 +280,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 					}
 				}
 			}
+			m.clearChosen()
 			s.targets = nil
 			s.input, s.digits = false, ""
 			s.notice = "Utsatt til " + at.Local().Format("2006-01-02 15:04:05 MST -07:00")
@@ -284,7 +296,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				if len(s.digits) == 256 {
 					s.digits += "!"
 				}
-				s.notice = "Ugyldig verdi; bruk sifre og h, d eller D"
+				s.notice = "Ugyldig verdi; bruk sifre og h, d eller m"
 			}
 		}
 		return true, nil
@@ -331,7 +343,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.notice = "Kunne ikke lese snooze: " + s.loadErr.Error()
 			return true, nil
 		}
-		if !m.tasks.active && !m.jiraActive {
+		if !m.tasks.active {
 			s.targets = nil
 			for _, ref := range m.taskReferences() {
 				s.targets = append(s.targets, snooze.Entry{ID: snooze.Identity(ref.Provider, ref.URL), Kind: ref.Provider, Title: ref.Title, URL: ref.URL})
@@ -366,7 +378,7 @@ func (m Model) snoozeView() tea.View {
 	if len(rows) == 0 {
 		lines = append(lines, " Ingen utsatte elementer.")
 	}
-	lines = append(lines, "j/k velg · z endre tidspunkt · u hent tilbake · Esc tilbake")
+	lines = append(lines, "j/k velg · z endre tidspunkt · az hent tilbake · Esc tilbake")
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

@@ -5,6 +5,14 @@ CREATE TABLE accounts (
     username TEXT NOT NULL
 );
 
+CREATE TABLE archived_entities (
+    provider TEXT NOT NULL,
+    url TEXT NOT NULL,
+    reference_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    PRIMARY KEY (provider, url)
+);
+
 CREATE TABLE copilot_events (
     session_id TEXT NOT NULL REFERENCES copilot_sessions(id) ON DELETE CASCADE,
     event_key TEXT NOT NULL,
@@ -75,6 +83,18 @@ CREATE TABLE copilot_usage (
 );
 
 CREATE TABLE documents (id INTEGER PRIMARY KEY CHECK (id = 1), payload BLOB NOT NULL);
+
+CREATE TABLE entity_links (
+    source_provider TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    source_title TEXT NOT NULL,
+    target_provider TEXT NOT NULL,
+    target_url TEXT NOT NULL,
+    target_key TEXT NOT NULL,
+    target_title TEXT NOT NULL,
+    PRIMARY KEY (source_provider, source_url, target_provider, target_url)
+);
 
 CREATE TABLE github_labels (
     pull_request_id TEXT NOT NULL REFERENCES github_pull_requests(id) ON DELETE CASCADE,
@@ -235,7 +255,7 @@ CREATE TABLE tasks (
     position INTEGER PRIMARY KEY,
     stable_id TEXT NOT NULL,
     title TEXT NOT NULL
-);
+, archived INTEGER NOT NULL DEFAULT 0);
 
 CREATE VIEW overview_items AS
 SELECT 'github' AS provider, p.id AS item_id, p.title, p.url, p.updated_at AS last_activity,

@@ -39,6 +39,8 @@ func update(m Model, msg tea.Msg) (Model, tea.Cmd) {
 }
 func ready(t *testing.T) Model {
 	t.Helper()
+	t.Setenv("CUSTOM_VISNING_LINKS", t.TempDir()+"/links.sqlite")
+	t.Setenv("CUSTOM_VISNING_TASKS", t.TempDir()+"/tasks.sqlite")
 	m := New(context.Background(), &fakeSource{}, nil)
 	t.Cleanup(m.cancel)
 	m.booting = false
@@ -85,8 +87,8 @@ func TestNavigationAndFilter(t *testing.T) {
 		}
 	}
 	for _, r := range "1234" {
-		m, _ = update(m, key(r))
-		if m.active != model.View(r-'1') {
+		m, _ = sequence(m, "l")
+		if m.active != model.View((r-'0')%4) {
 			t.Fatal("switch view")
 		}
 	}
@@ -110,11 +112,11 @@ func TestRefreshAsyncAndNoDuplicates(t *testing.T) {
 	source := &fakeSource{result: model.Result{Complete: true}}
 	m.source = source
 	var cmd tea.Cmd
-	m, cmd = update(m, key('r'))
+	m, cmd = sequence(m, "au")
 	if cmd == nil || source.calls != 0 || !m.loading[0] {
 		t.Fatal("refresh blocked Update")
 	}
-	next, duplicate := update(m, key('r'))
+	next, duplicate := sequence(m, "au")
 	m = next
 	if duplicate != nil {
 		t.Fatal("duplicate refresh")
@@ -154,7 +156,7 @@ func TestBootstrapErrorAndRetry(t *testing.T) {
 		t.Fatal("auth error missing")
 	}
 	source.err = nil
-	m, cmd := update(m, key('r'))
+	m, cmd := sequence(m, "au")
 	if !m.booting || cmd == nil {
 		t.Fatal("cannot retry bootstrap")
 	}
@@ -181,7 +183,7 @@ func TestOpenAndQuit(t *testing.T) {
 	m := ready(t)
 	opened := ""
 	m.open = func(ctx context.Context, url string) error { opened = url; return nil }
-	_, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd := sequence(m, "en")
 	if cmd == nil || opened != "" {
 		t.Fatal("browser opened synchronously")
 	}
@@ -189,7 +191,7 @@ func TestOpenAndQuit(t *testing.T) {
 	if opened != m.filtered()[0].URL {
 		t.Fatal("wrong PR opened")
 	}
-	m, cmd = update(m, key('q'))
+	m, cmd = update(m, tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	if cmd == nil || m.ctx.Err() == nil {
 		t.Fatal("quit did not cancel")
 	}
@@ -217,7 +219,7 @@ func TestResponsiveViewAndHelp(t *testing.T) {
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = update(m, key('?'))
-	if !strings.Contains(m.View().Content, "UNKNOWN means") {
+	if !strings.Contains(m.View().Content, "Hurtigtaster") {
 		t.Fatal("help missing")
 	}
 }
@@ -239,7 +241,7 @@ func TestHelpScrollAndSmallWindows(t *testing.T) {
 	m = press(m, "?")
 	for _, size := range [][2]int{{120, 30}, {40, 10}, {8, 3}, {1, 1}} {
 		m, _ = update(m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		for range 50 {
+		for range 200 {
 			m = press(m, "j")
 		}
 		view := m.View()
@@ -253,13 +255,13 @@ func TestHelpScrollAndSmallWindows(t *testing.T) {
 		}
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 10})
-	if !strings.Contains(m.View().Content, "Partial refreshes") {
+	if !strings.Contains(m.View().Content, "Delvis oppdatering") {
 		t.Fatal("cannot reach the end of help")
 	}
-	for range 50 {
+	for range 200 {
 		m = press(m, "k")
 	}
-	if !strings.Contains(m.View().Content, "Snooze:") {
+	if !strings.Contains(m.View().Content, "Hurtigtaster") {
 		t.Fatal("cannot return to the start of help")
 	}
 	m = press(m, "zZ")

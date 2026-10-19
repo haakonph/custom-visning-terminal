@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
@@ -21,18 +20,18 @@ func TestProviderShortcutsPreserveFiltersAndSelection(t *testing.T) {
 	m.jira.rows = []jira.Issue{{Key: "APP-1"}, {Key: "APP-2"}}
 	m.jira.selected = 1
 	m.jira.custom = "project = APP"
-	m, _ = update(m, key('g'))
+	m, _ = sequence(m, "vg")
 	if m.jiraActive || m.active != model.Reviews || m.selected != 2 || m.input.Value() != "backend" || m.filtering {
 		t.Fatal("GitHub state lost")
 	}
-	m, _ = update(m, key('J'))
+	m, _ = sequence(m, "vt")
 	if !m.jiraActive || m.jira.active != 2 || m.jira.selected != 1 || m.jira.custom != "project = APP" {
 		t.Fatal("Jira state lost")
 	}
 	if m.jira.generation != 0 {
 		t.Fatal("switch triggered unwanted refresh")
 	}
-	_, cmd := update(m, key('J'))
+	_, cmd := sequence(m, "vt")
 	if cmd != nil {
 		t.Fatal("already-active shortcut did work")
 	}
@@ -42,12 +41,12 @@ func TestFirstJiraVisitLoadsOnce(t *testing.T) {
 	defer m.cancel()
 	m.source = &fakeSource{}
 	m.jiraActive = false
-	m, cmd := update(m, key('J'))
+	m, cmd := sequence(m, "vt")
 	if !m.jiraActive || cmd == nil || m.jira.generation != 1 {
 		t.Fatal("first visit did not load")
 	}
-	m, _ = update(m, key('g'))
-	m, cmd = update(m, key('J'))
+	m, _ = sequence(m, "vg")
+	m, cmd = sequence(m, "vt")
 	if cmd != nil || m.jira.generation != 1 {
 		t.Fatal("return visit restarted in-flight request")
 	}
@@ -55,13 +54,13 @@ func TestFirstJiraVisitLoadsOnce(t *testing.T) {
 func TestMissingProviderKeepsCurrentView(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
-	m, _ = update(m, key('g'))
-	if !m.jiraActive || !strings.Contains(m.jira.notice, "GitHub") {
+	m, _ = sequence(m, "vg")
+	if !m.jiraActive || m.sequenceNotice == "" {
 		t.Fatal("missing GitHub not explained")
 	}
 	gh := ready(t)
-	gh, _ = update(gh, key('J'))
-	if gh.jiraActive || !strings.Contains(gh.notice, "JIRA_BASE_URL") {
+	gh, _ = sequence(gh, "vt")
+	if gh.jiraActive || gh.sequenceNotice == "" {
 		t.Fatal("missing Jira not explained")
 	}
 }

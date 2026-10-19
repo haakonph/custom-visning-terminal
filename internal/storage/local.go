@@ -16,12 +16,14 @@ func writeDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 		return writeJira(ctx, q, v)
 	case model.CopilotStore:
 		return writeCopilot(ctx, q, v)
+	case model.EntityState:
+		return writeEntities(ctx, q, v)
 	case []model.Task:
 		if err := q.ClearTasks(ctx); err != nil {
 			return err
 		}
 		for pos, t := range v {
-			if err := q.InsertTasks(ctx, dbgen.InsertTasksParams{Position: int64(pos), StableID: t.ID, Title: t.Title}); err != nil {
+			if err := q.InsertTasks(ctx, dbgen.InsertTasksParams{Position: int64(pos), StableID: t.ID, Title: t.Title, Archived: boolInt(t.Archived)}); err != nil {
 				return err
 			}
 			for refPos, r := range t.References {
@@ -53,7 +55,7 @@ func writeDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 			return err
 		}
 		for key, e := range v {
-			if key == "" || e.ID != key || e.Until.IsZero() || e.Until.Year() > 9999 || (e.Kind != "github" && e.Kind != "jira" && e.Kind != "task") {
+			if key == "" || e.ID != key || e.Until.IsZero() || e.Until.Year() > 9999 || (e.Kind != "github" && e.Kind != "jira" && e.Kind != "task" && e.Kind != "copilot" && e.Kind != "mattermost") {
 				return fmt.Errorf("invalid snooze entry")
 			}
 			if err := q.InsertSnoozes(ctx, dbgen.InsertSnoozesParams{ID: e.ID, Kind: e.Kind, Title: e.Title, Url: e.URL, UntilAt: timestamp(e.Until)}); err != nil {
@@ -86,6 +88,8 @@ func readDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 			return err
 		}
 		*out = v
+	case *model.EntityState:
+		return readEntities(ctx, q, out)
 	case *[]model.Task:
 		rows, err := q.ListTasks(ctx)
 		if err != nil {
@@ -94,7 +98,7 @@ func readDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 		items := make([]model.Task, len(rows))
 		indices := map[int64]int{}
 		for i, r := range rows {
-			items[i] = model.Task{ID: r.StableID, Title: r.Title}
+			items[i] = model.Task{ID: r.StableID, Title: r.Title, Archived: r.Archived != 0}
 			indices[r.Position] = i
 		}
 		refs, err := q.ListTaskReferences(ctx)

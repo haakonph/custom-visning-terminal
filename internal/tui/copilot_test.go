@@ -13,7 +13,7 @@ import (
 func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
 	client := testCopilot(t)
 	m := ready(t).WithCopilot(client, false)
-	m, cmd := update(m, key('c'))
+	m, cmd := sequence(m, "va")
 	if !m.copilotActive || cmd == nil {
 		t.Fatal("Copilot not opened")
 	}
@@ -29,7 +29,7 @@ func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
 	if len(m.copilot.rows()) != 1 || m.copilot.rows()[0].ID != "s2" {
 		t.Fatal("filter failed")
 	}
-	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, cmd = sequence(m, "d")
 	if cmd == nil || m.copilot.detail.Session.ID != "s2" {
 		t.Fatal("detail not loaded")
 	}
@@ -41,7 +41,7 @@ func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
 	if m.copilot.detail != nil || len(m.copilot.rows()) != 2 {
 		t.Fatal("escape did not reset")
 	}
-	m, _ = update(m, key('g'))
+	m, _ = sequence(m, "vg")
 	if m.copilotActive {
 		t.Fatal("GitHub switch failed")
 	}
@@ -53,8 +53,8 @@ func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
 	if m.Init() == nil {
 		t.Fatal("standalone init")
 	}
-	m, _ = update(m, key('g'))
-	if !m.copilotActive || m.copilot.notice == "" {
+	m, _ = sequence(m, "vg")
+	if !m.copilotActive || m.sequenceNotice == "" {
 		t.Fatal("missing provider feedback")
 	}
 	m.copilot.detail = &copilot.Detail{Session: copilot.Session{Name: "Session"}, Events: []copilot.Event{{Type: "tool.complete", Content: "line1\nline2\x1b]52;secret\a", Args: "args", Result: "result"}}}
@@ -64,7 +64,7 @@ func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
 	if strings.Contains(rendered, "\x1b]52") || len(strings.Split(rendered, "\n")) > m.height {
 		t.Fatal("unsafe or oversized rendering")
 	}
-	m, _ = update(m, key('d'))
+	m, _ = sequence(m, "vi")
 	if !m.copilot.diagnosticsOpen {
 		t.Fatal("diagnostics toggle")
 	}

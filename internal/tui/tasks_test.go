@@ -25,22 +25,25 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	defer m.cancel()
 	m.active = model.Reviews
 	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Repository: "org/repo", Number: 1, Title: "Review this"}}
-	m = taskKey(m, "t")
+	m, _ = sequence(m, "an")
 	if !m.tasks.active || len(m.tasks.items) != 1 || m.tasks.items[0].References[0].Role != "review" {
 		t.Fatal("review PR should create a task")
 	}
-	m = taskKey(m, "T")
-	m = taskKey(m, "a")
+	m.tasks.active = false
+	m, _ = sequence(m, "to")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.tasks.items[0].References) != 1 {
 		t.Fatal("adding the same PR must not duplicate it")
 	}
 	m.tasks.active = false
 	m.jira = &jiraState{rows: []jira.Issue{{Key: "ABC-1", URL: "https://jira.example/browse/ABC-1", Title: "First issue"}, {Key: "ABC-2", URL: "https://jira.example/browse/ABC-2", Title: "Second issue"}}}
 	m.jiraActive = true
-	m = taskKey(m, "a")
+	m, _ = sequence(m, "to")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.tasks.active = false
 	m.jira.selected = 1
-	m = taskKey(m, "a")
+	m, _ = sequence(m, "to")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.tasks.items[0].References) != 3 {
 		t.Fatal("task should contain one PR and two Jira issues")
 	}
@@ -48,7 +51,9 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	if reloaded.loadFailed || len(reloaded.items) != 1 || len(reloaded.items[0].References) != 3 {
 		t.Fatal("references should survive restart")
 	}
-	m = taskKey(m, "d")
+	m.tasks.active = true
+	m.tasks.details = true
+	m = taskKey(taskKey(m, "a"), "d")
 	if len(m.tasks.items[0].References) != 2 {
 		t.Fatal("d should remove only selected reference")
 	}
@@ -65,8 +70,8 @@ func TestTasksCorruptStorageIsNotOverwritten(t *testing.T) {
 	}
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m = taskKey(m, "T")
-	m = taskKey(m, "n")
+	m, _ = sequence(m, "vo")
+	m, _ = sequence(m, "an")
 	data, err := os.ReadFile(path)
 	if err != nil || string(data) != "broken" || len(m.tasks.items) != 0 {
 		t.Fatal("corrupt file must be preserved")
@@ -77,8 +82,8 @@ func TestTasksTitleEditingDoesNotTriggerGlobalShortcuts(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m = taskKey(m, "T")
-	m = taskKey(m, "n")
+	m, _ = sequence(m, "vo")
+	m, _ = sequence(m, "an")
 	m.tasks.input.SetValue("Jira og PR")
 	m = taskKey(m, "g")
 	if !m.tasks.active || !m.tasks.editing {
@@ -98,16 +103,17 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	m := New(context.Background(), &fakeSource{}, nil)
 	defer m.cancel()
 	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "Old title"}}
-	m = taskKey(m, "t")
+	m, _ = sequence(m, "an")
 	m, _ = update(m, refreshMsg{view: model.Open, result: model.Result{Complete: true, PRs: []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "New title", Review: model.Approved}}}})
 	if !m.tasks.active || !strings.Contains(m.tasksView().Content, "New title") {
 		t.Fatal("background refresh should update task references without leaving the page")
 	}
-	m = taskKey(m, "g")
+	m, _ = sequence(m, "vg")
 	if m.tasks.active {
 		t.Fatal("g should return to GitHub")
 	}
-	m = taskKey(m, "a")
+	m, _ = sequence(m, "to")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.tasks.items) != 1 || len(m.tasks.items[0].References) != 1 {
 		t.Fatal("returning to provider must preserve target task")
 	}
@@ -118,7 +124,9 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 			t.Fatal("task page exceeds terminal height")
 		}
 	}
-	m = taskKey(m, "D")
+	m.tasks.active = true
+	m.tasks.details = false
+	m, _ = sequence(m, "ad")
 	if len(m.tasks.items) != 0 {
 		t.Fatal("D should delete the local task")
 	}
@@ -144,13 +152,13 @@ func TestTaskListWithFifteenTasks(t *testing.T) {
 	if !strings.Contains(m.View().Content, "Oppgave 15") {
 		t.Fatal("selected task must remain visible after scrolling")
 	}
-	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = sequence(m, "d")
 	if !m.tasks.details {
 		t.Fatal("Enter must focus details")
 	}
 	opened := ""
 	m.open = func(_ context.Context, link string) error { opened = link; return nil }
-	_, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd := sequence(m, "en")
 	if cmd == nil {
 		t.Fatal("Enter in details must open reference")
 	}
@@ -169,7 +177,7 @@ func TestTaskListWithFifteenTasks(t *testing.T) {
 		t.Fatal("search should match references and select visible task")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = taskKey(m, "n")
+	m, _ = sequence(m, "an")
 	if m.tasks.query != "" || m.tasks.selected != 15 {
 		t.Fatal("new task must be visible even after filtering")
 	}

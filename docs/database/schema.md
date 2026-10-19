@@ -11,6 +11,12 @@ erDiagram
         TEXT provider
         TEXT username
     }
+    archived_entities {
+        TEXT provider PK
+        TEXT url PK
+        TEXT reference_key
+        TEXT title
+    }
     copilot_events {
         TEXT session_id PK,FK
         TEXT event_key PK
@@ -76,6 +82,16 @@ erDiagram
     documents {
         INTEGER id PK
         BLOB payload
+    }
+    entity_links {
+        TEXT source_provider PK
+        TEXT source_url PK
+        TEXT source_key
+        TEXT source_title
+        TEXT target_provider PK
+        TEXT target_url PK
+        TEXT target_key
+        TEXT target_title
     }
     github_labels {
         TEXT pull_request_id PK,FK
@@ -222,6 +238,7 @@ erDiagram
         INTEGER position PK
         TEXT stable_id
         TEXT title
+        INTEGER archived
     }
     copilot_sessions |o..o{ copilot_events : fk_0
     copilot_sessions |o..o{ copilot_traces : fk_0

@@ -27,12 +27,12 @@ inngå i URL-en. Server og brukernavn lagres i den eksisterende konfigurasjonen
 ```
 
 Miljøvariablene overstyrer filen. Etter første oppstart er de ikke nødvendige.
-Bruk `M` for Mattermost når GitHub eller Jira er aktiv. Uten GitHub åpnes
-Mattermost direkte. Velg `a`, skriv passord og trykk Enter. Skriv deretter TOTP
+Bruk `vc` for Mattermost når GitHub eller Jira er aktiv. Uten GitHub åpnes
+Mattermost direkte. Velg `al`, skriv passord og trykk Enter. Skriv deretter TOTP
 hvis serveren krever dette, ellers trykk Enter uten kode. Ved utløpt sesjon vises
 innlogging igjen; Esc lar deg fortsette å lese offline.
 
-Alternativt: bruk `p` og skriv et Personal Access Token i det maskerte feltet.
+Alternativt: bruk `ap` og skriv et Personal Access Token i det maskerte feltet.
 `MATTERMOST_TOKEN` kan også brukes; den overstyrer en lagret sesjon ved oppstart.
 Tokenets bruker må ha samme brukernavn som konfigurasjonen, slik at cacher ikke
 blandes mellom kontoer. Appen skriver aldri passord eller TOTP-koder til disk.
@@ -45,7 +45,7 @@ konfigurasjonsfilen. OS kan vise sin egen nøkkelringdialog ved tilgang.
 
 ## Team, kanaler og meldinger
 
-`+` eller Enter på «Add channel» åpner kanalvelgeren. Den viser teamnavn og alle
+`vk` åpner kanalvelgeren. Den viser teamnavn og alle
 offentlige kanaler i teamene dine, samt private kanaler du er medlem av. Skriv
 for å søke lokalt i navn og team, bruk pilene, og Enter for å slå overvåkning
 av/på. Valgene huskes per server og brukernavn. Overvåkning endrer ikke
@@ -56,31 +56,30 @@ Hver overvåket kanal får en horisontal tab. Tab-raden flytter seg slik at akti
 tab er synlig. Meldinger viser tidspunkt, avsender og innhold. Overskrifter,
 fet/kursiv tekst, inline-kode, kodeblokker og sitater får terminalstil; øvrig
 Markdown, inkludert lenker, bevares som lesbar tekst. Ingen bilder eller vedlegg
-lastes ned. `t` åpner hele tråden fra serveren og beholder svarene offline.
+lastes ned. `d` åpner hele tråden fra serveren og beholder svarene offline.
 
 | Tast | Handling |
 | --- | --- |
-| `M` | Åpne Mattermost fra en annen visning |
-| `Tab` / `Shift+Tab`, `←` / `→` | Neste / forrige kanal, inkludert Add channel |
-| `↑` / `↓`, `k` / `j` | Velge melding |
-| `PageUp` / `PageDown` | Rulle i lange meldinger |
-| `+` | Søke etter og velge kanaler |
-| `-` | Slutte å overvåke aktiv kanal; beholde cache |
-| `t` | Hente / vise tråd og svar |
-| `h` | Hente én eldre side (opptil 60 meldinger) |
-| `[` / `]` | Velge blant lenkene i meldingen |
-| `Enter` | Åpne valgt lenke i nettleser; i PR-referanser: gå til meldingen |
-| `g` | Gå til valgt PR i den eksisterende GitHub-visningen |
-| `v` (GitHub) | Vise alle cachede Mattermost-referanser til markert PR |
-| `u` | Markere kanalens cachede meldinger som lest lokalt |
-| `r` | Synkronisere overvåkede kanaler |
-| `a` / `p` | Logge inn med passord/TOTP eller PAT |
-| `D`, så `y` | Slette alle lokale Mattermost-data og gjeldende lagrede sesjon |
-| `Esc` | Tilbake / avbryte innlogging; fra tråd til kanal |
-| `q` / `Ctrl+C` | Avslutte |
+| `vc` | Åpne Mattermost fra en annen visning |
+| `h` / `l`, `←` / `→` | Forrige / neste kanal |
+| `j` / `k`, `↓` / `↑` | Velg melding |
+| `Space`, `Shift+↑/↓`, `x` | Marker, utvid eller fjern markeringer |
+| `/` | Filtrer meldinger lokalt |
+| `vk` / `aw` | Velg kanaler / slutt å overvåke aktiv kanal |
+| `d` | Vis tråd og svar |
+| `ah` / `a↓` / `a↑` | Eldre meldinger / rull halv side ned/opp |
+| `en` / `el` | Åpne meldingen i nettleser / velg lenke i meldinger |
+| `rg` / `rc` | Relaterte PR-er / relaterte chatmeldinger fra GitHub |
+| `to/tg/tt/ta/tc` | Koble valgte meldinger til valgte objekter lokalt |
+| `as` / `ak` | Lag melding fra valget / arkiver lokalt |
+| `av` / `au` | Merk kanal lest / synkroniser |
+| `al` / `ap` | Logg inn med passord/TOTP / PAT |
+| `ab`, så Enter | Tøm lokal chatcache og lagret sesjon |
+| `Esc` / `Ctrl+C` | Tilbake/avbryt / avslutt |
+
 
 Uleste meldinger markeres med `●`. Serverens sist-lest-tid hentes ved
-kanaloppdagelse og kombineres med lokal lesestatus. `u` endrer bare lokal status;
+kanaloppdagelse og kombineres med lokal lesestatus. `av` endrer bare lokal status;
 appen sender ingen lesebekreftelser eller meldinger gjennom leseintegrasjonen.
 
 ## Synkronisering og offline
@@ -93,8 +92,8 @@ Første synkronisering henter opptil 60 siste meldinger per valgt kanal. Videre
 hentes endringer siden siste servermarkør med én millisekunds overlapp og
 id-basert deduplisering. Redigeringer erstatter innhold; slettetombstones tømmer
 lokalt innhold og fjerner PR-relasjoner. Markøren avanserer bare etter vellykket
-henting og bruker serverens tidsstempler. Eldre historie hentes bare med `h`,
-og tråder ved `t`. Feil i én kanal forkaster ikke vellykket synkronisering i andre.
+henting og bruker serverens tidsstempler. Eldre historie hentes bare med `ah`,
+og tråder ved `d`. Feil i én kanal forkaster ikke vellykket synkronisering i andre.
 
 Automatiske oppdateringer bruker polling hvert 30. sekund, også når en annen
 provider vises. WebSocket er ikke implementert. Cachen kan leses uten nett;
@@ -102,7 +101,7 @@ API-feil vises i statuslinjen. En offline sletting blir først kjent når server
 returnerer den ved neste synkronisering; serverens retention- og tilgangsregler
 kan begrense hvilke historiske endringer som er tilgjengelige.
 
-`D` med bekreftelse fjerner Mattermost-tabellinnhold for **alle** lokale kontoer,
+`ab` med Enter-bekreftelse fjerner Mattermost-tabellinnhold for **alle** lokale kontoer,
 kanalvalg og PR-relasjoner. Dette påvirker ikke GitHub-, Jira- eller Copilot-data.
 Gjeldende kontos sesjon fjernes også fra nøkkelringen hvis den er tilgjengelig;
 eventuelle nøkkelringposter for andre kontoer må fjernes i OS-nøkkelringverktøyet.
@@ -119,9 +118,9 @@ meldingene og fjernes når en melding redigeres eller slettes.
 
 Under meldingen vises tittel, Open/Draft og review-status når PR-en finnes i den
 allerede lastede GitHub-cachen. Integrasjonen gjør **ingen ekstra GitHub-kall**;
-den deler snapshot og metadata med den eksisterende PR-visningen. `g` går til
-den aktuelle raden. GitHub-visningen viser antall Mattermost-referanser; `v`
-åpner referanselisten med kanal, avsender, tidspunkt og melding. Enter går tilbake
+den deler snapshot og metadata med den eksisterende PR-visningen. `rg` går til
+den aktuelle raden. GitHub-visningen viser antall Mattermost-referanser; `rc`
+åpner referanselisten med kanal, avsender, tidspunkt og melding. Enter i valglisten går tilbake
 til den nøyaktige meldingen eller dens cachede tråd.
 
 Referanser gjelder synkronisert historikk, ikke en full serversøk-indeks. PR-er
@@ -137,3 +136,5 @@ Testene bruker lokale TLS-testservere, en falsk lese-API og mock-nøkkelring;
 ingen ekte Mattermost-server eller konto kreves. `make lint` kjører `go vet` og
 formatkontroll. SQLite-migreringene og dokumentasjonen kan kontrolleres med
 `make check-generated` og `go run ./cmd/db-docs -check`.
+
+Se [fullstendig tastaturoversikt](keyboard.md) for kjeding og alle tillegg.

@@ -12,7 +12,7 @@ REPOSITORY           PR      TITLE                       AUTHOR       REVIEW    
 acme/frontend        #123    Fix login flow              alice        APPROVED  PASS    2h
 acme/backend         #456    Add new endpoint            alice        PENDING   FAIL    5h
  1/2 · merge: MERGEABLE · reviewers: bob · teams: acme/core · labels: bug
-1–4 views • j/k ↑/↓ move • Enter open • r refresh • / filter • ? help • q quit
+h/l tabs • j/k ↑/↓ move • d details • en browser • au refresh • / filter • ? help • Ctrl+C quit
 ```
 
 ## Krav og oppstart
@@ -118,35 +118,25 @@ PR-bygg bruker GitHubs test-merge-commit.
 
 ## Visninger og hurtigtaster
 
-| Tast | Handling |
-| --- | --- |
-| `1` | My Open PRs: egne åpne PR-er, uten drafts |
-| `2` | My Draft PRs: egne åpne drafts |
-| `3` | My Review Requests: bare direkte forespørsler til brukeren |
-| `4` | Team Review Requests: forespørsler til tilgjengelige team brukeren er medlem av |
-| `j` / `k`, `↓` / `↑` | Velg rad |
-| `Enter` | Åpne valgt PR i standardnettleseren |
-| `r` | Oppdater aktiv visning; prøv autentisering på nytt hvis oppstart feilet |
-| `/` | Filtrer lokalt på repository, PR-nummer, tittel, forfatter, label, team eller status |
-| `Enter` i filter | Behold filter og gå tilbake til navigasjon |
-| `Esc` | Fjern filter og lukk hjelp |
-| `?` | Vis/skjul hjelp |
-| `q` / `Ctrl+C` | Avslutt og kanseller nettverksarbeid |
+Alle snarveier følger nå ett mønster. Se [fullstendig tastaturoversikt](docs/keyboard.md),
+inkludert tastene som ikke var definert i den opprinnelige listen.
 
-Filteret gjelder også ved bytte av visning. Oppdatering er asynkron og én
-oppdatering per visning kan kjøre om gangen; fire visninger kan oppdateres
-parallelt. Alle fire oppdateres ved oppstart, deretter manuelt med `r`.
-Teamforespørsler dedupliseres, og teamnavn vises i detaljlinjen for valgt PR.
-En PR som har både direkte og teamforespørsler kan naturlig forekomme i begge
-visningene; teamtreff alene gir aldri treff i den direkte visningen.
+- `j/k` eller ↑/↓ velger rad; `h/l` eller ←/→ bytter fane.
+- `d` viser detaljer, `/` søker, `?` viser hjelpen.
+- Space og Shift+↑/↓ velger flere; `x` fjerner alle markeringer.
+- `r` relatert, `v` visning, `t` koble, `e` åpne, `a` handling.
+- `o/g/t/a/c` velger oppgaver/GitHub/Jira/AI/chat under en starttast.
+- `atfq` flytter tilhørende Jira-saker til QA direkte fra GitHub.
+- `au` oppdaterer, `vs` åpner innstillinger og Ctrl+C avslutter.
 
-Kolonner prioriteres etter vindusbredde. Smale vinduer viser PR-nummer og tittel;
-større vinduer viser også repository, forfatter, review, CI og alder. Utvalgte
-PR-ers labels, reviewers, team og mergeability står under tabellen. `UNKNOWN`
-betyr at GitHub ikke ga noen kjent status, f.eks. ved manglende checks eller
-reviewregel. `PENDING` betyr ventende review/checks, og `CHANGES` betyr at
-endringer er etterspurt. Mergeability betyr konfliktdeteksjon, ikke at alle
-branch protection-regler er oppfylt.
+Gamle enkelttaster, talltaster for faner og Tab-snarveier er fjernet. Enter brukes
+bare til å bekrefte dialoger/tekstfelt. AI og chat har også flervalg, koblinger,
+relasjoner, snooze og lokalt arkiv. Typene kan inngå i kjedede handlinger.
+
+GitHub-fanene er egne åpne PR-er uten drafts, egne drafts, direkte reviewforespørsler
+og teamforespørsler. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
+Delvise resultater beholder cache og tidspunkt for siste fulle synk. UNKNOWN betyr
+at GitHub ikke har gitt en kjent status; det er ikke bevis på at sjekker har bestått.
 
 ## GitHub-rettigheter
 
@@ -287,11 +277,11 @@ er tilgjengelige i samme kjøring; flagget velger bare startvisningen. Uten
 GitHub-innlogging starter appen automatisk i Jira dersom Jira er konfigurert.
 Ugyldig Jira-konfigurasjon rapporteres uten å hindre oppstart av GitHub.
 
-**Trykk `g` for GitHub og `J` (Shift+j) for Jira.** Hurtigtastene fungerer
+**Trykk `vg` for GitHub og `vt` for Jira.** Hurtigtastene fungerer
 i navigasjonsmodus. Mens du redigerer et filter eller JQL, skrives bokstavene
 som vanlig tekst; avslutt redigeringen før du bytter. Begge visninger beholder
 valgt fane, filter, markert rad og data. Byttet utløser ingen ny henting etter
-første åpning; bruk `r` når du vil oppdatere. Snarveiene vises øverst i begge visninger.
+første åpning; bruk `au` når du vil oppdatere. Snarveiene vises øverst i begge visninger.
 GitHub-feil og Jira-feil håndteres hver for seg under kjøring.
 
 Standardfanene er **Mine**, **Prosjekt**, **Uten ansvarlig** og **Aktiv sprint**.
@@ -300,26 +290,23 @@ prosjekter når prosjektfilter ikke er satt. Aktiv sprint krever Jira Software.
 
 | Tast | Jira-handling |
 | --- | --- |
-| `g` | Gå til GitHub; behold tilstanden |
-| `J` (Shift+j) | Gå til Jira; behold tilstanden |
-| `1`–`4` | Velg standardfane, som i GitHub-visningen |
-| `5`–`9` | Velg de fem første lagrede søkene direkte |
-| `Tab` / `Shift+Tab`, `←` / `→` | Bytt mellom standardfaner og lagrede søk |
+| `vg` | Gå til GitHub; behold tilstanden |
+| `vt` | Gå til Jira; behold tilstanden |
+| `h` / `l`, `←` / `→` | Bytt mellom standardfaner og lagrede søk |
 | `j` / `k`, `↓` / `↑` | Velg sak |
-| `Enter` | Åpne valgt sak i Jira |
+| `en` | Åpne valgt sak i Jira |
 | `/` | Filtrer lokalt blant hentede saker |
-| `f` | Rediger kombinerbare hurtigfiltre i standardfaner |
-| `:` | Rediger og kjør full JQL, inkludert ønsket `ORDER BY` |
-| `s` | Lagre gjeldende JQL med navn; samme navn erstatter eksisterende søk |
-| `x` | Fjern hurtigfiltre og midlertidig JQL; vis aktiv fanes søk |
-| `r` | Hent aktivt søk på nytt |
+| `vf` | Rediger kombinerbare hurtigfiltre i standardfaner |
+| `vj` | Rediger og kjør full JQL, inkludert ønsket `ORDER BY` |
+| `aq` | Lagre gjeldende JQL med navn; samme navn erstatter eksisterende søk |
+| `x` | Fjern markeringer; søk og filtre beholdes |
+| `au` | Hent aktivt søk på nytt |
 | `Esc` | Avbryt redigering eller fjern lokalt tekstfilter |
 | `?` | Vis/skjul hjelp |
-| `q` / `Ctrl+C` | Avslutt og kanseller nettverksarbeid |
+| `Ctrl+C` | Avslutt og kanseller nettverksarbeid |
 
-Fanene viser nummeret du kan trykke for å velge dem, på samme måte som i
-GitHub-visningen. Lokalt tekstfilter beholdes ved fanebytte. Flere enn fem lagrede
-søk nås med Tab eller piltastene.
+Bruk h/l eller venstre-/høyrepil for å velge fane. Lokalt tekstfilter beholdes ved fanebytte. Flere enn fem lagrede
+søk nås med h/l eller venstre-/høyrepil.
 
 Hurtigfiltrene er prosjekt, status, ansvarlig (Jira-brukernavn), prioritet,
 sakstype, sprint, epic og label. Enter går til neste felt; tom verdi fjerner
@@ -340,7 +327,7 @@ PR-tittel, beskrivelse og branchnavn, både i detaljvisningen og ved navigasjon
 mellom relaterte PR-er og Jira-saker. Eksemplet over godtar `KAKE-123` til
 `KAKE-12345`, men ikke 2 eller 6 sifre, andre prefikser eller treff inni ord.
 Trykk `,` for å åpne **Innstillinger** fra GitHub, Jira eller Copilot.
-`P` fungerer også fra GitHub og Jira. Velg felt med ↑/↓ eller j/k og trykk
+`vs` fungerer fra alle visninger. Velg felt med ↑/↓ eller j/k og trykk
 Enter for å redigere. Enter validerer og lagrer feltet; Esc avbryter redigering,
 og Esc på innstillingssiden går tilbake til forrige visning.
 
@@ -394,7 +381,7 @@ metadata og beskrivelse i klartekst, med mapper `0700` og filer `0600`. Slett
 undermappen for å fjerne lokale Jira-data. Ved oppstart/søk vises eventuell cache
 mens data hentes. Feil beholder forrige resultat og flytter ikke siste vellykkede
 synkronisering. Alle sider må lykkes før et nytt resultat erstatter cachen.
-Jiras `ORDER BY` beholdes. Oppdateringer skjer ved oppstart, søk/fanebytte og `r`.
+Jiras `ORDER BY` beholdes. Oppdateringer skjer ved oppstart, søk/fanebytte og `au`.
 Nye søk kansellerer forrige søk, og forsinkede svar ignoreres.
 
 Klienten har 30 sekunders request-timeout og to minutter per søk. Ved ugyldig JQL,
@@ -405,14 +392,14 @@ Jira-server og context path. Integrasjonen endrer ingen Jira-saker.
 
 ## Navigering mellom GitHub og Jira
 
-Trykk `l` i navigasjonsmodus for å vise relaterte saker eller PR-er.
+Trykk `rt` fra GitHub for relaterte Jira-saker, eller `rg` fra Jira for relaterte PR-er. `ro` finner den første interne oppgaven som inneholder valgt referanse, og `rc` viser Mattermost-omtaler av aktiv PR.
 
 - Fra GitHub: Jira-nøkler (for eksempel `TEAM-123`) hentes fra PR-tittel, beskrivelse og branchnavn. Jira viser alle refererte saker i et eget JQL-søk, uavhengig av hurtigfiltrene.
 - Fra Jira: viser relaterte PR-er fra alle fire lastede GitHub-visninger, uten duplikater. Dette er ikke et søk i alle organisasjonens PR-er.
-- `Enter` åpner valgt PR eller sak i nettleseren. `Esc` i GitHub fjerner avgrensningen til en Jira-sak. I Jira velger du en vanlig fane for å forlate relasjonssøket.
-- `g` og `J` bytter fortsatt leverandør. Begge integrasjonene må være konfigurert for navigering begge veier.
+- `en` åpner valgt PR eller sak i nettleseren. `Esc` i GitHub fjerner avgrensningen til en Jira-sak. I Jira velger du en vanlig fane for å forlate relasjonssøket.
+- `vg` og `vt` bytter visning. Begge integrasjonene må være konfigurert for navigering begge veier.
 
-Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `r` for å hente beskrivelser og branchnavn som mangler i gammel cache.
+Nøkler må bruke store bokstaver, og koblingen krever ikke skrivetilgang til GitHub eller Jira. Oppdater GitHub-data med `au` for å hente beskrivelser og branchnavn som mangler i gammel cache.
 
 
 ## Oppgaver (fleksibelt konsept)
@@ -422,21 +409,20 @@ wrapper rundt én Jira-sak eller PR, inkludert en PR fra review-fanene, eller sa
 flere Jira-saker og PR-er på tvers av repoer. Den har egen tittel og trenger ingen
 Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
 
-- `t` i Jira/GitHub lager en oppgave fra valgt rad og åpner oppgavesiden.
-- `T` åpner oppgavesiden; `j/k` velger oppgave i listen; `Tab` / `Shift+Tab` blar mellom oppgavene.
+- `an` fra valgte elementer lager en oppgave fra valgt rad og åpner oppgavesiden.
+- `vo` åpner oppgavesiden; `j/k` velger oppgave i listen; `h` / `l` blar mellom oppgavene.
   På brede terminaler vises oppgavelisten til venstre og detaljene til høyre.
   På smale terminaler bytter du mellom liste og detaljer.
 - `/` søker i oppgavetitler og tilknyttede referanser. `Enter` beholder søket,
   `Esc` nullstiller det.
-- `Enter` / høyrepil går fra listen til referansene. Venstrepil / `Esc` går tilbake
-  til listen. I detaljene velger `j/k` referanse og `Enter` åpner den.
-- `g` / `J` går til GitHub/Jira. Finn en rad og trykk `a` for å legge den til
-  oppgaven du sist valgte. Samme referanse legges ikke til to ganger.
-- `n` lager en tom oppgave, `e` redigerer tittelen, `Enter` lagrer og `Esc` avbryter
+- `d` går fra listen til referansene. `Esc` går tilbake
+  til listen. I detaljene velger `j/k` referanse og `en` åpner den.
+- `vg` / `vt` går til GitHub/Jira. Finn en rad og trykk `to`, velg en oppgave og bekreft med Enter for å legge den til. Samme referanse legges ikke til to ganger.
+- `an` lager en tom oppgave, `ae` redigerer tittelen, `Enter` lagrer og `Esc` avbryter
   tittelredigeringen. En tom oppgave kan fylles ut senere.
-- `d` fjerner valgt kobling.
-  `D` sletter den valgte lokale oppgaven.
-- `T` går tilbake til forrige provider-visning. `Esc` går først til listen,
+- `d` viser detaljer. `ad` fjerner valgt kobling i detaljene, eller sletter oppgaven i listen.
+- `ak` arkiverer/gjenoppretter lokal oppgave. `vb` viser arkivet; `ak` gjenoppretter derfra.
+- `vg` / `vt` / `va` / `vc` går til ønsket visning. `Esc` går først til listen,
   deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
 
 Oppgavene lagres atomisk i `custom-visning/tasks.sqlite` under operativsystemets
@@ -548,8 +534,8 @@ ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhol
 - **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
 - **i** åpner den valgte sesjonens prosjekt i IntelliJ fra listen eller detaljene.
 - **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
-- **d** viser diagnostikk; **Esc** går tilbake og fjerner søket.
-- **r** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
+- **vi** viser diagnostikk; **Esc** går tilbake og fjerner søket.
+- **au** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
 - **g** og **J** bytter til GitHub/Jira når de er konfigurert.
 
 ### Åpne IntelliJ fra en sesjon
@@ -791,15 +777,15 @@ andre filnavn får `.sqlite` lagt til. Mapper opprettes med 0700 og databaser me
 ### Lokal snooze
 
 I navigasjonsmodus starter `z` snooze for valgt PR, Jira-sak eller lokal oppgave.
-Skriv et positivt heltall og avslutt med `h`, `d` eller `D`; dette lagrer straks.
+Skriv et positivt heltall og avslutt med `h`, `d` eller `m`; dette lagrer straks.
 For eksempel betyr `z12h` tolv faktiske timer fra nå, `z3d` tre kalenderdager
-med samme lokale klokkeslett og `z14D` fjorten kalenderdager fra i dag kl. 06:00.
+med samme lokale klokkeslett og `z14m` fjorten kalenderdager fra i dag kl. 06:00.
 Backspace retter tallet. Esc avbryter uten å lagre. Null, ugyldige tall og
 verdier utenfor støttet tidsområde avvises. Ny snooze regnes alltid fra nå.
 
-Listen viser antall utsatte elementer. `Z` åpner **Utsatt**, sortert etter
+Listen viser antall utsatte elementer. `vz` åpner **Utsatt**, sortert etter
 tidligste returtidspunkt, også for elementer utenfor gjeldende søkeresultat.
-Der endrer `z` tidspunktet, `u` henter valgt element tilbake, og Esc går tilbake.
+Der endrer `z` tidspunktet, `az` henter valgt element tilbake, og Esc går tilbake.
 Etter lagring vises faktisk lokal returtid med tidssone og UTC-offset.
 
 Snooze deles mellom alle faner og søk for samme tjeneste/server og URL.
@@ -827,11 +813,11 @@ Installer Neovim, Vim eller vi (appen velger første tilgjengelige i den rekkef�
 
 1. Marker én eller flere PR-er med `Space`, også på tvers av faner og filtre.
    Uten markering brukes PR-en under markøren.
-2. Trykk `m`. Meldingen åpnes ferdig utfylt som Markdown i Vim/Neovim.
+2. Trykk `as`. Meldingen åpnes ferdig utfylt som Markdown i Vim/Neovim.
 3. Trykk `i` for å redigere. Bruk `Esc` og `:wq` for å lagre og gå tilbake.
    `:cq` avbryter redigeringen og beholder forrige utkast.
-4. Se gjennom Markdown-teksten i terminalappen (`j/k` ruller), trykk `e` for
-   å redigere videre, `Ctrl+S` for å sende, eller `Esc` for å avbryte sendingen.
+4. Se gjennom Markdown-teksten i terminalappen (`j/k` ruller), trykk `ee` for
+   å redigere videre, `as` for å sende, eller `Esc` for å avbryte sendingen.
 
 Alle valgte PR-er sendes i **én melding**, med én lenke per linje:
 
@@ -854,16 +840,16 @@ ved nettverksfeil bør du sjekke kanalen før du sender igjen.
 Trykk `d` på en markert PR for å se endrede filer som et mappetre (med
 endringstype, tillegg/slettinger og tidligere navn), kommentarer og reviews,
 og status og resultat for hver enkelt Actions-sjekk på gjeldende PR-head.
-`j`/`k` eller piltastene blar, `r` henter detaljene på nytt, `Enter` åpner PR-en
+`j`/`k` eller piltastene blar, `au` henter detaljene på nytt, `en` åpner PR-en
 på GitHub, og `Esc` går tilbake til listen. Hvis et API-endepunkt ikke er
 tilgjengelig, vises en advarsel sammen med detaljene som kunne lastes.
 
 ## Les Mattermost-kanaler
 
 Sett `MATTERMOST_SERVER=https://chat.example.org` og `MATTERMOST_USERNAME` og
-start appen. `M` åpner Mattermost, `a` logger inn med passord/TOTP, `p` bruker PAT,
-og `+` velger kanaler. Sesjoner lagres i OS-nøkkelringen når den er tilgjengelig;
-meldinger og kanalvalg i SQLite gir offline-lesing. `g` går fra en melding til en
-cachet GitHub-PR, og `v` i GitHub viser Mattermost-referansene tilbake.
+start appen. `vc` åpner Mattermost, `al` logger inn med passord/TOTP, `ap` bruker PAT,
+og `vk` velger kanaler. Sesjoner lagres i OS-nøkkelringen når den er tilgjengelig;
+meldinger og kanalvalg i SQLite gir offline-lesing. `rg` går fra en melding til en
+cachet GitHub-PR, og `rc` i GitHub viser Mattermost-referansene tilbake.
 
 Se [Mattermost-oppsett, tastatursnarveier og begrensninger](docs/mattermost.md).

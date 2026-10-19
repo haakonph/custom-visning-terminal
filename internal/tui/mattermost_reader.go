@@ -15,9 +15,16 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
 type mattermostReader struct {
+	entities         *entityState
+	snoozes          *snoozeState
+	query            string
+	searching        bool
+	channelSearching bool
+
 	open                                                          func(context.Context, string) error
 	service                                                       *mm.Service
 	api                                                           *mm.API
@@ -42,7 +49,7 @@ func mmTimer() tea.Cmd { return tea.Tick(30*time.Second, func(time.Time) tea.Msg
 func (m Model) WithMattermostReader(service *mm.Service, api *mm.API, keychain mm.TokenStore, account, token string) Model {
 	input := textinput.New()
 	input.CharLimit = 512
-	m.mmReader = &mattermostReader{open: openMattermostBrowser, service: service, api: api, keychain: keychain, account: account, apiToken: token, data: service.Snapshot(), input: input}
+	m.mmReader = &mattermostReader{entities: m.entities, snoozes: m.snoozes, open: openMattermostBrowser, service: service, api: api, keychain: keychain, account: account, apiToken: token, data: service.Snapshot(), input: input}
 	if m.source == nil {
 		if !m.jiraActive && !m.copilotActive {
 			m.mmReader.active = true
@@ -117,6 +124,10 @@ func (s *mattermostReader) posts() []model.MattermostPost {
 	var out []model.MattermostPost
 	c := s.channel()
 	for _, p := range s.data.Posts {
+		link := strings.TrimRight(s.data.Server, "/") + "/_redirect/pl/" + p.ID
+		if s.entities.archived("mattermost", link) || (s.snoozes != nil && s.snoozes.hidden(snooze.Identity("mattermost", link))) || !strings.Contains(strings.ToLower(p.Message+" "+p.Author), strings.ToLower(s.query)) {
+			continue
+		}
 		if p.DeletedAt != 0 {
 			continue
 		}
@@ -294,6 +305,25 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			m.cancel()
 			return true, tea.Quit
 		}
+		if s.searching {
+			switch key {
+			case "esc":
+				s.query = ""
+				s.searching = false
+				s.input.Blur()
+			case "enter":
+				s.searching = false
+				s.input.Blur()
+			default:
+				var cmd tea.Cmd
+				s.input, cmd = s.input.Update(msg)
+				s.query = s.input.Value()
+				s.row = 0
+				return true, cmd
+			}
+			s.row = 0
+			return true, nil
+		}
 		if s.mode != "" {
 			if key == "esc" {
 				s.mode = ""
@@ -318,19 +348,34 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		if s.confirmClear {
 			s.confirmClear = false
-			if key == "y" {
+			if key == "enter" {
 				return true, m.mmCommand(func(ctx context.Context) error { err := s.service.Clear(); _ = s.keychain.Delete(ctx); return err })
 			}
 			return true, nil
 		}
 		if s.choosing {
+			if s.channelSearching {
+				switch key {
+				case "esc":
+					s.channelSearching = false
+					s.input.SetValue("")
+				case "enter":
+					s.channelSearching = false
+				default:
+					var cmd tea.Cmd
+					s.input, cmd = s.input.Update(msg)
+					s.channelRow = 0
+					return true, cmd
+				}
+				return true, nil
+			}
 			switch key {
 			case "esc":
 				s.choosing = false
 				s.input.Blur()
-			case "up", "ctrl+p":
+			case "up", "k":
 				s.channelRow = max(0, s.channelRow-1)
-			case "down", "ctrl+n":
+			case "down", "j":
 				s.channelRow = min(max(0, len(s.choices())-1), s.channelRow+1)
 			case "enter":
 				cs := s.choices()
@@ -346,11 +391,9 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 						return nil
 					})
 				}
-			default:
-				var cmd tea.Cmd
-				s.input, cmd = s.input.Update(msg)
-				s.channelRow = 0
-				return true, cmd
+			case "/":
+				s.channelSearching = true
+				return true, s.input.Focus()
 			}
 			return true, nil
 		}
@@ -367,7 +410,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 				s.mentions = false
 			}
 			s.scroll = 0
-		case "a":
+		case "A":
 			if !s.busy {
 				return true, s.prompt("Password")
 			}
@@ -379,7 +422,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			if !s.busy {
 				s.confirmClear = true
 			}
-		case "r":
+		case "R":
 			if s.authenticated {
 				return true, m.mmCommand(s.service.Sync)
 			}
@@ -462,7 +505,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.link++
 		case "[":
 			s.link = max(0, s.link-1)
-		case "t":
+		case "d":
 			ps := s.posts()
 			if len(ps) > 0 {
 				p := ps[s.row]
@@ -493,7 +536,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 					return s.service.More(ctx, p.ChannelID, "", root)
 				})
 			}
-		case "h":
+		case "H":
 			ps := s.posts()
 			if len(ps) > 0 {
 				p := ps[0]
@@ -558,7 +601,7 @@ func (m *Model) mmGoPR() tea.Cmd {
 			}
 		}
 	}
-	s.notice = "PR is not in the GitHub cache; Enter opens its URL"
+	s.notice = "PR er ikke i GitHub-cachen; el viser lenken"
 	return nil
 }
 func (m Model) mmMentionCount(u string) int {
@@ -619,7 +662,7 @@ func (m Model) mmReaderView() tea.View {
 	if s.mode != "" {
 		lines = append(lines, "Sign in as "+clean(s.account), s.input.View(), "Enter next / submit · Esc cancel")
 	} else if s.confirmClear {
-		lines = append(lines, "Delete ALL locally cached Mattermost accounts and the current saved session? y / any key cancel")
+		lines = append(lines, "Tøm alle lokale chatkontoer og lagret sesjon? Enter bekreft · Esc avbryt")
 	} else if s.choosing {
 		lines = append(lines, s.input.View())
 		choices := s.choices()
@@ -636,11 +679,11 @@ func (m Model) mmReaderView() tea.View {
 			}
 			lines = append(lines, line)
 		}
-		lines = append(lines, "Enter toggle monitoring · ↑↓ select · type to search · Esc back")
+		lines = append(lines, "j/k ↑↓ velg · / søk · Enter overvåk/avslutt overvåking · Esc tilbake")
 	} else {
 		ps := s.posts()
 		if len(ps) == 0 {
-			lines = append(lines, "No cached messages. + chooses channels; a signs in; p supplies a PAT.")
+			lines = append(lines, "No cached messages. vk velger kanaler; al logger inn; ap bruker PAT.")
 		} else {
 			var body []string
 			selectedLine := 0
@@ -654,6 +697,9 @@ func (m Model) mmReaderView() tea.View {
 					author = p.UserID
 				}
 				prefix := "  "
+				if m.extraSelected(m.postRef(p), "mattermost") {
+					prefix += "✓ "
+				}
 				if i == s.row {
 					prefix = "› "
 				}
@@ -670,7 +716,7 @@ func (m Model) mmReaderView() tea.View {
 				}
 				title := prefix + channel + time.UnixMilli(p.CreatedAt).Local().Format("02 Jan 15:04") + " " + author
 				if p.RootID != "" {
-					title += " ↳ reply (t thread)"
+					title += " ↳ reply (d thread)"
 				}
 				body = append(body, accent.Render(clean(title)))
 				for _, line := range renderMessage(p.Message, max(1, m.width-4)) {
@@ -709,6 +755,11 @@ func (m Model) mmReaderView() tea.View {
 			}
 		}
 	}
+	if s.searching {
+		lines = append(lines, s.input.View())
+	} else if s.query != "" {
+		lines = append(lines, "Søk: "+clean(s.query))
+	}
 	notice := s.notice
 	if at := s.channel().LastSyncAt; at > 0 {
 		notice = "Last sync " + time.UnixMilli(at).Local().Format("15:04:05") + " · " + notice
@@ -717,13 +768,13 @@ func (m Model) mmReaderView() tea.View {
 		notice = "Syncing… " + notice
 	}
 	if !s.authenticated {
-		notice = "Offline / sign in: a password, p PAT · " + notice
+		notice = "Offline / sign in: al passord, ap PAT · " + notice
 	}
 	lines = append(lines, warning.Render(clean(notice)))
 	if s.mentions {
-		lines = append(lines, muted.Render("Enter: jump to channel/message or thread"))
+		lines = append(lines, muted.Render("d åpner tråden; rc/rg følger relasjoner"))
 	}
-	lines = append(lines, muted.Render("↑↓ messages · Tab channels · + add · - remove · t thread · h older · PgUp/PgDn scroll · Enter open · [ ] links · g PR · u read · r sync · D clear · Esc back"))
+	lines = append(lines, muted.Render("j/k meldinger · h/l kanaler · vk overvåk · d tråd · ah eldre · a↓/a↑ rull · en åpne · el lenker · rg PR · av lest · au synk · ab tøm · Esc tilbake"))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], max(1, m.width), "…")
 	}

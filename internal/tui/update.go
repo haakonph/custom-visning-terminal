@@ -15,6 +15,30 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := msg.(tea.KeyPressMsg); ok && m.sequence == "" && m.jiraAction == nil {
+		m.sequenceNotice = ""
+	}
+	if next, cmd, handled := m.updateKeyboard(msg); !m.internalKey && handled {
+		return next, cmd
+	}
+	m.internalKey = false
+	if m.snoozes != nil && m.snoozes.input {
+		if handled, cmd := m.snoozeMessage(msg); handled {
+			return m, cmd
+		}
+	}
+	if m.settings.active {
+		switch msg.(type) {
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		default:
+			return m.updateSettings(msg)
+		}
+	}
+	if m.mattermost != nil && m.mattermost.active {
+		if handled, cmd := m.mattermostMessage(msg); handled {
+			return m, cmd
+		}
+	}
 	if result, ok := msg.(detailMsg); ok {
 		if m.detail != nil && m.detail.request == result.request {
 			m.detail.loading = false
@@ -32,20 +56,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch key.String() {
 			case "esc":
 				m.detail = nil
-			case "q", "ctrl+c":
-				m.cancel()
-				return m, tea.Quit
 			case "j", "down":
 				m.detail.offset = min(m.detail.offset+1, max(0, len(m.detailLines())-max(1, m.height)))
 			case "k", "up":
 				m.detail.offset = max(0, m.detail.offset-1)
-			case "r":
-				if !m.detail.loading {
-					return m, m.loadDetails()
-				}
-			case "enter":
-				pr, opener, ctx := m.detail.pr, m.open, m.ctx
-				return m, func() tea.Msg { return openMsg{err: opener(ctx, pr.URL)} }
+
 			}
 			return m, nil
 		}
@@ -95,9 +110,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _, ok := msg.(copilotTick); ok {
 		return m.updateCopilot(msg)
 	}
-	if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == "," && !m.tasks.active && !m.filtering && (m.jira == nil || m.jira.mode == "") && (m.copilot == nil || !m.copilot.filtering) {
-		return m.openSettings()
-	}
 	if m.copilotActive {
 		switch msg.(type) {
 		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
@@ -108,52 +120,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if key, ok := msg.(tea.KeyPressMsg); ok && m.local != nil && m.local.choosing {
 		switch key.String() {
-		case "1":
+		case "j", "down":
+			m.local.editorChoice = min(2, m.local.editorChoice+1)
+		case "k", "up":
+			m.local.editorChoice = max(0, m.local.editorChoice-1)
+		case "enter":
 			m.local.choosing = false
-			return m, m.openLocal("intellij")
-		case "2":
-			m.local.choosing = false
-			return m, m.openLocal("vscode")
-		case "3":
-			m.local.choosing = false
-			return m, m.openLocal("custom")
+			return m, m.openLocal([]string{"intellij", "vscode", "custom"}[m.local.editorChoice])
 		case "esc":
 			m.local.choosing = false
-			return m, nil
-		case "ctrl+c", "q":
-			m.cancel()
-			return m, tea.Quit
 		}
 		return m, nil
 	}
-	if key, ok := msg.(tea.KeyPressMsg); ok {
-		if m.tasks.active {
-			return m.updateTasks(key)
-		}
-		editing := m.filtering
-		if m.jiraActive {
-			editing = m.jira.mode != ""
-		}
-		if !editing {
-			switch key.String() {
-			case "P", ",":
-				return m.openSettings()
-			case "T":
-				m.tasks.active = true
-				m.tasks.selectVisible()
-				return m, nil
-			case "t", "a":
-				return m.collectTask(key.String() == "t")
-			case "c":
-				return m.switchCopilot()
-			case "l":
-				return m.navigateRelated()
-			case "g":
-				return m.switchProvider(false)
-			case "J":
-				return m.switchProvider(true)
-			}
-		}
+	if key, ok := msg.(tea.KeyPressMsg); ok && m.tasks.active {
+		return m.updateTasks(key)
 	}
 	if m.tasks.active && (m.tasks.editing || m.tasks.searching) {
 		switch msg.(type) {
@@ -299,33 +279,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.detail = &detailState{pr: rows[m.selected]}
 				return m, m.loadDetails()
 			}
-		case "m":
-			return m, m.composeMattermost()
-		case "o":
-			return m, m.openLocal("")
-		case "O":
-			if m.local != nil {
-				m.local.choosing = true
-			}
-		case "q":
-			m.cancel()
-			return m, tea.Quit
-		case "1", "2", "3", "4":
-			m.active = model.View(key[0] - '1')
-			m.selected = 0
 		case "j", "down":
 			m.selected++
 			m.clamp()
 		case "k", "up":
 			m.selected--
 			m.clamp()
-		case "r":
-			if m.snapshot.User == "" && !m.booting {
-				m.booting = true
-				m.notice = ""
-				return m, m.bootstrap()
-			}
-			return m, m.refresh(m.active)
 		case "/":
 			m.filtering = true
 			return m, m.input.Focus()
@@ -337,24 +296,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			m.help = !m.help
 			m.helpOffset = 0
-		case "enter":
-			rows := m.selectedPRs()
-			opener, ctx := m.open, m.ctx
-			if len(rows) == 0 {
-				return m, nil
-			}
-			return m, func() tea.Msg {
-				var failures []string
-				for _, p := range rows {
-					if err := opener(ctx, p.URL); err != nil {
-						failures = append(failures, err.Error())
-					}
-				}
-				if len(failures) > 0 {
-					return openMsg{err: fmt.Errorf("%s", strings.Join(failures, "; "))}
-				}
-				return openMsg{}
-			}
+
 		}
 	default:
 		var cmd tea.Cmd
@@ -370,7 +312,7 @@ func (m Model) filtered() []model.PullRequest {
 	}
 	visible := make([]model.PullRequest, 0, len(rows))
 	for _, p := range rows {
-		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) {
+		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) && !m.entities.archived("github", p.URL) {
 			visible = append(visible, p)
 		}
 	}

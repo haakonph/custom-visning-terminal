@@ -22,6 +22,7 @@ type localState struct {
 	running                    int
 	editor                     string
 	choosing                   bool
+	editorChoice               int
 	results                    []string
 }
 type localResult struct {
