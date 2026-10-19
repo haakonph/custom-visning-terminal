@@ -20,6 +20,15 @@ referansene til valgt oppgave til høyre. Innholdet er gjengitt fra appens fakti
 ANSI-farger er gjengitt i PNG, med en vindusramme lagt til for presentasjon.
 Ingen eksterne tjenester eller ekte saker er brukt.
 
+## Navigasjonsvalg med bruker
+
+- [GitHub](navigation-github.png): relaterte PR-er med forfatter og flervalg.
+- [Jira](navigation-jira.png): relaterte saker med ansvarlig; `—` viser manglende bruker.
+- [Smal terminal](navigation-narrow.png): tabellen prioriterer bruker og tittel.
+
+Bildene er gjengitt fra faktisk `Model.View()` med lokale eksempeldata.
+ANSI-farger er bevart, og en vindusramme er lagt til ved PNG-gjengivelse.
+
 ## GitHub-detaljer
 
 - `github-details-files.png`: detaljvisning for en PR med endrede filer som mappetre.
