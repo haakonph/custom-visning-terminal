@@ -450,6 +450,11 @@ Jira-server og context path. Integrasjonen endrer ingen Jira-saker.
 
 Trykk `rt` fra GitHub for relaterte Jira-saker, eller `rg` fra Jira for relaterte PR-er. `ro` finner den første interne oppgaven som inneholder valgt referanse, og `rc` viser Mattermost-omtaler av aktiv PR.
 
+Når flere treff vises, bruker valglisten en tabell med type, nøkkel, bruker og
+tittel. Bruker er PR-forfatteren i GitHub, ansvarlig i Jira og meldingsforfatteren
+i Mattermost. Manglende bruker vises som `—`. I smale terminalvinduer prioriteres
+bruker og tittel. Søk med `/`, marker med Space og gå til valgt treff med Enter.
+
 - Fra GitHub: Jira-nøkler (for eksempel `TEAM-123`) hentes fra PR-tittel, beskrivelse og branchnavn. Jira viser alle refererte saker i et eget JQL-søk, uavhengig av hurtigfiltrene.
 - Fra Jira: viser relaterte PR-er fra alle fire lastede GitHub-visninger, uten duplikater. Dette er ikke et søk i alle organisasjonens PR-er.
 - `en` åpner valgt PR eller sak i nettleseren. `Esc` i GitHub fjerner avgrensningen til en Jira-sak. I Jira velger du en vanlig fane for å forlate relasjonssøket.
