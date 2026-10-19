@@ -596,7 +596,8 @@ ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhol
 
 - **/** søker på sesjon, repository, prosjekt, Jira, klient, modell og status.
 - **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
-- **i** åpner den valgte sesjonens prosjekt i IntelliJ fra listen eller detaljene.
+- **eee** åpner den valgte sesjonens arbeidsmappe i IntelliJ fra listen eller detaljene.
+- **eew** åpner sesjonens Git-/worktreerot i IntelliJ.
 - **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
 - **vi** viser diagnostikk; **Esc** går tilbake og fjerner søket.
 - **au** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
@@ -604,8 +605,12 @@ ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhol
 
 ### Åpne IntelliJ fra en sesjon
 
-Trykk **i** i Copilot-visningen. Appen bruker første eksisterende lokale mappe av
-sesjonens prosjektrot, arbeidskatalog og Git-rot. IntelliJ åpner prosjektet eller
+Trykk **eee** i Copilot-visningen for chattens arbeidsmappe (`cwd`), eller **eew**
+for Git-/worktreeroten (`gitRoot`). **ee** venter på tredje tast; **Esc** avbryter.
+Hvis den foretrukne mappen mangler eller ikke finnes lokalt, brukes prosjektroten
+og deretter den andre mappen. Hvis chatten jobber i worktreeroten, åpner begge
+samme mappe. I andre visninger og relasjonskjeder beholdes editorhandlingen som før.
+IntelliJ åpner prosjektet eller
 aktiverer det hvis det allerede er åpent. Dette åpner prosjektet; den konkrete
 Copilot-chatten gjenåpnes ikke automatisk, siden sesjonsdataene ikke gir en støttet
 IDE-lenke til den.

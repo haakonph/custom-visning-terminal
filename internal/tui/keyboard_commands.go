@@ -23,6 +23,13 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 		}
 		return m.unavailable()
 	}
+	if prefix == "ee" {
+		switch k {
+		case "e", "w":
+			return m.openReferencesWithTarget(refs, true, k)
+		}
+		return m.unavailable()
+	}
 	op := prefix[:1]
 	if op == "v" {
 		return m.viewProvider(k)
@@ -133,6 +140,10 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	if op == "e" {
 		switch k {
 		case "e":
+			if prefix == "e" && m.visibleProvider() == "copilot" {
+				m.sequence = "ee"
+				return m, nil
+			}
 			return m.openReferences(refs, true)
 		case "n":
 			return m.openReferences(refs, false)
@@ -427,6 +438,10 @@ func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 	return m, m.editMattermost()
 }
 func (m Model) openReferences(refs []model.TaskReference, editor bool) (tea.Model, tea.Cmd) {
+	return m.openReferencesWithTarget(refs, editor, "")
+}
+
+func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool, target string) (tea.Model, tea.Cmd) {
 	if len(refs) == 0 {
 		return m.unavailable()
 	}
@@ -488,6 +503,13 @@ func (m Model) openReferences(refs []model.TaskReference, editor bool) (tea.Mode
 			opener, ctx := m.copilot.openIDE, m.ctx
 			return m, func() tea.Msg {
 				for _, s := range sessions {
+					if target != "" {
+						var err error
+						s, err = sessionEditorTarget(s, target)
+						if err != nil {
+							return copilotOpenMsg{err: err}
+						}
+					}
 					if err := opener(ctx, s); err != nil {
 						return copilotOpenMsg{err: err}
 					}
@@ -521,7 +543,7 @@ func (m Model) openReferences(refs []model.TaskReference, editor bool) (tea.Mode
 		cmds := []tea.Cmd{}
 		for _, group := range [][]model.TaskReference{prs, ai} {
 			if len(group) > 0 {
-				next, cmd := m.openReferences(group, true)
+				next, cmd := m.openReferencesWithTarget(group, true, target)
 				m = next.(Model)
 				if cmd != nil {
 					cmds = append(cmds, cmd)

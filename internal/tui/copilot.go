@@ -324,7 +324,7 @@ func (m Model) copilotView() tea.View {
 	if c.notice != "" {
 		lines = append(lines, warning.Render(clean(c.notice)))
 	}
-	lines = append(lines, muted.Render("vs innstillinger · ee IntelliJ · d detaljer · j/k ↑/↓ · / søk · vi diagnostikk · au oppdater · Esc tilbake · Ctrl+C avslutt"))
+	lines = append(lines, muted.Render("vs innstillinger · eee chatmappe · eew worktree (IntelliJ) · d detaljer · j/k ↑/↓ · / søk · vi diagnostikk · au oppdater · Esc tilbake · Ctrl+C avslutt"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

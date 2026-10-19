@@ -380,6 +380,9 @@ func (m Model) unavailable() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 func sequenceHint(prefix string) string {
+	if prefix == "ee" {
+		return "e chattens arbeidsmappe · w worktree"
+	}
 	switch prefix[0] {
 	case 'r':
 		return "o oppgaver · g GitHub · t Jira · a AI · c chat"

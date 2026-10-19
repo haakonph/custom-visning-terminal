@@ -110,7 +110,12 @@ Eksempler:
 
 Målene tas fra valget når sekvensen starter. Bakgrunnsoppdateringer flytter ikke
 handlingen til en annen rad. QA-tasten kan også skrives mens overgangene lastes.
-`ee` bruker IntelliJ. Fra typer uten eget prosjekt følges relasjoner til lastede
+`ee` bruker IntelliJ. I AI-visningen venter `ee` på tredje tast:
+`eee` åpner chattens arbeidsmappe (`cwd`), mens `eew` åpner Git-/worktreeroten
+(`gitRoot`). Hvis den foretrukne mappen mangler eller ikke finnes lokalt, brukes
+prosjektroten og deretter den andre mappen. Esc avbryter uten å åpne editoren.
+I andre visninger og i relasjonskjeder som `eae` virker `ee`/editorhandlingen som før.
+Fra typer uten eget prosjekt følges relasjoner til lastede
 PR-er og AI-prosjekter. `en` åpner HTTPS-adresser; AI-sesjoner uten nettadresse
 kan bare åpnes i editor. En referanse som ikke er lastet kan ikke åpnes i editor
 ved å falle tilbake til en tilfeldig aktiv PR.
