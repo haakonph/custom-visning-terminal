@@ -219,8 +219,12 @@ func TestResponsiveViewAndHelp(t *testing.T) {
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = update(m, key('?'))
-	if !strings.Contains(m.View().Content, "Hurtigtaster") {
-		t.Fatal("help missing")
+	if !strings.Contains(m.View().Content, "Hurtigtaster · custom-visning · Versjon dev") {
+		t.Fatal("help or development version missing")
+	}
+	m = m.WithVersion("main-42.1-abcdef123456")
+	if !strings.Contains(m.View().Content, "Versjon main-42.1-abcdef123456") {
+		t.Fatal("build version missing from help")
 	}
 }
 
@@ -237,7 +241,7 @@ func TestOfflineStartupUsesCredentialScopedCache(t *testing.T) {
 }
 
 func TestHelpScrollAndSmallWindows(t *testing.T) {
-	m := snoozeReady(t)
+	m := snoozeReady(t).WithVersion("main-42.1-abcdef123456")
 	m = press(m, "?")
 	for _, size := range [][2]int{{120, 30}, {40, 10}, {8, 3}, {1, 1}} {
 		m, _ = update(m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})

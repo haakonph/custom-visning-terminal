@@ -33,7 +33,7 @@ func main() {
 		}
 		return
 	}
-	if err := app.RunProviders(ctx, os.Stderr, *startJira, *startCopilot); err != nil {
+	if err := app.RunProviders(ctx, os.Stderr, *startJira, *startCopilot, version); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
