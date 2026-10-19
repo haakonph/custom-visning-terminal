@@ -54,9 +54,10 @@ func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
 		t.Fatal("standalone init")
 	}
 	m, _ = sequence(m, "vg")
-	if !m.copilotActive || m.sequenceNotice == "" {
+	if !m.copilotActive || m.setup.provider == "" {
 		t.Fatal("missing provider feedback")
 	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	m.copilot.detail = &copilot.Detail{Session: copilot.Session{Name: "Session"}, Events: []copilot.Event{{Type: "tool.complete", Content: "line1\nline2\x1b]52;secret\a", Args: "args", Result: "result"}}}
 	m.width = 35
 	m.height = 10

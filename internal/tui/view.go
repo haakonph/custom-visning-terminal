@@ -56,6 +56,9 @@ func (m Model) View() tea.View {
 	if m.settings.active {
 		return m.settingsView()
 	}
+	if m.setup.provider != "" {
+		return m.setupView()
+	}
 	if m.mattermost != nil && m.mattermost.active {
 		return m.mattermostView()
 	}

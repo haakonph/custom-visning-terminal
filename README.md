@@ -43,6 +43,30 @@ make build
 go install ./cmd/custom-visning
 ```
 
+## Oppsettshjelp i appen
+
+Appen kan startes uten GitHub-innlogging. Når du åpner en visning som mangler
+oppsett (`vg` GitHub, `vt` Jira, `va` AI eller `vc` Mattermost), får du hjelp
+med konkrete steg for innstillinger, innlogging og nødvendig oppsett utenfor
+appen. `vh` viser oppsettshjelp for aktiv side, `vs` åpner innstillingene,
+og Esc går tilbake. Lange veiledninger kan rulles med j/k eller piltaster.
+
+| Visning/funksjon | I appen | Utenfor appen |
+| --- | --- | --- |
+| GitHub | `vh` viser innlogging og tilgang; `vg` åpner PR-er | Installer `gh`, kjør `gh auth login`, gi repo/read:org og eventuell SSO-tilgang, eller sett `GITHUB_TOKEN` |
+| Jira | Sett serveradresse i `vs`; `vt` åpner Jira | Opprett Jira PAT og sett `JIRA_TOKEN` i startterminalen |
+| Mattermost-lesing | Sett server og brukernavn i `vs`; `vc`, deretter `al`/`ap`, logger inn | Konto/servertilgang; PAT må eventuelt opprettes i Mattermost |
+| Mattermost-sending | `as` viser webhook-hjelp hvis oppsett mangler | Opprett incoming-webhook og sett `MATTERMOST_WEBHOOK_URL` |
+| AI/Copilot | `vs` velger sesjonsmappe/innsamling; `vi` viser diagnostikk | Installer og logg inn i Copilot CLI; konfigurer eventuell OTLP-exporter |
+| Editor/lokale repositories | Velg repository paths og editor i `vs` | Installer Git og editor-launcher; konfigurer Git-tilgang til private repositories |
+
+GitHub/Jira-token og webhook leses ved oppstart; start appen på nytt fra samme
+terminal etter endringer. Mattermost kan settes opp første gang uten omstart:
+lagre server og brukernavn, gå tilbake og velg Enter eller `vc`. Miljøvariabler
+overstyrer lagrede innstillinger. Passord, engangskoder og token skrives ikke
+til konfigurasjonsfilen. Oppgaver, koblinger, utsettelse og arkiv krever ingen
+ekstern innlogging.
+
 ## Installere release på macOS Apple Silicon
 
 Last ned `custom-visning_Darwin_arm64.tar.gz` og `checksums.txt` fra
@@ -846,8 +870,9 @@ tilgjengelig, vises en advarsel sammen med detaljene som kunne lastes.
 
 ## Les Mattermost-kanaler
 
-Sett `MATTERMOST_SERVER=https://chat.example.org` og `MATTERMOST_USERNAME` og
-start appen. `vc` åpner Mattermost, `al` logger inn med passord/TOTP, `ap` bruker PAT,
+Åpne `vc`, velg `vs` og sett Mattermost-server og brukernavn i appen.
+Alternativt kan du sette `MATTERMOST_SERVER=https://chat.example.org` og
+`MATTERMOST_USERNAME` før oppstart. `vc` åpner Mattermost, `al` logger inn med passord/TOTP, `ap` bruker PAT,
 og `vk` velger kanaler. Sesjoner lagres i OS-nøkkelringen når den er tilgjengelig;
 meldinger og kanalvalg i SQLite gir offline-lesing. `rg` går fra en melding til en
 cachet GitHub-PR, og `rc` i GitHub viser Mattermost-referansene tilbake.

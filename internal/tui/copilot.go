@@ -302,7 +302,7 @@ func (m Model) copilotView() tea.View {
 			body = append(body, line)
 		}
 		if len(rows) == 0 {
-			body = append(body, "Ingen Copilot-sesjoner. Start en Copilot CLI-sesjon; sjekk vi for diagnostikk.")
+			body = append(body, "Ingen Copilot-sesjoner. vh viser oppsett; vi viser diagnostikk.", "Start en Copilot CLI-sesjon. Historikk leses fra ~/.copilot/session-state.", "vs lar deg endre sesjonsmappe og innsamling; au skanner på nytt.")
 		}
 	}
 	if c.detail != nil || c.diagnosticsOpen {

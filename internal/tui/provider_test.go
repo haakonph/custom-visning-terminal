@@ -55,12 +55,12 @@ func TestMissingProviderKeepsCurrentView(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
 	m, _ = sequence(m, "vg")
-	if !m.jiraActive || m.sequenceNotice == "" {
+	if !m.jiraActive || m.setup.provider == "" {
 		t.Fatal("missing GitHub not explained")
 	}
 	gh := ready(t)
 	gh, _ = sequence(gh, "vt")
-	if gh.jiraActive || gh.sequenceNotice == "" {
+	if gh.jiraActive || gh.setup.provider == "" {
 		t.Fatal("missing Jira not explained")
 	}
 }

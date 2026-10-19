@@ -164,6 +164,16 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
+	if k == "h" {
+		kind := m.visibleProvider()
+		if m.setup.provider != "" {
+			kind = m.setup.provider
+		}
+		return m.WithSetup(kind), nil
+	}
+	if k != "s" {
+		m.setup = setupState{}
+	}
 	if k == "r" {
 		k = map[string]string{"task": "o", "github": "g", "jira": "t", "copilot": "a", "mattermost": "c"}[m.previousProvider]
 		if k == "" {
@@ -172,7 +182,16 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 	}
 	switch k {
 	case "s":
-		return m.openSettings()
+		next, cmd := m.openSettings()
+		result := next.(Model)
+		path := map[string]string{"jira": "jira.base_url", "mattermost": "mattermost.server", "copilot": "copilot.session_root", "editor": "repository_paths"}[m.setup.provider]
+		for i, field := range settingFields {
+			if field.path == path {
+				result.settings.selected = i
+				break
+			}
+		}
+		return result, cmd
 	case "z":
 		m.snoozes.active = true
 		m.snoozes.selected = 0
@@ -204,6 +223,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 			m.dialog = nil
 			return m, nil
 		}
+		return m.WithSetup("copilot"), nil
 	case "f", "j":
 		if m.jira != nil {
 			m.rememberProvider("jira")
@@ -222,6 +242,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 			}
 			return m, m.jira.edit("jql", "JQL: ", m.jira.currentQuery())
 		}
+		return m.WithSetup("jira"), nil
 	case "k":
 		if m.mmReader != nil {
 			m.rememberProvider("mattermost")
@@ -234,14 +255,26 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 			m.dialog = nil
 			return m.dispatchKey("+")
 		}
+		return m.viewProvider("c")
 	}
 	kind := provider(k)
 	if kind == "" {
 		return m.unavailable()
 	}
+	var mmCmd tea.Cmd
+	if kind == "mattermost" && m.mmReader == nil {
+		var err error
+		m, err = m.WithMattermostConfig()
+		if err != nil {
+			return m.WithSetupProblem("mattermost", "Kunne ikke klargjøre Mattermost: "+err.Error()), nil
+		}
+		if m.mmReader != nil {
+			m.mmReader.active = false
+			mmCmd = m.mmStart()
+		}
+	}
 	if (kind == "jira" && m.jira == nil) || (kind == "copilot" && m.copilot == nil) || (kind == "mattermost" && m.mmReader == nil) || (kind == "github" && m.source == nil) {
-		m.sequenceNotice = "Visningen " + kind + " er ikke konfigurert"
-		return m, nil
+		return m.WithSetup(kind), nil
 	}
 	m.rememberProvider(kind)
 	m.dialog = nil
@@ -270,6 +303,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		return m, m.refreshCopilot()
 	case "mattermost":
 		m.mmReader.active = true
+		return m, mmCmd
 	case "github":
 		m.relatedKey = ""
 	}
@@ -343,7 +377,10 @@ func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd) {
-	if m.mattermost == nil || len(refs) == 0 {
+	if m.mattermost == nil {
+		return m.WithSetup("webhook"), nil
+	}
+	if len(refs) == 0 {
 		return m.unavailable()
 	}
 	var lines []string

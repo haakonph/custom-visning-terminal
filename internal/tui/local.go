@@ -75,7 +75,7 @@ func (m *Model) refreshLocal() tea.Cmd {
 }
 func (m *Model) openLocal(editor string) tea.Cmd {
 	if m.local == nil {
-		m.notice = "Local worktrees unavailable; check startup configuration"
+		*m = m.WithSetup("editor")
 		return nil
 	}
 	l := m.local
@@ -85,7 +85,7 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 	}
 	// Validate the editor before any clone or fetch.
 	if _, err := l.launcher.Command(editor, "."); err != nil {
-		m.notice = err.Error()
+		*m = m.WithSetupProblem("editor", err.Error())
 		return nil
 	}
 	rows := m.selectedPRs()
