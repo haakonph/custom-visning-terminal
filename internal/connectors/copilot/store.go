@@ -309,6 +309,9 @@ func (s *Service) Sessions(ctx context.Context) ([]Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if err := s.load(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rows := []Session{}
@@ -325,6 +328,9 @@ func (s *Service) Sessions(ctx context.Context) ([]Session, error) {
 }
 func (s *Service) Detail(ctx context.Context, id string) (Detail, error) {
 	if err := ctx.Err(); err != nil {
+		return Detail{}, err
+	}
+	if err := s.load(); err != nil {
 		return Detail{}, err
 	}
 	s.mu.Lock()

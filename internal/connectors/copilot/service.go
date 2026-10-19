@@ -72,6 +72,8 @@ func OptionsFromEnv() (Options, error) {
 
 // Service owns its importer, private store and optional loopback OTLP receiver.
 type Service struct {
+	loadOnce    sync.Once
+	loadErr     error
 	mu          sync.Mutex
 	scanMu      sync.Mutex
 	options     Options
@@ -87,6 +89,20 @@ type Service struct {
 }
 
 func New(o Options) (*Service, error) {
+	s, err := NewDeferred(o)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.load(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// NewDeferred validates configuration without reading history. Start loads the
+// store in its worker, so a large history cannot delay the first terminal frame.
+// Readers wait for that same load and receive any error without replacing data.
+func NewDeferred(o Options) (*Service, error) {
 	if !filepath.IsAbs(o.SessionRoot) || !filepath.IsAbs(o.StorePath) {
 		return nil, errors.New("Copilot session root and store path must be absolute")
 	}
@@ -98,29 +114,49 @@ func New(o Options) (*Service, error) {
 		return nil, errors.New("invalid COPILOT_JIRA_PATTERN")
 	}
 	s := &Service{options: o, pattern: re, cursors: map[string]*cursor{}, data: diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}}, diagnostics: Diagnostics{SessionRoot: o.SessionRoot, StorePath: storage.Path(o.StorePath), Port: o.Port, CollectionEnabled: o.Enabled, CaptureContent: o.CaptureContent, ShowContent: o.ShowContent}}
+	return s, nil
+}
+
+func (s *Service) load() error {
+	s.loadOnce.Do(func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.loadErr = s.readStore()
+	})
+	return s.loadErr
+}
+
+func (s *Service) readStore() error {
+	o := s.options
 	readPath := o.StorePath
 	if _, statErr := os.Stat(storage.Path(o.StorePath)); statErr == nil {
 		readPath = storage.Path(o.StorePath)
 	}
-	err = storage.Load(o.StorePath, &s.data)
+	err := storage.Load(o.StorePath, &s.data)
 	if err == nil {
 		if s.data.Version != 1 || s.data.Sessions == nil || s.data.Traces == nil {
-			return nil, storeReadError(readPath, "unsupported or invalid store format")
+			return storeReadError(readPath, "unsupported or invalid store format")
 		}
 		for _, v := range s.data.Sessions {
 			if v == nil || v.Events == nil || v.Meta == nil {
-				return nil, storeReadError(readPath, "invalid session format")
+				return storeReadError(readPath, "invalid session format")
 			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, storeReadError(readPath, "invalid or unreadable store; check format, path and permissions")
+		return storeReadError(readPath, "invalid or unreadable store; check format, path and permissions")
 	}
 	if err == nil {
-		if err = storage.Migrate(o.StorePath, s.storageSnapshot()); err != nil {
-			return nil, err
+		// Normalized stores already contain summaries. Avoid sorting and
+		// summarizing every historical event just to attempt a no-op import.
+		data := s.data
+		if data.Summaries == nil {
+			data = s.storageSnapshot()
+		}
+		if err = storage.Migrate(o.StorePath, data); err != nil {
+			return err
 		}
 	}
-	return s, nil
+	return nil
 }
 
 func storeReadError(path, reason string) error {
@@ -161,6 +197,9 @@ func (s *Service) Start(parent context.Context) {
 	}
 	go func() {
 		defer close(s.done)
+		if err := s.load(); err != nil {
+			return
+		}
 		if s.options.Enabled {
 			s.Scan(ctx)
 		}
@@ -193,6 +232,9 @@ func (s *Service) Close() error {
 			_ = server.Close()
 		}
 	}
+	if err := s.load(); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.diagnostics.ReceiverRunning = false
@@ -211,6 +253,9 @@ func (s *Service) addErrorLocked(message string) {
 }
 func (s *Service) Diagnostics(ctx context.Context) (Diagnostics, error) {
 	if err := ctx.Err(); err != nil {
+		return Diagnostics{}, err
+	}
+	if err := s.load(); err != nil {
 		return Diagnostics{}, err
 	}
 	s.mu.Lock()
