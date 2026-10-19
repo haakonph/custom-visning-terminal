@@ -47,7 +47,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	if copilotErr != nil {
 		return copilotErr
 	}
-	copilotClient, copilotErr := copilot.New(copilotOptions)
+	copilotClient, copilotErr := copilot.NewDeferred(copilotOptions)
 	if copilotErr != nil {
 		return copilotErr
 	}

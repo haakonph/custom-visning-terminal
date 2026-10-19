@@ -63,6 +63,10 @@ func (s *Service) handler() http.Handler {
 			http.Error(w, "Invalid OTLP payload", 400)
 			return
 		}
+		if s.load() != nil {
+			http.Error(w, "Local store unavailable", 503)
+			return
+		}
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.ingestLocked(events)
