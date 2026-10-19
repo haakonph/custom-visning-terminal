@@ -24,6 +24,7 @@ ro/rg/rt/ra/rc  Relaterte elementer av valgt type
 to/tg/tt/ta/tc  Koble til valgte mål av typen; Enter lagrer lokalt
                 Space og Shift+↑/↓ velger flere kilder og mål
 ee/en           Editor (IntelliJ) / nettleser
+eee/eew         AI-visning: chattens arbeidsmappe / worktree i IntelliJ
 e + ting + e/n  Følg relasjon(er), åpne i editor/nettleser
 as/ak/ad        Melding / lokalt arkiv / slett lokal oppgave/referanse
 atf             Flytt tilhørende Jira-saker; velg faktisk overgang

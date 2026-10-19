@@ -34,6 +34,26 @@ func sessionProject(session copilot.Session) (string, error) {
 	return "", errors.New("Sesjonen har ingen tilgjengelig lokal prosjektmappe eller arbeidskatalog.")
 }
 
+// Explicit AI shortcuts choose between the chat's working directory and its
+// Git/worktree root, retaining the existing fallback for incomplete metadata.
+func sessionEditorTarget(session copilot.Session, target string) (copilot.Session, error) {
+	preferred := session.Cwd
+	if target == "w" {
+		preferred = session.GitRoot
+	}
+	paths := session
+	paths.ProjectRoot, paths.Cwd, paths.GitRoot = preferred, session.ProjectRoot, session.GitRoot
+	if target == "w" {
+		paths.GitRoot = session.Cwd
+	}
+	project, err := sessionProject(paths)
+	if err != nil {
+		return session, err
+	}
+	session.ProjectRoot = project
+	return session, nil
+}
+
 func ideaCommand(platform, override, project string) ideaLaunch {
 	if override != "" {
 		return ideaLaunch{command: override, args: []string{project}}
