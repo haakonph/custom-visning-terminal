@@ -218,6 +218,15 @@ branchnavn. Nøklene fjernes fra viste PR-titler, inkludert tomme `[]`, `{}` og
 vises `AUTO` (`ON`/`OFF`/`UNKNOWN`) og `QUEUE` (plass og status, eller `NONE`).
 Statusene finnes også under tabellen og i detaljvisningen på smalere terminaler.
 
+Alle fire PR-fanene grupperer PR-er under Jira-saken, på tvers av repoer.
+Gruppene viser Jira-nøkkel, sakstittel når den er lastet fra Jira, og antall PR-er.
+Første nøkkel i tittel, beskrivelse eller branchnavn bestemmer gruppen; hver PR
+vises én gang, og alle Jira-koblinger beholdes. Relaterte PR-er grupperes under
+saken du kom fra. PR-er uten nøkkel samles nederst under **Uten Jira-sak**.
+Gruppene følger rekkefølgen til første PR, med eksisterende sortering innad.
+Søk og filtre brukes før gruppering. Gruppeoverskrifter hoppes over ved
+navigasjon og markering; handlinger gjelder fortsatt de valgte PR-ene.
+
 Organisasjonsprefikset `skatteetaten-ghe/` skjules i viste repository- og teamnavn,
 og i GitHub-referanser i oppgaver, arkiv og relaterte visninger. Velg
 **GitHub · skjulte organisasjonsprefikser** i `vs` for å endre listen; `[]` viser
