@@ -11,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
-	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
@@ -369,8 +368,11 @@ func (m Model) tasksView() tea.View {
 		refStart := max(0, t.row-refsCapacity+1)
 		for i := refStart; i < min(len(task.References), refStart+refsCapacity); i++ {
 			r := m.liveReference(task.References[i])
-			if m.snoozes.hidden(snooze.Identity(r.Provider, r.URL)) {
-				r.Title += " · utsatt til " + m.snoozes.entries[snooze.Identity(r.Provider, r.URL)].Until.Local().Format("2006-01-02 15:04 MST")
+			if entry, ok := m.snoozes.effective(refSnoozeID(r)); ok {
+				r.Title += " · utsatt til " + entry.Until.Local().Format("2006-01-02 15:04 MST")
+				if len(entry.Roots) > 0 {
+					r.Title += " via " + entry.Title
+				}
 			}
 			prefix := "  "
 			if i == t.row {

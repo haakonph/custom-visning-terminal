@@ -10,16 +10,20 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
 type snoozeState struct {
 	store    snooze.Store
 	entries  map[string]snooze.Entry
+	coverage map[string][]string
 	at       time.Time
 	now      func() time.Time
 	loadErr  error
 	input    bool
+	whole    bool
+	origins  []model.TaskReference
 	digits   string
 	target   snooze.Entry
 	targets  []snooze.Entry
@@ -38,6 +42,7 @@ func newSnooze() *snoozeState {
 	}
 	s.store = snooze.Store{Path: path}
 	s.entries, s.loadErr = s.store.Load()
+	s.indexContexts()
 	if s.loadErr != nil {
 		s.notice = "Kunne ikke lese snooze: " + s.loadErr.Error()
 	}
@@ -48,8 +53,32 @@ func (s *snoozeState) hidden(id string) bool {
 	if s == nil {
 		return false
 	}
-	e, ok := s.entries[id]
-	return ok && e.Until.After(s.at)
+	_, ok := s.effective(id)
+	return ok
+}
+
+func (s *snoozeState) effective(id string) (snooze.Entry, bool) {
+	var result snooze.Entry
+	if e, ok := s.entries[id]; ok && e.Until.After(s.at) {
+		result = e
+	}
+	for _, groupID := range s.coverage[id] {
+		e := s.entries[groupID]
+		if e.Until.After(s.at) && (result.ID == "" || e.Until.After(result.Until) || (e.Until.Equal(result.Until) && e.ID < result.ID)) {
+			result = e
+		}
+	}
+	return result, result.ID != ""
+}
+
+func (s *snoozeState) indexContexts() {
+	s.coverage = map[string][]string{}
+	for _, e := range s.entries {
+		for _, r := range e.Members {
+			id := refSnoozeID(r)
+			s.coverage[id] = append(s.coverage[id], e.ID)
+		}
+	}
 }
 func (s *snoozeState) rows() []snooze.Entry { return snooze.Active(s.entries, s.at) }
 
@@ -68,7 +97,7 @@ func (m Model) snoozeLines() []string {
 	if s == nil {
 		return nil
 	}
-	line := fmt.Sprintf(" %d utsatte · z snooze · vz vis", len(s.rows()))
+	line := fmt.Sprintf(" %d utsatte · z snooze · zz hele sammenhengen · vz vis", len(s.rows()))
 	if s.input {
 		line = " Snooze: " + s.digits + "▏  h timer · d dager · m dager kl. 06 · Esc avbryt"
 	}
@@ -138,6 +167,7 @@ func (s *snoozeState) commitEntries(batch []snooze.Entry, remove bool) error {
 		return err
 	}
 	s.entries = entries
+	s.indexContexts()
 	return nil
 }
 
@@ -213,6 +243,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 	if _, ok := msg.(snoozeTick); ok {
 		a := m.snoozeAnchor()
 		s.at = s.now()
+		m.refreshSnoozeContexts()
 		m.restoreSnoozeAnchor(a)
 		return true, snoozeTimer()
 	}
@@ -225,25 +256,32 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 		switch k {
 		case "esc":
 			s.input, s.digits = false, ""
+			s.targets, s.origins, s.whole = nil, nil, false
 			s.notice = ""
 		case "backspace":
 			if len(s.digits) > 0 {
 				s.digits = s.digits[:len(s.digits)-1]
 			}
 			s.notice = ""
-		case "h", "d", "m":
+		case "z":
+			m.expandSnooze()
+		case "h", "d", "m", "D":
 			unit := k
 			if unit == "m" {
 				unit = "D"
 			}
-			at, err := snooze.Deadline(s.now().In(time.Local), s.digits, unit)
+			digits := s.digits
+			if digits == "" {
+				digits = "1"
+			}
+			at, err := snooze.Deadline(s.now().In(time.Local), digits, unit)
 			if err != nil {
 				s.notice = err.Error()
 				return true, nil
 			}
 			entry := s.target
 			entry.Until = at
-			if !s.active && m.tasks.active && m.tasks.items[m.tasks.selected].ID == "" {
+			if !s.active && m.tasks.active && len(m.tasks.items) > 0 && m.tasks.items[m.tasks.selected].ID == "" {
 				task := &m.tasks.items[m.tasks.selected]
 				task.ID = strings.TrimPrefix(entry.ID, "task:")
 				if err := m.tasks.save(); err != nil {
@@ -282,6 +320,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			}
 			m.clearChosen()
 			s.targets = nil
+			s.origins, s.whole = nil, false
 			s.input, s.digits = false, ""
 			s.notice = "Utsatt til " + at.Local().Format("2006-01-02 15:04:05 MST -07:00")
 			m.restoreSnoozeAnchor(a)
@@ -370,6 +409,9 @@ func (m Model) snoozeView() tea.View {
 	for i := start; i < min(len(rows), start+capacity); i++ {
 		r := rows[i]
 		line := fmt.Sprintf(" %s · %s · %s", r.Kind, clean(r.Title), r.Until.Local().Format("2006-01-02 15:04:05 MST -07:00"))
+		if len(r.Roots) > 0 {
+			line = fmt.Sprintf(" gruppe · %s · %s · %s", clean(r.Title), contextSummary(r.Members), r.Until.Local().Format("2006-01-02 15:04 MST"))
+		}
 		if i == s.selected {
 			line = selection.Render(line)
 		}

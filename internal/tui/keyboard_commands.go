@@ -308,6 +308,7 @@ func (m Model) refreshVisible() (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
+	refs = underlyingReferences(refs)
 	if m.tasks.loadFailed {
 		return m.unavailable()
 	}
@@ -551,6 +552,7 @@ func (m Model) openReferences(refs []model.TaskReference, editor bool) (tea.Mode
 	}
 }
 func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd) {
+	refs = underlyingReferences(refs)
 	if len(refs) == 0 || m.entities.err != nil {
 		return m.unavailable()
 	}
@@ -703,12 +705,19 @@ func (m Model) beginSnooze() (tea.Model, tea.Cmd) {
 		return m.unavailable()
 	}
 	m.snoozes.targets = nil
+	m.snoozes.origins = append([]model.TaskReference(nil), refs...)
+	m.snoozes.whole = false
 	for _, r := range refs {
 		id := refSnoozeID(r)
 		if id == "" {
 			return m.unavailable()
 		}
-		m.snoozes.targets = append(m.snoozes.targets, snooze.Entry{ID: id, Kind: r.Provider, URL: r.URL, Title: r.Title})
+		entry := snooze.Entry{ID: id, Kind: r.Provider, URL: r.URL, Title: r.Title}
+		if saved, ok := m.snoozes.entries[id]; ok && len(saved.Roots) > 0 {
+			entry = saved
+			m.snoozes.whole = true
+		}
+		m.snoozes.targets = append(m.snoozes.targets, entry)
 	}
 	m.dialog = nil
 	m.snoozes.target = m.snoozes.targets[0]

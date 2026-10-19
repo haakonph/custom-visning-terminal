@@ -11,8 +11,10 @@ x           Fjern alle markeringer; behold søk og filtre
 /           Søk/filtrer; Enter beholder søket, Esc avbryter
 ?           Vis/lukk hjelp
 Esc         Avbryt sekvens, lukk detaljer eller fjern markering
-z           Utsett: positivt heltall + h timer / d kalenderdager
-            m er ekstra enhet: kalenderdager kl. 06 (tidligere D)
+z / zz      Utsett valgte elementer / hele sammenhengen
+            h timer / d kalenderdager / m eller D dager kl. 06
+            Uten tall: 1. zh = én time; zzh = hele sammenhengen én time
+            zz viser kjente relasjoner før du velger tid; Esc avbryter
 
 Ting: o oppgaver · g GitHub · t Jira · a AI/Copilot · c chat/Mattermost
 vo/vg/vt/va/vc  Visningsside

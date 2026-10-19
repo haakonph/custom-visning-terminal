@@ -61,6 +61,13 @@ func writeDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 			if err := q.InsertSnoozes(ctx, dbgen.InsertSnoozesParams{ID: e.ID, Kind: e.Kind, Title: e.Title, Url: e.URL, UntilAt: timestamp(e.Until)}); err != nil {
 				return err
 			}
+			for role, refs := range map[string][]model.TaskReference{"root": e.Roots, "member": e.Members} {
+				for pos, r := range refs {
+					if err := q.InsertSnoozeReference(ctx, dbgen.InsertSnoozeReferenceParams{SnoozeID: e.ID, ReferenceRole: role, Position: int64(pos), Provider: r.Provider, Url: r.URL, ReferenceKey: r.Key, Title: r.Title}); err != nil {
+						return err
+					}
+				}
+			}
 		}
 	default:
 		return fmt.Errorf("unsupported storage type %T", value)
@@ -145,6 +152,20 @@ func readDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 				return err
 			}
 			items[r.ID] = model.SnoozeEntry{ID: r.ID, Kind: r.Kind, Title: r.Title, URL: r.Url, Until: at}
+		}
+		refs, err := q.ListSnoozeReferences(ctx)
+		if err != nil {
+			return err
+		}
+		for _, r := range refs {
+			e := items[r.SnoozeID]
+			ref := model.TaskReference{Provider: r.Provider, URL: r.Url, Key: r.ReferenceKey, Title: r.Title}
+			if r.ReferenceRole == "root" {
+				e.Roots = append(e.Roots, ref)
+			} else {
+				e.Members = append(e.Members, ref)
+			}
+			items[r.SnoozeID] = e
 		}
 		*out = items
 	default:
