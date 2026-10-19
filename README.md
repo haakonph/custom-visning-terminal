@@ -209,11 +209,23 @@ REST Search API brukes til oppdagelse med alle sider frem til GitHubs grense på
 **1 000 treff per søk**, også per team. Søket bruker det verifiserte brukernavnet
 istedenfor `@me`, `sort=updated` og `order=desc`. Teammedlemskap pagineres på tvers
 av organisasjoner. Direkte forespørsler bruker `user-review-requested:LOGIN`;
-team bruker `team-review-requested:ORG/SLUG`.
+team bruker `team-review-requested:ORG/SLUG -author:LOGIN`. Egne PR-er skjules
+også fra tidligere cache i Team Review Requests.
+
+GitHub-tabellen har egen Jira-kolonne med nøkler fra PR-tittel, beskrivelse og
+branchnavn. Nøklene fjernes fra viste PR-titler, inkludert tomme `[]`, `{}` og
+`()`. Originaltekst og lenker beholdes for søk og handlinger. Fra 100 kolonner
+vises `AUTO` (`ON`/`OFF`/`UNKNOWN`) og `QUEUE` (plass og status, eller `NONE`).
+Statusene finnes også under tabellen og i detaljvisningen på smalere terminaler.
+
+Organisasjonsprefikset `skatteetaten-ghe/` skjules i viste repository- og teamnavn,
+og i GitHub-referanser i oppgaver, arkiv og relaterte visninger. Velg
+**GitHub · skjulte organisasjonsprefikser** i `vs` for å endre listen; `[]` viser
+fulle navn. Innstillingen `github.hidden_prefixes` endrer bare presentasjonen.
 
 GraphQL `nodes(ids:)` beriker opptil 40 PR-er per kall med draft-status,
 reviewDecision, requested reviewers/teams, siste commits statusCheckRollup og
-mergeable. Ingen ubetingede HTTP-kall per PR. Opptil 100 reviewer-forespørsler per
+mergeable, automerge og mergekø (status og plass). Ingen ubetingede HTTP-kall per PR. Opptil 100 reviewer-forespørsler per
 PR hentes; større lister markeres delvise. Ved GraphQL-/tilgangsfeil beholdes
 søkeresultatene med eksplisitt ukjente statuser og advarsel. Resultater sorteres
 lokalt etter sist oppdatert og dedupliseres på URL.
@@ -366,7 +378,7 @@ Copilot-innstillinger (mapper, port, innsamling, innholdsvalg, Jira-mønster og
 IntelliJ-launcher). Lister og editorargumenter redigeres som JSON, for eksempel
 `["/sti/til/repo"]` og `["--new-window", "{path}"]`.
 
-Jira-mønsteret tas i bruk med en gang. Tom verdi gjenoppretter
+Jira-mønsteret og GitHub-prefiksene tas i bruk med en gang. Tom verdi gjenoppretter
 `[A-Z][A-Z0-9_]*-[0-9]+`. Øvrige innstillinger tas i bruk etter omstart.
 Miljøvariabler overstyrer filverdiene ved oppstart, så fjern eksempelvis
 `JIRA_PATTERN` for å bruke det lagrede mønsteret. Trykk `?` i innstillingssiden for rullbar hjelp til GitHub-innlogging, Jira-PAT
@@ -384,6 +396,7 @@ Eksempel på deler av den felles filen (utelatte felt bruker standardverdier):
 
 ```json
 {
+  "github": {"hidden_prefixes": ["skatteetaten-ghe"]},
   "repository_paths": ["/sti/til/repo"],
   "editors": {"default": "vscode"},
   "jira": {

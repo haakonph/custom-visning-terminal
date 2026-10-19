@@ -30,7 +30,8 @@ func (m Model) entityView() tea.View {
 		if _, ok := d.chosen[refID(rows[i])]; ok {
 			mark += "✓ "
 		}
-		lines = append(lines, fmt.Sprintf("%s%s · %s · %s", mark, rows[i].Provider, rows[i].Key, clean(rows[i].Title)))
+		r := m.displayReference(rows[i])
+		lines = append(lines, fmt.Sprintf("%s%s · %s · %s", mark, r.Provider, r.Key, clean(r.Title)))
 	}
 	if len(lines) > m.height {
 		lines = lines[:max(1, m.height)]
@@ -57,6 +58,7 @@ func (m Model) snoozeInputView() tea.View {
 		}
 		lines = append(lines, contextSummary(members))
 		for _, r := range members {
+			r = m.displayReference(r)
 			lines = append(lines, fmt.Sprintf(" %s · %s · %s", r.Provider, r.Key, clean(r.Title)))
 		}
 	}
@@ -80,13 +82,14 @@ func (m Model) showSnapshot(r model.TaskReference) (tea.Model, tea.Cmd) {
 }
 func (m Model) entitySnapshotView() tea.View {
 	d := m.dialog
-	r := d.rows[0]
+	r := m.displayReference(d.rows[0])
 	text := r.Provider + " · " + r.Key + "\n" + r.Title + "\n" + r.URL
 	if entry, ok := m.snoozes.entries[refSnoozeID(r)]; ok {
 		text += "\nUtsatt til: " + entry.Until.Local().Format("2006-01-02 15:04 MST")
 		if len(entry.Roots) > 0 {
 			text += "\nHele sammenhengen: " + contextSummary(entry.Members)
 			for _, member := range entry.Members {
+				member = m.displayReference(member)
 				text += "\n" + member.Provider + " · " + member.Key + " · " + member.Title
 			}
 		}

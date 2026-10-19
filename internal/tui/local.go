@@ -150,10 +150,10 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 		l.running--
 		delete(l.preparing, msg.p.Key())
 		s := msg.status
-		result := fmt.Sprintf("%s #%d: opened (%s)", msg.p.Repository, msg.p.Number, s.String())
+		result := fmt.Sprintf("%s #%d: opened (%s)", m.githubName(msg.p.Repository), msg.p.Number, s.String())
 		if msg.err != nil {
 			s.Error = msg.err.Error()
-			result = fmt.Sprintf("%s #%d: %s", msg.p.Repository, msg.p.Number, msg.err)
+			result = fmt.Sprintf("%s #%d: %s", m.githubName(msg.p.Repository), msg.p.Number, msg.err)
 		}
 		l.statuses[msg.p.Key()] = s
 		l.results = append(l.results, result)

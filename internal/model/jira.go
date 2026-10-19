@@ -45,3 +45,35 @@ func (p PullRequest) HasJiraKey(key string, patterns ...*regexp.Regexp) bool {
 	}
 	return false
 }
+
+var emptyJiraBrackets = regexp.MustCompile(`\[[\s,;/|]*\]|\{[\s,;/|]*\}|\([\s,;/|]*\)`)
+
+// DisplayTitle removes whole Jira keys and empty wrappers for presentation only.
+func (p PullRequest) DisplayTitle(patterns ...*regexp.Regexp) string {
+	pattern := jiraKeyPattern
+	if len(patterns) > 0 && patterns[0] != nil {
+		pattern = patterns[0]
+	}
+	var title strings.Builder
+	start := 0
+	for _, loc := range pattern.FindAllStringIndex(p.Title, -1) {
+		if loc[0] == loc[1] || loc[0] > 0 && jiraWord(p.Title[loc[0]-1]) || loc[1] < len(p.Title) && jiraWord(p.Title[loc[1]]) {
+			continue
+		}
+		title.WriteString(p.Title[start:loc[0]])
+		start = loc[1]
+	}
+	if start == 0 {
+		return p.Title
+	}
+	title.WriteString(p.Title[start:])
+	text := title.String()
+	for {
+		next := emptyJiraBrackets.ReplaceAllString(text, "")
+		if next == text {
+			break
+		}
+		text = next
+	}
+	return strings.Trim(strings.Join(strings.Fields(text), " "), " :;,-–—|")
+}

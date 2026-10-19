@@ -121,6 +121,9 @@ erDiagram
         TEXT ci
         TEXT mergeability
         INTEGER draft
+        TEXT auto_merge
+        TEXT merge_queue
+        INTEGER queue_position
     }
     github_repositories {
         INTEGER id PK

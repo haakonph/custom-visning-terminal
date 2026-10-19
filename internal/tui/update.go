@@ -312,6 +312,9 @@ func (m Model) filtered() []model.PullRequest {
 	}
 	visible := make([]model.PullRequest, 0, len(rows))
 	for _, p := range rows {
+		if m.active == model.TeamReviews && m.relatedKey == "" && strings.EqualFold(p.Author, m.snapshot.User) {
+			continue
+		}
 		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) && !m.entities.archived("github", p.URL) {
 			visible = append(visible, p)
 		}

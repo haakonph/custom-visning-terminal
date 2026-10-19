@@ -162,7 +162,7 @@ func (m Model) View() tea.View {
 		if len(rows) > 0 {
 			p := rows[m.selected]
 			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
-			detail := fmt.Sprintf(" %d/%d · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), strings.Join(p.RequestedTeams, ", "), strings.Join(p.Labels, ", "))
+			detail := fmt.Sprintf(" %d/%d · merge: %s · automerge: %s · queue: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), p.Mergeability, autoMergeLabel(p), queueLabel(p), strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 			if m.mmReader != nil {
 				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · v vis referanser · M kanaler", m.mmMentionCount(p.URL)))
@@ -200,24 +200,35 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	}
 	columns := []column{}
 	number := fmt.Sprintf("#%d", p.Number)
-	title := p.Title
+	title := p.DisplayTitle(m.jiraPattern)
 	if _, ok := m.chosen[p.Key()]; ok {
 		title = "[✓] " + title
 	}
 	if p.Draft {
 		title = "[draft] " + title
 	}
+	jira := strings.Join(p.JiraKeys(m.jiraPattern), ", ")
+	repository := m.githubName(p.Repository)
 	if m.width >= 100 {
-		columns = []column{{"REPOSITORY", p.Repository, 20, false}, {"PR", number, 7, false}, {"TITLE", title, m.width - 74, false}, {"AUTHOR", p.Author, 12, false}, {"REVIEW", string(p.Review), 9, true}, {"CI", string(p.CI), 7, true}, {"UPDATED", age(p.UpdatedAt), 7, false}}
+		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 8, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"QUEUE", queueLabel(p), 14, false}}
+		if m.width >= 140 {
+			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})
+		}
 	} else if m.width >= 60 {
-		columns = []column{{"REPOSITORY", p.Repository, 16, false}, {"PR", number, 7, false}, {"TITLE", title, m.width - 34, false}, {"REVIEW", string(p.Review), 8, true}}
+		columns = []column{{"REPOSITORY", repository, 14, false}, {"PR", number, 6, false}, {"JIRA", jira, 12, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 8, true}}
 	} else {
-		columns = []column{{"PR", number, 7, false}, {"TITLE", title, max(1, m.width-8), false}}
+		columns = []column{{"PR", number, 6, false}, {"JIRA", jira, min(12, max(0, m.width/4)), false}, {"TITLE", title, 1, false}}
 	}
-	if m.width >= 120 {
-		columns[2].width -= 19
-		columns = append(columns, column{"LOCAL", m.localLabel(p), 18, false})
+	// Give the title all remaining space, including column separators.
+	used, titleIndex := len(columns)-1, 0
+	for i, c := range columns {
+		if c.name == "TITLE" {
+			titleIndex = i
+		} else {
+			used += c.width
+		}
 	}
+	columns[titleIndex].width = max(1, m.width-used)
 	values := []string{}
 	for _, c := range columns {
 		value := c.value

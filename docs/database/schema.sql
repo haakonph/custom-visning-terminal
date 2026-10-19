@@ -128,7 +128,7 @@ CREATE TABLE github_pull_requests (
     ci TEXT NOT NULL,
     mergeability TEXT NOT NULL,
     draft INTEGER NOT NULL CHECK (draft IN (0, 1))
-);
+, auto_merge TEXT NOT NULL DEFAULT 'UNKNOWN', merge_queue TEXT NOT NULL DEFAULT 'UNKNOWN', queue_position INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE github_repositories (
     id INTEGER PRIMARY KEY,

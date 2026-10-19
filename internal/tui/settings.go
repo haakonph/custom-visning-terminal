@@ -43,6 +43,7 @@ var settingFields = []settingField{
 	{"Copilot · IntelliJ-launcher", "copilot.intellij_command", "string"},
 	{"Mattermost · serveradresse", "mattermost.server", "url"},
 	{"Mattermost · brukernavn", "mattermost.username", "string"},
+	{"GitHub · skjulte organisasjonsprefikser (JSON)", "github.hidden_prefixes", "list"},
 }
 
 type settingsState struct {
@@ -74,7 +75,7 @@ func settingsDocument() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defaults := map[string]any{"editors": local.Defaults().Editors, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp}
+	defaults := map[string]any{"editors": local.Defaults().Editors, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
 	b, _ := json.Marshal(defaults)
 	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
@@ -299,6 +300,10 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if err := s.loadValues(); err != nil {
 				s.notice = err.Error()
+			}
+			if field.path == "github.hidden_prefixes" {
+				m.loadGitHubDisplay()
+				s.notice = "GitHub-visning lagret og tatt i bruk."
 			}
 			if field.path == "jira.pattern" {
 				m.jiraPattern = nil

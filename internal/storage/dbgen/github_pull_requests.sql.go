@@ -19,26 +19,29 @@ func (q *Queries) ClearGithubPullRequests(ctx context.Context) error {
 }
 
 const insertGithubPullRequests = `-- name: InsertGithubPullRequests :exec
-INSERT INTO github_pull_requests (id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+INSERT INTO github_pull_requests (id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft, auto_merge, merge_queue, queue_position) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
 `
 
 type InsertGithubPullRequestsParams struct {
-	ID           string
-	RepositoryID int64
-	Number       int64
-	ProviderID   string
-	Body         string
-	HeadOid      string
-	HeadRef      string
-	Title        string
-	Url          string
-	Author       string
-	CreatedAt    string
-	UpdatedAt    string
-	Review       string
-	Ci           string
-	Mergeability string
-	Draft        int64
+	ID            string
+	RepositoryID  int64
+	Number        int64
+	ProviderID    string
+	Body          string
+	HeadOid       string
+	HeadRef       string
+	Title         string
+	Url           string
+	Author        string
+	CreatedAt     string
+	UpdatedAt     string
+	Review        string
+	Ci            string
+	Mergeability  string
+	Draft         int64
+	AutoMerge     string
+	MergeQueue    string
+	QueuePosition int64
 }
 
 func (q *Queries) InsertGithubPullRequests(ctx context.Context, arg InsertGithubPullRequestsParams) error {
@@ -59,12 +62,15 @@ func (q *Queries) InsertGithubPullRequests(ctx context.Context, arg InsertGithub
 		arg.Ci,
 		arg.Mergeability,
 		arg.Draft,
+		arg.AutoMerge,
+		arg.MergeQueue,
+		arg.QueuePosition,
 	)
 	return err
 }
 
 const listGithubPullRequests = `-- name: ListGithubPullRequests :many
-SELECT id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft FROM github_pull_requests ORDER BY id
+SELECT id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft, auto_merge, merge_queue, queue_position FROM github_pull_requests ORDER BY id
 `
 
 func (q *Queries) ListGithubPullRequests(ctx context.Context) ([]GithubPullRequest, error) {
@@ -93,6 +99,9 @@ func (q *Queries) ListGithubPullRequests(ctx context.Context) ([]GithubPullReque
 			&i.Ci,
 			&i.Mergeability,
 			&i.Draft,
+			&i.AutoMerge,
+			&i.MergeQueue,
+			&i.QueuePosition,
 		); err != nil {
 			return nil, err
 		}

@@ -266,7 +266,7 @@ func (m Model) copilotView() tea.View {
 		body = append(body, d.Errors...)
 	} else if c.detail != nil {
 		s := c.detail.Session
-		body = append(body, s.Name+" · "+s.ID, "Status: "+s.Status+" ("+s.StatusSource+")", "Klient: "+s.Client+" · modell: "+s.Model+" · agent: "+s.Agent, "Repository: "+s.Repository+" · branch: "+s.Branch+" · Jira: "+s.Jira, "Cwd: "+s.Cwd, "Prosjekt: "+s.ProjectRoot+" · git: "+s.GitRoot, "Remote: "+s.Remote, "Start: "+s.StartedAt+" · aktivitet: "+s.LastActivity, "Tokens inn/ut: "+metric(s.InputTokens)+" / "+metric(s.OutputTokens), "Trace IDs: "+strings.Join(s.TraceIDs, ", "))
+		body = append(body, s.Name+" · "+s.ID, "Status: "+s.Status+" ("+s.StatusSource+")", "Klient: "+s.Client+" · modell: "+s.Model+" · agent: "+s.Agent, "Repository: "+m.githubName(s.Repository)+" · branch: "+s.Branch+" · Jira: "+s.Jira, "Cwd: "+s.Cwd, "Prosjekt: "+s.ProjectRoot+" · git: "+s.GitRoot, "Remote: "+s.Remote, "Start: "+s.StartedAt+" · aktivitet: "+s.LastActivity, "Tokens inn/ut: "+metric(s.InputTokens)+" / "+metric(s.OutputTokens), "Trace IDs: "+strings.Join(s.TraceIDs, ", "))
 		if s.DurationMs != nil {
 			body = append(body, fmt.Sprintf("Varighet: %.0f ms", *s.DurationMs))
 		}
@@ -290,7 +290,7 @@ func (m Model) copilotView() tea.View {
 		start := max(0, c.selected-capacity+1)
 		for i := start; i < min(len(rows), start+capacity); i++ {
 			s := rows[i]
-			line := cell(s.Status, 16) + " " + cell(s.Name, max(12, m.width-65)) + " " + cell(s.Repository, 22) + " " + s.Jira
+			line := cell(s.Status, 16) + " " + cell(s.Name, max(12, m.width-65)) + " " + cell(m.githubName(s.Repository), 22) + " " + s.Jira
 			if i == c.selected {
 				line = selection.Render(cell(line, m.width))
 			} else {

@@ -52,6 +52,9 @@ type PullRequest struct {
 	RequestedTeams     []string  `json:"requested_teams"`
 	Review             Status    `json:"review"`
 	CI                 Status    `json:"ci"`
+	AutoMerge          Status    `json:"auto_merge,omitempty"`
+	MergeQueue         Status    `json:"merge_queue,omitempty"`
+	QueuePosition      int       `json:"queue_position,omitempty"`
 	Mergeability       Status    `json:"mergeability"`
 }
 

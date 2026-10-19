@@ -22,6 +22,8 @@ func mapIssue(i *gh.Issue) model.PullRequest {
 const detailsQuery = `query($ids:[ID!]!) {
  nodes(ids:$ids) { ... on PullRequest {
   id body headRefName headRefOid isDraft reviewDecision mergeable
+  autoMergeRequest { enabledAt }
+  mergeQueueEntry { position state }
   reviewRequests(first:100) {
    pageInfo { hasNextPage }
    nodes { requestedReviewer { ... on User { login } ... on Team { slug organization { login } } } }
@@ -31,14 +33,16 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
-	HeadOID        string `json:"headRefOid"`
-	Body           string `json:"body"`
-	HeadRef        string `json:"headRefName"`
-	ID             string `json:"id"`
-	IsDraft        bool   `json:"isDraft"`
-	ReviewDecision string `json:"reviewDecision"`
-	Mergeable      string `json:"mergeable"`
-	ReviewRequests struct {
+	AutoMergeRequest json.RawMessage `json:"autoMergeRequest"`
+	MergeQueueEntry  json.RawMessage `json:"mergeQueueEntry"`
+	HeadOID          string          `json:"headRefOid"`
+	Body             string          `json:"body"`
+	HeadRef          string          `json:"headRefName"`
+	ID               string          `json:"id"`
+	IsDraft          bool            `json:"isDraft"`
+	ReviewDecision   string          `json:"reviewDecision"`
+	Mergeable        string          `json:"mergeable"`
+	ReviewRequests   struct {
 		PageInfo struct {
 			HasNextPage bool `json:"hasNextPage"`
 		} `json:"pageInfo"`
@@ -110,6 +114,30 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 	return errors.Join(failures...)
 }
 func applyDetails(p *model.PullRequest, d *details) {
+	p.AutoMerge, p.MergeQueue, p.QueuePosition = model.Unknown, model.Unknown, 0
+	if len(d.AutoMergeRequest) > 0 {
+		p.AutoMerge = "ON"
+		if string(d.AutoMergeRequest) == "null" {
+			p.AutoMerge = "OFF"
+		}
+	}
+	if len(d.MergeQueueEntry) > 0 {
+		if string(d.MergeQueueEntry) == "null" {
+			p.MergeQueue = "NONE"
+		} else {
+			var entry struct {
+				Position int    `json:"position"`
+				State    string `json:"state"`
+			}
+			if json.Unmarshal(d.MergeQueueEntry, &entry) == nil {
+				p.MergeQueue = model.Status(entry.State)
+				if p.MergeQueue == "" {
+					p.MergeQueue = "QUEUED"
+				}
+				p.QueuePosition = entry.Position
+			}
+		}
+	}
 	p.Body = d.Body
 	p.HeadRef = d.HeadRef
 	p.HeadOID = d.HeadOID
