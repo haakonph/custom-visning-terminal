@@ -367,7 +367,7 @@ func (m Model) tasksView() tea.View {
 		refsCapacity := max(1, capacity-2)
 		refStart := max(0, t.row-refsCapacity+1)
 		for i := refStart; i < min(len(task.References), refStart+refsCapacity); i++ {
-			r := m.liveReference(task.References[i])
+			r := m.displayReference(m.liveReference(task.References[i]))
 			if entry, ok := m.snoozes.effective(refSnoozeID(r)); ok {
 				r.Title += " · utsatt til " + entry.Until.Local().Format("2006-01-02 15:04 MST")
 				if len(entry.Roots) > 0 {

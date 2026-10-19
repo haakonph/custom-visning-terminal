@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	gh "github.com/google/go-github/v93/github"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -34,7 +35,7 @@ func (c *Client) List(ctx context.Context, view model.View, user string) (model.
 		}
 		queries = nil
 		for _, team := range teams {
-			queries = append(queries, "is:open is:pr team-review-requested:"+team)
+			queries = append(queries, "is:open is:pr team-review-requested:"+team+" -author:"+user)
 		}
 	} else if view < model.Open || view >= model.ViewCount {
 		return result, errors.New("invalid PR view")
@@ -54,6 +55,9 @@ func (c *Client) List(ctx context.Context, view model.View, user string) (model.
 			failures = append(failures, err)
 		}
 		for _, p := range rows {
+			if view == model.TeamReviews && strings.EqualFold(p.Author, user) {
+				continue
+			}
 			if prior, ok := found[p.Key()]; ok {
 				p.RequestedTeams = prior.RequestedTeams
 			}

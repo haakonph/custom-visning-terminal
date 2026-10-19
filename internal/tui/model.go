@@ -30,38 +30,39 @@ type Model struct {
 	jiraAction     *jiraActionState
 	jiraChosen     map[string]jira.Issue
 
-	detail          *detailState
-	detailSequence  uint64
-	mmReader        *mattermostReader
-	settings        settingsState
-	snoozes         *snoozeState
-	mattermost      *mattermostState
-	chosen          map[string]model.PullRequest
-	tasks           taskState
-	copilot         *copilotState
-	copilotActive   bool
-	local           *localState
-	jira            *jiraState
-	jiraActive      bool
-	jiraPattern     *regexp.Regexp
-	relatedKey      string
-	ctx             context.Context
-	cancel          context.CancelFunc
-	source          model.Source
-	cache           Cache
-	snapshot        model.Snapshot
-	active          model.View
-	selected        int
-	width, height   int
-	input           textinput.Model
-	filtering, help bool
-	helpOffset      int
-	booting         bool
-	loading         [model.ViewCount]bool
-	warnings        [model.ViewCount]string
-	notice          string
-	saving, dirty   bool
-	open            func(context.Context, string) error
+	detail               *detailState
+	detailSequence       uint64
+	mmReader             *mattermostReader
+	settings             settingsState
+	snoozes              *snoozeState
+	mattermost           *mattermostState
+	chosen               map[string]model.PullRequest
+	tasks                taskState
+	copilot              *copilotState
+	copilotActive        bool
+	local                *localState
+	jira                 *jiraState
+	jiraActive           bool
+	githubHiddenPrefixes []string
+	jiraPattern          *regexp.Regexp
+	relatedKey           string
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	source               model.Source
+	cache                Cache
+	snapshot             model.Snapshot
+	active               model.View
+	selected             int
+	width, height        int
+	input                textinput.Model
+	filtering, help      bool
+	helpOffset           int
+	booting              bool
+	loading              [model.ViewCount]bool
+	warnings             [model.ViewCount]string
+	notice               string
+	saving, dirty        bool
+	open                 func(context.Context, string) error
 }
 type bootMsg struct {
 	snapshot model.Snapshot
@@ -88,6 +89,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	tasks.snoozes = s
 	m := Model{entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadJiraPattern()
+	m.loadGitHubDisplay()
 	return m
 }
 func (m Model) initProviders() tea.Cmd {

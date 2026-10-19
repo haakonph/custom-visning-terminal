@@ -733,7 +733,7 @@ func (m Model) mmReaderView() tea.View {
 								if pr.Draft {
 									state = "Draft"
 								}
-								body = append(body, fmt.Sprintf("    PR #%d · %s · %s · %s", pr.Number, clean(pr.Title), state, status(pr.Review)))
+								body = append(body, fmt.Sprintf("    PR #%d · %s · %s · %s", pr.Number, clean(pr.DisplayTitle(m.jiraPattern)), state, status(pr.Review)))
 								found = true
 								break
 							}

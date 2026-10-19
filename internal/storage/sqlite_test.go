@@ -176,7 +176,7 @@ func TestDocumentDatabaseImportsIntoNormalizedTables(t *testing.T) {
 		t.Fatal("legacy document not retired", err)
 	}
 	var version int
-	if err := db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil || version != 9 {
+	if err := db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil || version != 11 {
 		t.Fatal(version, err)
 	}
 }
@@ -213,7 +213,7 @@ func TestFailedConversionRollsBackAndRetainsDocument(t *testing.T) {
 func TestGitHubDeduplicatesAndPreservesMemberships(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github.sqlite")
 	at := time.Now().UTC().Truncate(time.Second)
-	pr := model.PullRequest{ID: "node", Repository: "org/repo", Number: 7, URL: "https://github.com/org/repo/pull/7", Title: "Latest", Body: "Body", HeadOID: "commit", HeadRef: "ABC-1", Author: "alice", CreatedAt: at, UpdatedAt: at, Review: model.Approved, CI: model.Pass, Mergeability: model.Mergeable, Labels: []string{"bug", "priority"}, RequestedReviewers: []string{"z", "a"}, RequestedTeams: []string{"org/team"}}
+	pr := model.PullRequest{ID: "node", Repository: "org/repo", Number: 7, URL: "https://github.com/org/repo/pull/7", Title: "Latest", Body: "Body", HeadOID: "commit", HeadRef: "ABC-1", Author: "alice", CreatedAt: at, UpdatedAt: at, Review: model.Approved, CI: model.Pass, Mergeability: model.Mergeable, AutoMerge: "ON", MergeQueue: "AWAITING_CHECKS", QueuePosition: 3, ReviewSummary: &model.ReviewSummary{Approved: 2, Changes: 1, Pending: 1, PendingTeams: 1, Complete: true, Fallback: true}, Labels: []string{"bug", "priority"}, RequestedReviewers: []string{"z", "a"}, RequestedTeams: []string{"org/team"}}
 	snap := model.Snapshot{Version: 1, User: "alice"}
 	snap.Datasets[model.Open] = model.Dataset{PRs: []model.PullRequest{pr}, SyncedAt: at}
 	snap.Datasets[model.Reviews] = snap.Datasets[model.Open]

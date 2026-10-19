@@ -408,6 +408,9 @@ func (m Model) snoozeView() tea.View {
 	start := max(0, s.selected-capacity+1)
 	for i := start; i < min(len(rows), start+capacity); i++ {
 		r := rows[i]
+		if r.Kind == "github" {
+			r.Title = m.displayReference(model.TaskReference{Provider: "github", Title: r.Title}).Title
+		}
 		line := fmt.Sprintf(" %s · %s · %s", r.Kind, clean(r.Title), r.Until.Local().Format("2006-01-02 15:04:05 MST -07:00"))
 		if len(r.Roots) > 0 {
 			line = fmt.Sprintf(" gruppe · %s · %s · %s", clean(r.Title), contextSummary(r.Members), r.Until.Local().Format("2006-01-02 15:04 MST"))

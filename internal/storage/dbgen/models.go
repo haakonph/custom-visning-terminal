@@ -110,22 +110,25 @@ type GithubLabel struct {
 }
 
 type GithubPullRequest struct {
-	ID           string
-	RepositoryID int64
-	Number       int64
-	ProviderID   string
-	Body         string
-	HeadOid      string
-	HeadRef      string
-	Title        string
-	Url          string
-	Author       string
-	CreatedAt    string
-	UpdatedAt    string
-	Review       string
-	Ci           string
-	Mergeability string
-	Draft        int64
+	ID            string
+	RepositoryID  int64
+	Number        int64
+	ProviderID    string
+	Body          string
+	HeadOid       string
+	HeadRef       string
+	Title         string
+	Url           string
+	Author        string
+	CreatedAt     string
+	UpdatedAt     string
+	Review        string
+	Ci            string
+	Mergeability  string
+	Draft         int64
+	AutoMerge     string
+	MergeQueue    string
+	QueuePosition int64
 }
 
 type GithubPullRequestReviewer struct {
@@ -139,6 +142,16 @@ type GithubRepository struct {
 	ID        int64
 	AccountID int64
 	Name      string
+}
+
+type GithubReviewSummary struct {
+	PullRequestID string
+	Approved      int64
+	Changes       int64
+	Pending       int64
+	PendingTeams  int64
+	Complete      int64
+	Fallback      int64
 }
 
 type GithubViewMembership struct {

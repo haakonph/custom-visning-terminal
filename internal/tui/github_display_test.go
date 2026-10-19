@@ -1,0 +1,98 @@
+package tui
+
+import (
+	"context"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/charmbracelet/x/ansi"
+	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
+)
+
+func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	p := model.PullRequest{Repository: "skatteetaten-ghe/service", Title: "[ABC-123] Fix login", URL: "https://github.com/skatteetaten-ghe/service/pull/1", Number: 1, AutoMerge: "ON", MergeQueue: "QUEUED", QueuePosition: 2}
+	for _, width := range []int{40, 60, 100, 120, 140, 200} {
+		m.width = width
+		header, row := ansi.Strip(m.row(p, true, false)), ansi.Strip(m.row(p, false, false))
+		if !strings.Contains(header, "JIRA") || !strings.Contains(row, "ABC-123") || strings.Contains(row, "skatteetaten-ghe") || strings.Contains(row, "[ABC-123]") {
+			t.Fatalf("width=%d\n%s\n%s", width, header, row)
+		}
+		if ansi.StringWidth(row) > width {
+			t.Fatalf("row exceeds width %d: %q", width, row)
+		}
+		if width >= 100 && (!strings.Contains(header, "AUTO") || !strings.Contains(row, "ON") || !strings.Contains(row, "#2 QUEUED")) {
+			t.Fatal(row)
+		}
+	}
+	ref := m.displayReference(prRef(p))
+	if ref.Key != "service#1" || ref.URL != p.URL || ref.Title != "Fix login · Jira: ABC-123" {
+		t.Fatal(ref)
+	}
+	if m.githubName("other/skatteetaten-ghe/service") != "other/skatteetaten-ghe/service" {
+		t.Fatal("removed non-prefix")
+	}
+	opened, _ := m.openSettings()
+	m = opened.(Model)
+	m = editSetting(t, m, len(settingFields)-1, `[]`)
+	if m.settings.editing {
+		t.Fatal(m.settings.notice)
+	}
+	if m.githubName(p.Repository) != p.Repository {
+		t.Fatal("empty configuration should show full name")
+	}
+	if err := appconfig.Update(appconfig.Path(), map[string]any{"github": map[string]any{"hidden_prefixes": []string{"other"}}}); err != nil {
+		t.Fatal(err)
+	}
+	m.loadGitHubDisplay()
+	if m.githubName("other/service") != "service" || m.githubName(p.Repository) != p.Repository {
+		t.Fatal("custom prefix ignored")
+	}
+}
+
+func TestTeamReviewHidesCachedOwnPRs(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	m.snapshot.User = "alice"
+	m.active = model.TeamReviews
+	m.snapshot.Datasets[model.TeamReviews].PRs = []model.PullRequest{{Author: "Alice", URL: "https://github.com/acme/repo/pull/1"}, {Author: "bob", URL: "https://github.com/acme/repo/pull/2"}}
+	if rows := m.filtered(); len(rows) != 1 || rows[0].Author != "bob" {
+		t.Fatal(rows)
+	}
+	m.active = model.Open
+	m.snapshot.Datasets[model.Open].PRs = m.snapshot.Datasets[model.TeamReviews].PRs
+	if len(m.filtered()) != 2 {
+		t.Fatal("own PR hidden outside Team Review")
+	}
+}
+
+func TestReviewSummaryRendering(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	m.width = 180
+	p := model.PullRequest{Title: "Stacked PR", Review: model.ChangesRequested, ReviewSummary: &model.ReviewSummary{Approved: 2, Changes: 1, Pending: 1, PendingTeams: 1, Complete: true, Fallback: true}}
+	m.detail = &detailState{pr: p}
+	text := strings.Join(m.detailLines(), "\n")
+	for _, want := range []string{"Review: CHANGES (vurderinger)", "2 godkjent · 1 endringer · 1 venter", "1 team venter", "GitHubs regler avgjør"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q: %s", want, text)
+		}
+	}
+	p.ReviewSummary.Fallback = false
+	p.ReviewSummary.Complete = false
+	if label := reviewSummaryLabel(p); !strings.Contains(label, "(GitHub)") || !strings.Contains(label, "delvis opptelling") {
+		t.Fatal(label)
+	}
+	p.Review = model.NoReview
+	p.ReviewSummary = nil
+	for _, width := range []int{60, 100, 140} {
+		m.width = width
+		if row := ansi.Strip(m.row(p, false, false)); !strings.Contains(row, "NO REVIEW") {
+			t.Fatal(row)
+		}
+	}
+}

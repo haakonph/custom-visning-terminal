@@ -22,6 +22,12 @@ func mapIssue(i *gh.Issue) model.PullRequest {
 const detailsQuery = `query($ids:[ID!]!) {
  nodes(ids:$ids) { ... on PullRequest {
   id body headRefName headRefOid isDraft reviewDecision mergeable
+  latestOpinionatedReviews(first:100) {
+   pageInfo { hasNextPage }
+   nodes { state author { login } }
+  }
+  autoMergeRequest { enabledAt }
+  mergeQueueEntry { position state }
   reviewRequests(first:100) {
    pageInfo { hasNextPage }
    nodes { requestedReviewer { ... on User { login } ... on Team { slug organization { login } } } }
@@ -31,18 +37,21 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
-	HeadOID        string `json:"headRefOid"`
-	Body           string `json:"body"`
-	HeadRef        string `json:"headRefName"`
-	ID             string `json:"id"`
-	IsDraft        bool   `json:"isDraft"`
-	ReviewDecision string `json:"reviewDecision"`
-	Mergeable      string `json:"mergeable"`
-	ReviewRequests struct {
-		PageInfo struct {
+	AutoMergeRequest         json.RawMessage     `json:"autoMergeRequest"`
+	MergeQueueEntry          json.RawMessage     `json:"mergeQueueEntry"`
+	HeadOID                  string              `json:"headRefOid"`
+	Body                     string              `json:"body"`
+	HeadRef                  string              `json:"headRefName"`
+	ID                       string              `json:"id"`
+	IsDraft                  bool                `json:"isDraft"`
+	ReviewDecision           string              `json:"reviewDecision"`
+	Mergeable                string              `json:"mergeable"`
+	LatestOpinionatedReviews *opinionatedReviews `json:"latestOpinionatedReviews"`
+	ReviewRequests           *struct {
+		PageInfo *struct {
 			HasNextPage bool `json:"hasNextPage"`
 		} `json:"pageInfo"`
-		Nodes []struct {
+		Nodes []*struct {
 			RequestedReviewer struct {
 				Login        string `json:"login"`
 				Slug         string `json:"slug"`
@@ -102,7 +111,10 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 				continue
 			}
 			applyDetails(&rows[i], d)
-			if d.ReviewRequests.PageInfo.HasNextPage {
+			if rows[i].ReviewSummary != nil && !rows[i].ReviewSummary.Complete {
+				failures = append(failures, errors.New("review summary incomplete; at most 100 reviewers and requests are included"))
+			}
+			if d.ReviewRequests != nil && d.ReviewRequests.PageInfo != nil && d.ReviewRequests.PageInfo.HasNextPage {
 				failures = append(failures, errors.New("reviewer list truncated at 100 requests"))
 			}
 		}
@@ -110,18 +122,35 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 	return errors.Join(failures...)
 }
 func applyDetails(p *model.PullRequest, d *details) {
+	p.AutoMerge, p.MergeQueue, p.QueuePosition = model.Unknown, model.Unknown, 0
+	if len(d.AutoMergeRequest) > 0 {
+		p.AutoMerge = "ON"
+		if string(d.AutoMergeRequest) == "null" {
+			p.AutoMerge = "OFF"
+		}
+	}
+	if len(d.MergeQueueEntry) > 0 {
+		if string(d.MergeQueueEntry) == "null" {
+			p.MergeQueue = "NONE"
+		} else {
+			var entry struct {
+				Position int    `json:"position"`
+				State    string `json:"state"`
+			}
+			if json.Unmarshal(d.MergeQueueEntry, &entry) == nil {
+				p.MergeQueue = model.Status(entry.State)
+				if p.MergeQueue == "" {
+					p.MergeQueue = "QUEUED"
+				}
+				p.QueuePosition = entry.Position
+			}
+		}
+	}
 	p.Body = d.Body
 	p.HeadRef = d.HeadRef
 	p.HeadOID = d.HeadOID
 	p.Draft = d.IsDraft
-	switch d.ReviewDecision {
-	case "APPROVED":
-		p.Review = model.Approved
-	case "CHANGES_REQUESTED":
-		p.Review = model.ChangesRequested
-	case "REVIEW_REQUIRED":
-		p.Review = model.Pending
-	}
+
 	switch d.Mergeable {
 	case "MERGEABLE":
 		p.Mergeability = model.Mergeable
@@ -132,22 +161,28 @@ func applyDetails(p *model.PullRequest, d *details) {
 	teams := p.RequestedTeams
 	p.RequestedReviewers = nil
 	p.RequestedTeams = nil
-	for _, node := range d.ReviewRequests.Nodes {
-		r := node.RequestedReviewer
-		if r.Login != "" {
-			p.RequestedReviewers = append(p.RequestedReviewers, r.Login)
-		}
-		if r.Slug != "" && r.Organization.Login != "" {
-			p.RequestedTeams = append(p.RequestedTeams, r.Organization.Login+"/"+r.Slug)
+	if d.ReviewRequests != nil {
+		for _, node := range d.ReviewRequests.Nodes {
+			if node == nil {
+				continue
+			}
+			r := node.RequestedReviewer
+			if r.Login != "" {
+				p.RequestedReviewers = append(p.RequestedReviewers, r.Login)
+			}
+			if r.Slug != "" && r.Organization.Login != "" {
+				p.RequestedTeams = append(p.RequestedTeams, r.Organization.Login+"/"+r.Slug)
+			}
 		}
 	}
-	if d.ReviewRequests.PageInfo.HasNextPage {
+	if d.ReviewRequests == nil || d.ReviewRequests.PageInfo == nil || d.ReviewRequests.PageInfo.HasNextPage {
 		for _, team := range teams {
 			if !contains(p.RequestedTeams, team) {
 				p.RequestedTeams = append(p.RequestedTeams, team)
 			}
 		}
 	}
+	applyReview(p, d)
 	if len(d.Commits.Nodes) > 0 && d.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
 		switch d.Commits.Nodes[0].Commit.StatusCheckRollup.State {
 		case "SUCCESS":

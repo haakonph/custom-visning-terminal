@@ -25,6 +25,7 @@ type Status string
 
 const (
 	Unknown          Status = "UNKNOWN"
+	NoReview         Status = "NO REVIEW"
 	Approved         Status = "APPROVED"
 	Pending          Status = "PENDING"
 	ChangesRequested Status = "CHANGES"
@@ -35,24 +36,39 @@ const (
 )
 
 type PullRequest struct {
-	ID                 string    `json:"id"`
-	Repository         string    `json:"repository"`
-	Number             int       `json:"number"`
-	Body               string    `json:"body,omitempty"`
-	HeadOID            string    `json:"head_oid,omitempty"`
-	HeadRef            string    `json:"head_ref,omitempty"`
-	Title              string    `json:"title"`
-	URL                string    `json:"url"`
-	Author             string    `json:"author"`
-	Draft              bool      `json:"draft"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
-	Labels             []string  `json:"labels"`
-	RequestedReviewers []string  `json:"requested_reviewers"`
-	RequestedTeams     []string  `json:"requested_teams"`
-	Review             Status    `json:"review"`
-	CI                 Status    `json:"ci"`
-	Mergeability       Status    `json:"mergeability"`
+	ID                 string         `json:"id"`
+	Repository         string         `json:"repository"`
+	Number             int            `json:"number"`
+	Body               string         `json:"body,omitempty"`
+	HeadOID            string         `json:"head_oid,omitempty"`
+	HeadRef            string         `json:"head_ref,omitempty"`
+	Title              string         `json:"title"`
+	URL                string         `json:"url"`
+	Author             string         `json:"author"`
+	Draft              bool           `json:"draft"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	Labels             []string       `json:"labels"`
+	RequestedReviewers []string       `json:"requested_reviewers"`
+	RequestedTeams     []string       `json:"requested_teams"`
+	ReviewSummary      *ReviewSummary `json:"review_summary,omitempty"`
+	Review             Status         `json:"review"`
+	CI                 Status         `json:"ci"`
+	AutoMerge          Status         `json:"auto_merge,omitempty"`
+	MergeQueue         Status         `json:"merge_queue,omitempty"`
+	QueuePosition      int            `json:"queue_position,omitempty"`
+	Mergeability       Status         `json:"mergeability"`
+}
+
+// ReviewSummary counts current opinions per reviewer, with outstanding requests
+// counted separately (a reviewer can be asked to review again).
+type ReviewSummary struct {
+	Approved     int  `json:"approved"`
+	Changes      int  `json:"changes"`
+	Pending      int  `json:"pending"`
+	PendingTeams int  `json:"pending_teams"`
+	Complete     bool `json:"complete"`
+	Fallback     bool `json:"fallback"`
 }
 
 func (p PullRequest) Key() string { return p.URL }

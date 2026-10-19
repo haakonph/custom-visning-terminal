@@ -109,10 +109,12 @@ func TestTeamsPaginationMultipleOrganizationsAndDedup(t *testing.T) {
 		case "/search/issues":
 			searches.Add(1)
 			q := r.URL.Query().Get("q")
-			if q != "is:open is:pr team-review-requested:acme/dev" && q != "is:open is:pr team-review-requested:other/dev" {
+			if q != "is:open is:pr team-review-requested:acme/dev -author:alice" && q != "is:open is:pr team-review-requested:other/dev -author:alice" {
 				t.Errorf("wrong team query: %s", q)
 			}
-			writeJSON(w, map[string]any{"total_count": 1, "items": []any{issue("N1", 1)}})
+			other := issue("N1", 1)
+			other["user"] = map[string]any{"login": "bob"}
+			writeJSON(w, map[string]any{"total_count": 2, "items": []any{other, issue("OWN", 2)}})
 		case "/graphql":
 			graph(w, r)
 		default:

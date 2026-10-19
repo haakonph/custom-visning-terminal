@@ -38,3 +38,28 @@ func TestCustomJiraPattern(t *testing.T) {
 		t.Fatal("missing custom key")
 	}
 }
+
+func TestDisplayTitle(t *testing.T) {
+	for _, tc := range []struct{ title, want string }{
+		{"[ABC-12] Fix login", "Fix login"},
+		{"[ABC-12, DEF-34] Fix login", "Fix login"},
+		{"feat: preserve [] - ", "feat: preserve [] - "},
+		{"{ABC-12} (DEF-34) [XYZ-5] Fix login", "Fix login"},
+		{"ABC-12: Fix (keep this) [context]", "Fix (keep this) [context]"},
+		{"[ABC-1] Fix ABC-123 support", "Fix support"},
+		{"Fix xABC-12suffix", "Fix xABC-12suffix"},
+		{"[{(ABC-12)}] Fix", "Fix"},
+	} {
+		p := PullRequest{Title: tc.title}
+		if got := p.DisplayTitle(); got != tc.want {
+			t.Errorf("%q: got %q want %q", tc.title, got, tc.want)
+		}
+		if p.Title != tc.title {
+			t.Fatal("changed original title")
+		}
+	}
+	p := PullRequest{Title: "[KAKE-123] ABC-1 Fix"}
+	if got := p.DisplayTitle(regexp.MustCompile(`KAKE-[0-9]{3,5}`)); got != "ABC-1 Fix" {
+		t.Fatal(got)
+	}
+}

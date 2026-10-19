@@ -128,13 +128,23 @@ CREATE TABLE github_pull_requests (
     ci TEXT NOT NULL,
     mergeability TEXT NOT NULL,
     draft INTEGER NOT NULL CHECK (draft IN (0, 1))
-);
+, auto_merge TEXT NOT NULL DEFAULT 'UNKNOWN', merge_queue TEXT NOT NULL DEFAULT 'UNKNOWN', queue_position INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE github_repositories (
     id INTEGER PRIMARY KEY,
     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     UNIQUE (account_id, name)
+);
+
+CREATE TABLE github_review_summaries (
+    pull_request_id TEXT PRIMARY KEY REFERENCES github_pull_requests(id) ON DELETE CASCADE,
+    approved INTEGER NOT NULL,
+    changes INTEGER NOT NULL,
+    pending INTEGER NOT NULL,
+    pending_teams INTEGER NOT NULL,
+    complete INTEGER NOT NULL CHECK (complete IN (0, 1)),
+    fallback INTEGER NOT NULL CHECK (fallback IN (0, 1))
 );
 
 CREATE TABLE github_view_memberships (
