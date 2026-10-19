@@ -331,8 +331,105 @@ func TestCleanWorktreeAutomaticallyFastForwards(t *testing.T) {
 	if updated.Path != first.Path || updated.Head != p.HeadOID || updated.Outdated || updated.Modified {
 		t.Fatalf("not updated: %+v", updated)
 	}
-	if _, err = git(ctx, updated.Path, "symbolic-ref", "-q", "HEAD"); err == nil {
-		t.Fatal("HEAD should remain detached")
+	if got := run(t, updated.Path, "symbolic-ref", "--short", "HEAD"); got != prBranch(p) {
+		t.Fatalf("PR branch changed: %s", got)
+	}
+}
+
+func TestLegacyDetachedWorktreeGetsBranchWithoutLosingFiles(t *testing.T) {
+	w, p, _ := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run(t, first.Path, "checkout", "--detach")
+	run(t, first.Path, "branch", "-d", prBranch(p))
+	file := filepath.Join(first.Path, "local.txt")
+	if err := os.WriteFile(file, []byte("keep me"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := w.Prepare(ctx, p)
+	if err != nil || got.Path != first.Path || got.Head != first.Head || !got.Modified {
+		t.Fatalf("legacy checkout changed: %+v, %v", got, err)
+	}
+	if branch := run(t, got.Path, "symbolic-ref", "--short", "HEAD"); branch != prBranch(p) {
+		t.Fatalf("still detached: %s", branch)
+	}
+	if data, err := os.ReadFile(file); err != nil || string(data) != "keep me" {
+		t.Fatalf("local file lost: %q, %v", data, err)
+	}
+}
+
+func TestRegisteredPRCheckoutReusesProjectFiles(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	p.HeadRef = "feature/my-pr"
+	run(t, source, "checkout", "-b", p.HeadRef)
+	run(t, source, "remote", "add", "origin", "https://github.com/acme/repo.git")
+	w.Repositories.Paths = []string{source}
+	for _, name := range []string{"node_modules", ".idea", "target"} {
+		if err := os.Mkdir(filepath.Join(source, name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := w.Prepare(ctx, p)
+	if err != nil || got.Path != source {
+		t.Fatalf("created unnecessary project: %+v, %v", got, err)
+	}
+	if _, err := os.Stat(w.path(p)); !os.IsNotExist(err) {
+		t.Fatal("created or remembered a separate checkout")
+	}
+	// Equal commits alone do not identify a PR branch. Do not switch a project
+	// or reuse the remembered project after the user moves to another branch.
+	run(t, source, "checkout", "-b", "other-work")
+	got, err = w.Prepare(ctx, p)
+	if err != nil || got.Path == source {
+		t.Fatalf("reused unrelated branch: %+v, %v", got, err)
+	}
+	if branch := run(t, source, "symbolic-ref", "--short", "HEAD"); branch != "other-work" {
+		t.Fatal("switched registered project", branch)
+	}
+}
+
+func TestRegisteredPRCheckoutRequiresMatchingCommit(t *testing.T) {
+	w, p, source := fixture(t)
+	p.HeadRef = "feature/my-pr"
+	run(t, source, "checkout", "-b", p.HeadRef)
+	run(t, source, "remote", "add", "origin", "https://github.com/acme/repo.git")
+	w.Repositories.Paths = []string{source}
+	p = advancePR(t, source, p)
+	run(t, source, "checkout", "--detach", "HEAD~1")
+	run(t, source, "branch", "-f", p.HeadRef, "HEAD")
+	run(t, source, "checkout", p.HeadRef)
+	before := run(t, source, "rev-parse", "HEAD")
+	got, err := w.Prepare(context.Background(), p)
+	if err != nil || got.Path == source || got.Head != p.HeadOID {
+		t.Fatalf("reused outdated registered project: %+v, %v", got, err)
+	}
+	if head := run(t, source, "rev-parse", "HEAD"); head != before {
+		t.Fatal("moved registered project")
+	}
+}
+
+func TestLegacyBranchCollisionPreservesCheckout(t *testing.T) {
+	w, p, _ := fixture(t)
+	ctx := context.Background()
+	first, err := w.Prepare(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run(t, first.Path, "checkout", "--detach")
+	run(t, first.Path, "commit", "--allow-empty", "-m", "local detached work")
+	localHead := run(t, first.Path, "rev-parse", "HEAD")
+	if _, err = w.Prepare(ctx, p); err == nil {
+		t.Fatal("branch collision should require manual repair")
+	}
+	if head := run(t, first.Path, "rev-parse", "HEAD"); head != localHead {
+		t.Fatal("detached commits replaced")
+	}
+	if head := run(t, first.Path, "rev-parse", prBranch(p)); head != first.Head {
+		t.Fatal("existing branch overwritten")
 	}
 }
 func TestLocalCommitsAreNotReplaced(t *testing.T) {

@@ -53,6 +53,9 @@ func New(dir string, c Config) (*WorktreeManager, error) {
 func key(p model.PullRequest) string {
 	return fmt.Sprintf("%s#%d", strings.ToLower(p.Repository), p.Number)
 }
+func prBranch(p model.PullRequest) string {
+	return fmt.Sprintf("custom-visning/%s/pr-%d", strings.ToLower(p.Repository), p.Number)
+}
 func (w *WorktreeManager) path(p model.PullRequest) string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -133,6 +136,29 @@ func (w *WorktreeManager) Prepare(ctx context.Context, p model.PullRequest) (Sta
 	if _, err := exec.LookPath("git"); err != nil {
 		return Status{}, fmt.Errorf("install Git and add it to PATH: %w", err)
 	}
+	// Reuse an already-open project only when both branch and commit match.
+	// Never switch a registered checkout: it may contain unrelated local work.
+	if p.HeadRef != "" && commitPattern.MatchString(p.HeadOID) {
+		for _, candidate := range w.Repositories.Paths {
+			candidate, err := filepath.Abs(candidate)
+			if err != nil || !w.Repositories.matches(ctx, candidate, id) {
+				continue
+			}
+			physical, err := common(ctx, candidate)
+			if err != nil {
+				continue
+			}
+			unlockPhysical := w.Repositories.lock("path:" + physical)
+			branch, err := git(ctx, candidate, "symbolic-ref", "--quiet", "HEAD")
+			s, inspectErr := inspect(ctx, candidate, candidate, p.HeadOID)
+			unlockPhysical()
+			if err == nil && inspectErr == nil && branch == "refs/heads/"+p.HeadRef && !s.Outdated {
+				// Keep the persistent PR mapping dedicated to its own worktree;
+				// this registered project may switch branches before the next open.
+				return s, nil
+			}
+		}
+	}
 	path := w.path(p)
 	if _, err := os.Lstat(path); err == nil {
 		if !w.Repositories.matches(ctx, path, id) {
@@ -179,7 +205,7 @@ func (w *WorktreeManager) Prepare(ctx context.Context, p model.PullRequest) (Sta
 	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return Status{}, err
 	}
-	if _, err = git(ctx, repo, "worktree", "add", "--detach", "--", path, have); err != nil {
+	if _, err = git(ctx, repo, "worktree", "add", "-b", prBranch(p), "--", path, have); err != nil {
 		return Status{}, fmt.Errorf("cannot add %s; inspect git worktree list and repair stale metadata manually: %w", path, err)
 	}
 	s, err := inspect(ctx, path, repo, p.HeadOID)
@@ -207,20 +233,13 @@ func prCommit(ctx context.Context, repo string, p model.PullRequest) (string, er
 	return git(ctx, repo, "rev-parse", ref+"^{commit}")
 }
 
-// Only fast-forward a clean detached HEAD. No reset, force checkout, rebase,
-// branch movement, or automatic stash is used. Unsafe/unavailable updates still
+// Only fast-forward a clean app-owned branch. No reset, force checkout, rebase,
+// or automatic stash is used. Unsafe/unavailable updates still
 // open the existing checkout and explain why it remains outdated.
 func (w *WorktreeManager) reuse(ctx context.Context, p model.PullRequest, s Status) (Status, error) {
-	if s.Modified || !s.Outdated || !commitPattern.MatchString(p.HeadOID) {
-		return s, w.remember(p, s)
-	}
 	branch, err := git(ctx, s.Path, "rev-parse", "--symbolic-full-name", "HEAD")
 	if err != nil {
 		return s, err
-	}
-	if branch != "HEAD" {
-		s.Note = "on a branch; update manually"
-		return s, w.remember(p, s)
 	}
 	for _, name := range []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_LOG", "BISECT_START", "rebase-merge", "rebase-apply", "sequencer"} {
 		marker, err := git(ctx, s.Path, "rev-parse", "--git-path", name)
@@ -231,9 +250,27 @@ func (w *WorktreeManager) reuse(ctx context.Context, p model.PullRequest, s Stat
 			marker = filepath.Join(s.Path, marker)
 		}
 		if _, err = os.Lstat(marker); !os.IsNotExist(err) {
+			if branch == "HEAD" {
+				return s, fmt.Errorf("Git operation in progress; finish it before attaching the PR branch")
+			}
 			s.Note = "Git operation in progress; update manually"
 			return s, w.remember(p, s)
 		}
+	}
+	if branch == "HEAD" {
+		// Attach legacy checkouts at their current commit, preserving dirty files
+		// and local commits. -b refuses to overwrite an existing branch.
+		if _, err = git(ctx, s.Path, "checkout", "--no-overwrite-ignore", "-b", prBranch(p)); err != nil {
+			return s, fmt.Errorf("cannot attach PR branch; inspect local branches manually: %w", err)
+		}
+		branch = "refs/heads/" + prBranch(p)
+	}
+	if s.Modified || !s.Outdated || !commitPattern.MatchString(p.HeadOID) {
+		return s, w.remember(p, s)
+	}
+	if branch != "refs/heads/"+prBranch(p) {
+		s.Note = "on a user branch; update manually"
+		return s, w.remember(p, s)
 	}
 	target, err := prCommit(ctx, s.Path, p)
 	if err != nil {
@@ -260,10 +297,10 @@ func (w *WorktreeManager) reuse(ctx context.Context, p model.PullRequest, s Stat
 	if err != nil {
 		return current, err
 	}
-	if current.Modified || current.Head != s.Head || branch != "HEAD" {
+	if current.Modified || current.Head != s.Head || branch != "refs/heads/"+prBranch(p) {
 		return current, w.remember(p, current)
 	}
-	if _, err = git(ctx, s.Path, "checkout", "--detach", "--no-overwrite-ignore", target); err != nil {
+	if _, err = git(ctx, s.Path, "-c", "merge.autostash=false", "merge", "--ff-only", "--no-overwrite-ignore", target); err != nil {
 		if ctx.Err() != nil {
 			return s, ctx.Err()
 		}

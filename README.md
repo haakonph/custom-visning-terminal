@@ -647,6 +647,14 @@ and HTTPS remotes are matched by GitHub owner/repository, case insensitively.
 Registered repositories take priority over cached clones. Moved/deleted paths
 are ignored; update the configuration to register their new location.
 
+If a registered checkout already has the PR's source branch and exact head commit
+checked out, the editor opens that project directory directly. This keeps its
+installed dependencies, build outputs and IntelliJ project settings available;
+the app does not run Maven/npm installs. Registered checkouts are never switched
+or updated automatically. Other PRs still get their own persistent worktrees.
+Opening a new project may still require dependency installation and initial IDE
+indexing; reusing a directory does not guarantee that IntelliJ skips indexing.
+
 Each executable is checked on PATH before preparation starts. Arguments are
 passed directly with Go's `os/exec`, without a shell. Every `{path}` is replaced
 with the absolute worktree directory; if no placeholder is supplied the path is
@@ -672,7 +680,13 @@ Linux respects an absolute `XDG_DATA_HOME`; macOS and Windows use
 identities, never authentication tokens. PR dashboard snapshots continue to use
 the existing account-scoped SQLite cache independently.
 
-New worktrees use detached HEADs and share their repository's Git objects.
+New worktrees use local `custom-visning/owner/repo/pr-NUMBER` branches and share
+their repository's Git objects. These are dedicated local branches, including
+for fork PRs; no upstream or push destination is configured automatically.
+Existing detached worktrees are attached to that branch at their current commit,
+preserving local changes and commits. Existing branches are never overwritten;
+resolve branch-name collisions manually. A detached checkout with a Git operation
+in progress must finish that operation before opening in the editor.
 Missing commits are fetched from the base repository's `refs/pull/NUMBER/head`,
 which also supports fork PRs; local refs use `refs/custom-visning/owner/repo/pr-NUMBER`.
 Native Git is used because `gh pr checkout --worktree` is unavailable in many
@@ -683,9 +697,10 @@ access to the repositories. No additional authentication mechanism is introduced
 
 Existing worktrees already at the dashboard's PR head open immediately without
 clone or fetch. When opening an outdated worktree, the app automatically advances
-it to that PR head **only if it is clean, detached, and the change is a
+it to that PR head **only if it is clean, on its app-owned PR branch, and the change is a
 fast-forward**. Missing commits are fetched if necessary. This never uses reset,
-force checkout, stash, merge or rebase. Attached branches, local commits, rewritten
+force checkout, stash or rebase; updates use `git merge --ff-only` without creating
+a merge commit. User branches, local commits, rewritten
 PR history, and Git operations in progress require manual updates. Ignored files
 that would be overwritten also prevent updating. Local changes are preserved.
 If fetching or checkout fails, the existing worktree still opens with an update
