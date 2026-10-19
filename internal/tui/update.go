@@ -22,6 +22,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 	m.internalKey = false
+	if handled, cmd := m.localMessage(msg); handled {
+		return m, cmd
+	}
 	if m.snoozes != nil && m.snoozes.input {
 		if handled, cmd := m.snoozeMessage(msg); handled {
 			return m, cmd
@@ -96,9 +99,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if handled, cmd := m.snoozeMessage(msg); handled {
-		return m, cmd
-	}
-	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
 	if _, ok := msg.(copilotOpenMsg); ok {

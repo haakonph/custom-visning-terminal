@@ -24,6 +24,20 @@ type localState struct {
 	choosing                   bool
 	editorChoice               int
 	results                    []string
+	warmed                     map[string]time.Time
+	warming                    bool
+	warmNotice                 string
+	warmTimerStarted           bool
+}
+type localWarmTick struct{}
+
+func localWarmTimer() tea.Cmd {
+	return tea.Tick(30*time.Second, func(time.Time) tea.Msg { return localWarmTick{} })
+}
+
+type localWarmResult struct {
+	repository string
+	err        error
 }
 type localResult struct {
 	p      model.PullRequest
@@ -36,7 +50,7 @@ type localStatuses struct {
 }
 
 func (m Model) WithLocal(manager *local.WorktreeManager, editors local.Editors) Model {
-	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: m.chosen, statuses: map[string]local.Status{}, preparing: map[string]bool{}}
+	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: m.chosen, statuses: map[string]local.Status{}, preparing: map[string]bool{}, warmed: map[string]time.Time{}}
 	return m
 }
 func (m *Model) refreshLocal() tea.Cmd {
@@ -60,7 +74,7 @@ func (m *Model) refreshLocal() tea.Cmd {
 		}
 	}
 	manager, parent := m.local.manager, m.ctx
-	return func() tea.Msg {
+	status := func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		result := localStatuses{values: map[string]local.Status{}, generation: generation}
@@ -72,7 +86,42 @@ func (m *Model) refreshLocal() tea.Cmd {
 		}
 		return result
 	}
+	var timer tea.Cmd
+	if m.local.manager.Workspace.Warm && !m.local.warmTimerStarted {
+		m.local.warmTimerStarted = true
+		timer = localWarmTimer()
+	}
+	return tea.Batch(status, m.warmLocal(), timer)
 }
+
+func (m *Model) warmLocal() tea.Cmd {
+	l := m.local
+	if !l.manager.Workspace.Warm || l.warming {
+		return nil
+	}
+	var id string
+	var oldest time.Time
+	for _, dataset := range m.snapshot.Datasets {
+		for _, p := range dataset.PRs {
+			last := l.warmed[p.Repository]
+			if p.Repository != "" && time.Since(last) >= 5*time.Minute && (id == "" || last.Before(oldest)) {
+				id, oldest = p.Repository, last
+			}
+		}
+	}
+	if id == "" {
+		return nil
+	}
+	l.warmed[id], l.warming = time.Now(), true
+	l.warmNotice = "Klargjør main: " + m.githubName(id)
+	manager, parent := l.manager, m.ctx
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(parent, 15*time.Minute)
+		defer cancel()
+		return localWarmResult{id, manager.Warm(ctx, id)}
+	}
+}
+
 func (m *Model) openLocal(editor string) tea.Cmd {
 	if m.local == nil {
 		*m = m.WithSetup("editor")
@@ -114,7 +163,7 @@ func (m *Model) nextLocal() tea.Cmd {
 		l.running++
 		manager, launcher, editor, parent := l.manager, l.launcher, l.editor, m.ctx
 		cmds = append(cmds, func() tea.Msg {
-			ctx, cancel := context.WithTimeout(parent, 5*time.Minute)
+			ctx, cancel := context.WithTimeout(parent, 20*time.Minute)
 			defer cancel()
 			s, err := manager.Prepare(ctx, p)
 			if err == nil && ctx.Err() != nil {
@@ -134,6 +183,20 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 	}
 	l := m.local
 	switch msg := msg.(type) {
+	case localWarmTick:
+		return true, tea.Batch(m.warmLocal(), localWarmTimer())
+	case localWarmResult:
+		l.warming = false
+		l.warmed[msg.repository] = time.Now()
+		l.warmNotice = "Main klar: " + m.githubName(msg.repository)
+		if l.manager.Workspace.Indexer.Command == "" {
+			l.warmNotice += " · headless-indeksering ikke konfigurert"
+		}
+		if msg.err != nil {
+			l.warmNotice = fmt.Sprintf("Main %s: %s", m.githubName(msg.repository), msg.err)
+			l.results = append(l.results, l.warmNotice)
+		}
+		return true, m.warmLocal()
 	case localStatuses:
 		l.statusLoading = false
 		for key, s := range msg.values {
