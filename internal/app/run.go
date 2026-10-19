@@ -22,9 +22,9 @@ import (
 
 func Run(ctx context.Context, stderr io.Writer) error { return RunMode(ctx, stderr, false) }
 func RunMode(ctx context.Context, stderr io.Writer, startJira bool) error {
-	return RunProviders(ctx, stderr, startJira, false)
+	return RunProviders(ctx, stderr, startJira, false, "dev")
 }
-func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool) error {
+func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot bool, version string) error {
 	if err := jira.Migrate(); err != nil {
 		return fmt.Errorf("configuration migration: %w", err)
 	}
@@ -59,7 +59,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		}
 	}()
 	if startCopilot {
-		dashboard := tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
+		dashboard := tui.New(ctx, nil, nil).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
 		return runDashboard(ctx, dashboard)
 	}
 
@@ -76,11 +76,11 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	token, err := github.Token(ctx)
 	if err != nil {
 		if jiraClient != nil {
-			runErr := runDashboard(ctx, tui.New(ctx, nil, nil).WithJiraPattern(jiraPattern).WithJira(jiraClient, true).WithCopilot(copilotClient, false))
+			runErr := runDashboard(ctx, tui.New(ctx, nil, nil).WithVersion(version).WithJiraPattern(jiraPattern).WithJira(jiraClient, true).WithCopilot(copilotClient, false))
 			return runErr
 		}
 		if mmConfig.Server != "" {
-			return runDashboard(ctx, tui.New(ctx, nil, nil).WithCopilot(copilotClient, false))
+			return runDashboard(ctx, tui.New(ctx, nil, nil).WithVersion(version).WithCopilot(copilotClient, false))
 		}
 		return errors.Join(err, jiraErr)
 	}
@@ -98,7 +98,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	} else {
 		persistence = store
 	}
-	dashboard := tui.New(ctx, client, persistence).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
+	dashboard := tui.New(ctx, client, persistence).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
 	if endpoint := os.Getenv("MATTERMOST_WEBHOOK_URL"); endpoint != "" {
 		sender, err := mattermost.New(endpoint)
 		if err != nil {

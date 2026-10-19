@@ -233,8 +233,8 @@ Release-workflowen kjører ved push til `main` og ved push av `v*`-tagger.
 Den tester commiten før bygging, cross-kompilerer macOS arm64 uten CGO og lager
 arkiv og SHA256-checksums. Hvert main-bygg publiseres som siste GitHub Release med
 en unik versjon `main-<kjøringsnummer>.<forsøk>-<commit>`. Taggede releaser bruker
-taggen som versjon. Versjonen bygges inn i `--version`. Publisering bruker
-workflowens `GITHUB_TOKEN`; bare publiseringsjobben har `contents: write`.
+taggen som versjon. Versjonen bygges inn i `--version` og vises øverst på
+hjelpsiden (`?`). Publisering bruker workflowens `GITHUB_TOKEN`; bare publiseringsjobben har `contents: write`.
 Du kan fortsatt opprette og pushe en versjonstagg, for eksempel:
 
 ```bash

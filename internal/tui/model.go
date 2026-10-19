@@ -16,6 +16,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	version          string
 	previousProvider string
 	entities         *entityState
 	dialog           *entityDialog
@@ -160,6 +161,12 @@ func (m *Model) persist() tea.Cmd {
 	m.dirty = false
 	snap, store := m.snapshot, m.cache
 	return func() tea.Msg { return cacheMsg{err: store.Save(snap)} }
+}
+
+// WithVersion sets the build version displayed in help.
+func (m Model) WithVersion(version string) Model {
+	m.version = version
+	return m
 }
 
 // WithJiraPattern selects the issue-key pattern used for PR links and navigation.

@@ -258,6 +258,11 @@ func age(at time.Time) string {
 
 func (m Model) helpView() tea.View {
 	rows := strings.Split(helpText, "\n")
+	version := m.version
+	if version == "" {
+		version = "dev"
+	}
+	rows[0] += " · custom-visning · Versjon " + clean(version)
 	capacity := max(1, m.height-1)
 	start := max(0, min(m.helpOffset, len(rows)-capacity))
 	lines := append([]string{}, rows[start:min(len(rows), start+capacity)]...)
