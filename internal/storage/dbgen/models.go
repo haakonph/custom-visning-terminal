@@ -256,6 +256,16 @@ type Snooze struct {
 	UntilAt string
 }
 
+type SnoozeReference struct {
+	SnoozeID      string
+	ReferenceRole string
+	Position      int64
+	Provider      string
+	Url           string
+	ReferenceKey  string
+	Title         string
+}
+
 type StorageState struct {
 	Kind string
 }

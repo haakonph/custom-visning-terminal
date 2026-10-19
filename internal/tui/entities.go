@@ -44,7 +44,20 @@ func newEntities() *entityState {
 	}
 	return s
 }
-func refID(r model.TaskReference) string { return r.Provider + ":" + r.URL }
+func refID(r model.TaskReference) string {
+	if r.SnoozeID != "" {
+		return "snooze:" + r.SnoozeID
+	}
+	return r.Provider + ":" + r.URL
+}
+
+func underlyingReferences(refs []model.TaskReference) []model.TaskReference {
+	refs = append([]model.TaskReference(nil), refs...)
+	for i := range refs {
+		refs[i].SnoozeID = ""
+	}
+	return refs
+}
 func provider(k string) string {
 	return map[string]string{"o": "task", "g": "github", "t": "jira", "a": "copilot", "c": "mattermost"}[k]
 }
@@ -155,6 +168,10 @@ func (m *Model) visibleReferences() []model.TaskReference {
 				if u, err := url.Parse(r.URL); err == nil {
 					r.Key = strings.TrimPrefix(u.Path, "/")
 				}
+			}
+			r.SnoozeID = e.ID
+			if len(e.Roots) > 0 {
+				r.Title = e.Title + " · hele sammenhengen"
 			}
 			refs = append(refs, r)
 		}
@@ -425,6 +442,17 @@ func (m *Model) allReferences() []model.TaskReference {
 	return sortedRefs(refs)
 }
 func (m *Model) relatedReferences(origins []model.TaskReference, kind string) []model.TaskReference {
+	return m.relatedReferenceKinds(origins, kind)
+}
+
+func (m *Model) relatedReferenceKinds(origins []model.TaskReference, kinds ...string) []model.TaskReference {
+	// Deferred rows have their own selection identity, but relations use the
+	// underlying provider entity, including for separately deferred groups.
+	origins = underlyingReferences(origins)
+	include := map[string]bool{}
+	for _, kind := range kinds {
+		include[kind] = true
+	}
 	refs := map[string]model.TaskReference{}
 	adj := map[string][]string{}
 	edge := func(a, b model.TaskReference) {
@@ -522,12 +550,12 @@ func (m *Model) relatedReferences(origins []model.TaskReference, kind string) []
 	result := map[string]model.TaskReference{}
 	for _, origin := range origins {
 		id := refID(origin)
-		if origin.Provider == kind {
+		if include[origin.Provider] {
 			result[id] = origin
 		}
 		for _, neighbor := range adj[id] {
 			r := refs[neighbor]
-			if r.Provider == kind {
+			if include[r.Provider] {
 				result[neighbor] = r
 			}
 		}
@@ -641,6 +669,7 @@ func (m *Model) updateCopilotDetail() tea.Cmd {
 	return cmd
 }
 func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model, tea.Cmd) {
+	origins, targets = underlyingReferences(origins), underlyingReferences(targets)
 	if m.entities.err != nil {
 		m.sequenceNotice = "Kunne ikke lese koblinger: " + m.entities.err.Error()
 		return m, nil
@@ -698,6 +727,9 @@ func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model
 	return m, nil
 }
 func refSnoozeID(r model.TaskReference) string {
+	if r.SnoozeID != "" {
+		return r.SnoozeID
+	}
 	if r.Provider == "task" {
 		return "task:" + r.Key
 	}

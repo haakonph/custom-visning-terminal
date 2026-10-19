@@ -10,6 +10,8 @@ type Task struct {
 }
 
 type TaskReference struct {
+	// SnoozeID distinguishes a deferred group from a separate item snooze.
+	SnoozeID string `json:"-"`
 	Provider string `json:"provider"`
 	URL      string `json:"url"`
 	Key      string `json:"key"`

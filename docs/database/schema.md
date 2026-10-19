@@ -210,6 +210,15 @@ erDiagram
     schema_migrations {
         INTEGER version PK
     }
+    snooze_references {
+        TEXT snooze_id PK,FK
+        TEXT reference_role PK
+        INTEGER position PK
+        TEXT provider
+        TEXT url
+        TEXT reference_key
+        TEXT title
+    }
     snoozes {
         TEXT id PK
         TEXT kind
@@ -256,6 +265,7 @@ erDiagram
     mattermost_accounts |o..o{ mattermost_channels : fk_0
     mattermost_channels |o..o{ mattermost_posts : fk_0
     mattermost_posts |o..o{ mattermost_pr_mentions : fk_0
+    snoozes |o..o{ snooze_references : fk_0
     accounts |o..o{ sync_state : fk_0
     tasks |o..o{ task_references : fk_0
 ```

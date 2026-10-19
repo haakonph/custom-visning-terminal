@@ -776,8 +776,11 @@ andre filnavn får `.sqlite` lagt til. Mapper opprettes med 0700 og databaser me
 
 ### Lokal snooze
 
-I navigasjonsmodus starter `z` snooze for valgt PR, Jira-sak eller lokal oppgave.
-Skriv et positivt heltall og avslutt med `h`, `d` eller `m`; dette lagrer straks.
+I navigasjonsmodus starter `z` snooze for valgte elementer. `zz` utvider til hele
+sammenhengen og viser kjente oppgaver, Jira-saker, PR-er, AI-sesjoner og
+chatmeldinger før du velger tid. Skriv eventuelt et positivt heltall og avslutt
+med `h`, `d`, `m` eller `D`; dette lagrer straks. Uten tall brukes **1**:
+`zh` betyr én time, `zzh` hele sammenhengen én time og `zz2h` to timer.
 For eksempel betyr `z12h` tolv faktiske timer fra nå, `z3d` tre kalenderdager
 med samme lokale klokkeslett og `z14m` fjorten kalenderdager fra i dag kl. 06:00.
 Backspace retter tallet. Esc avbryter uten å lagre. Null, ugyldige tall og
@@ -790,7 +793,17 @@ Etter lagring vises faktisk lokal returtid med tidssone og UTC-offset.
 
 Snooze deles mellom alle faner og søk for samme tjeneste/server og URL.
 En oppgaves snooze gjelder bare oppgaven; referansene beholdes og merkes hvis
-referansen selv er utsatt. Oppgaver får en varig lokal ID ved første snooze.
+referansen selv er utsatt. Med `zz` inkluderes valgte/tilknyttede oppgaver,
+deres referanser og én videre relasjon til andre typer. Andre oppgaver trekkes
+ikke inn via delte referanser. Fra en PR eller sak brukes direkte tilknyttede
+oppgaver som utgangspunkt. Oppgaver får en varig lokal ID.
+
+En hel sammenheng lagres som én gruppe i **Utsatt**. `d` viser medlemmene,
+`z` endrer tidspunktet for gruppen og `az` henter gruppen tilbake.
+Separate snoozinger og andre grupper beholdes. Nye kjente koblinger følger
+pausen automatisk; tidligere kjente medlemmer beholdes også uten nettverk.
+Relasjoner bygger på data appen har lastet og lokale koblinger, ikke et komplett
+søk i eksterne tjenester. Delte referanser merkes som utsatt i aktive oppgaver.
 GitHub og Jira endres aldri. Returtid sjekkes hvert sekund uten nettverkskall;
 utløpte elementer er synlige også etter omstart og beholder vanlig sortering.
 
@@ -800,7 +813,8 @@ forekommer to ganger velges første forekomst. Timer er alltid medgått tid.
 
 Data lagres separat fra nettverkscache i `custom-visning/snooze.sqlite` under
 brukerens konfigurasjonsmappe (`CUSTOM_VISNING_SNOOZE` kan overstyre filstien).
-Tabellen inneholder identitet, type, tittel, URL og returtid. Skriving bruker en
+Tabellen inneholder identitet, type, tittel, URL og returtid. Gruppens utgangspunkt
+og medlemmer ligger i `snooze_references`. Skriving bruker en
 SQLite-transaksjon, med 0600 på databasefilen og 0700 på nye mapper.
 Lagringsfeil vises, og raden skjules først når lagringen har lykkes. En skadet
 snooze-database blokkerer nye lagringer til lageret er rettet og programmet startet på nytt.

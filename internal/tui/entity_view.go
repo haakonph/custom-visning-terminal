@@ -49,8 +49,22 @@ func (m Model) snoozeInputView() tea.View {
 	m.snoozes = &state
 	view := m.View()
 	lines := strings.Split(view.Content, "\n")
+	if state.whole {
+		lines = []string{"Utsett hele sammenhengen · kjente relasjoner"}
+		var members []model.TaskReference
+		for _, e := range state.targets {
+			members = append(members, e.Members...)
+		}
+		lines = append(lines, contextSummary(members))
+		for _, r := range members {
+			lines = append(lines, fmt.Sprintf(" %s · %s · %s", r.Provider, r.Key, clean(r.Title)))
+		}
+	}
 	lines = lines[:min(len(lines), max(0, m.height-1))]
-	prompt := "Snooze: " + state.digits + "▏ · h timer · d dager · m dager kl. 06 · Esc avbryt"
+	prompt := "Snooze: " + state.digits + "▏ · h timer · d dager · m/D kl. 06 · uten tall: 1 · Esc avbryt"
+	if !state.whole && state.digits == "" {
+		prompt = "Snooze: ▏ · z hele sammenhengen · h 1 time · d 1 dag · m/D kl. 06 · Esc avbryt"
+	}
 	if state.notice != "" {
 		prompt += " · " + state.notice
 	}
@@ -70,6 +84,12 @@ func (m Model) entitySnapshotView() tea.View {
 	text := r.Provider + " · " + r.Key + "\n" + r.Title + "\n" + r.URL
 	if entry, ok := m.snoozes.entries[refSnoozeID(r)]; ok {
 		text += "\nUtsatt til: " + entry.Until.Local().Format("2006-01-02 15:04 MST")
+		if len(entry.Roots) > 0 {
+			text += "\nHele sammenhengen: " + contextSummary(entry.Members)
+			for _, member := range entry.Members {
+				text += "\n" + member.Provider + " · " + member.Key + " · " + member.Title
+			}
+		}
 	}
 	lines := []string{}
 	for _, line := range strings.Split(text, "\n") {

@@ -18,6 +18,34 @@ func (q *Queries) ClearSnoozes(ctx context.Context) error {
 	return err
 }
 
+const insertSnoozeReference = `-- name: InsertSnoozeReference :exec
+INSERT INTO snooze_references (snooze_id, reference_role, position, provider, url, reference_key, title)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+`
+
+type InsertSnoozeReferenceParams struct {
+	SnoozeID      string
+	ReferenceRole string
+	Position      int64
+	Provider      string
+	Url           string
+	ReferenceKey  string
+	Title         string
+}
+
+func (q *Queries) InsertSnoozeReference(ctx context.Context, arg InsertSnoozeReferenceParams) error {
+	_, err := q.db.ExecContext(ctx, insertSnoozeReference,
+		arg.SnoozeID,
+		arg.ReferenceRole,
+		arg.Position,
+		arg.Provider,
+		arg.Url,
+		arg.ReferenceKey,
+		arg.Title,
+	)
+	return err
+}
+
 const insertSnoozes = `-- name: InsertSnoozes :exec
 INSERT INTO snoozes (id, kind, title, url, until_at) VALUES (?1, ?2, ?3, ?4, ?5)
 `
@@ -39,6 +67,41 @@ func (q *Queries) InsertSnoozes(ctx context.Context, arg InsertSnoozesParams) er
 		arg.UntilAt,
 	)
 	return err
+}
+
+const listSnoozeReferences = `-- name: ListSnoozeReferences :many
+SELECT snooze_id, reference_role, position, provider, url, reference_key, title FROM snooze_references ORDER BY snooze_id, reference_role, position
+`
+
+func (q *Queries) ListSnoozeReferences(ctx context.Context) ([]SnoozeReference, error) {
+	rows, err := q.db.QueryContext(ctx, listSnoozeReferences)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SnoozeReference{}
+	for rows.Next() {
+		var i SnoozeReference
+		if err := rows.Scan(
+			&i.SnoozeID,
+			&i.ReferenceRole,
+			&i.Position,
+			&i.Provider,
+			&i.Url,
+			&i.ReferenceKey,
+			&i.Title,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSnoozes = `-- name: ListSnoozes :many

@@ -17,7 +17,8 @@ Gamle enkelttaster og tall-/Tab-snarveier er fjernet.
 | `Space` | Marker eller fjern markering av aktiv rad |
 | `Shift+↑` / `Shift+↓` | Utvid markeringen med aktiv og neste/forrige rad |
 | `x` | Fjern alle markeringer uten å endre søk eller filtre |
-| `z` + tall + `h` / `d` | Utsett valgte elementer i timer eller kalenderdager |
+| `z` + valgfritt tall + `h` / `d` | Utsett valgte elementer; uten tall brukes 1 |
+| `zz` + valgfritt tall + `h` / `d` / `m` / `D` | Vis og utsett hele sammenhengen; `zzh` betyr én time |
 | `Esc` | Avbryt sekvens/dialog, lukk detaljer eller fjern markeringer |
 
 Flervalg finnes for oppgaver, PR-er, Jira-saker, AI-sesjoner, chatmeldinger,
@@ -134,7 +135,7 @@ Følgende utvider mønsteret for funksjoner som allerede fantes:
 | `ah` / `a↓` / `a↑` | Eldre chatmeldinger / rull en halv side ned/opp |
 | `el` | Vis en liste over eksterne lenker i valgte elementer |
 | `ev` | Velg editor med j/k + Enter: IntelliJ, VS Code eller egendefinert |
-| `z` + tall + `m` | Utsett til kl. 06 etter antall kalenderdager, tidligere stor `D` |
+| `z` + valgfritt tall + `m` / `D` | Utsett til kl. 06 etter antall kalenderdager; uten tall brukes 1 |
 | `Ctrl+C` | Avslutt og kanseller bakgrunnsarbeid |
 | `Enter` | Bekreft valg/tekst i dialoger; ikke en snarvei i hovedlisten |
 

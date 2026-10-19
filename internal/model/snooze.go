@@ -8,4 +8,7 @@ type SnoozeEntry struct {
 	Title string    `json:"title"`
 	URL   string    `json:"url,omitempty"`
 	Until time.Time `json:"until"`
+	// Roots identify a context snooze. Members retain its known scope offline.
+	Roots   []TaskReference `json:"roots,omitempty"`
+	Members []TaskReference `json:"members,omitempty"`
 }
