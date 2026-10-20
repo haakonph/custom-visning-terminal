@@ -27,6 +27,7 @@ ee/en           Editor (IntelliJ) / nettleser
 eee/eew         AI-visning: chattens arbeidsmappe / worktree i IntelliJ
 e + ting + e/n  Følg relasjon(er), åpne i editor/nettleser
 as/ak/ad        Melding / lokalt arkiv / slett lokal oppgave/referanse
+aw              GitHub: slett valgte lokale worktrees; y bekrefter, Esc avbryter
 a+/a-          GitHub: automerge på / av for valgte PR-er
                 Merge when ready: GitHub merger når kravene er oppfylt
                 AUTO viser ON/OFF/UNKNOWN; QUEUE viser mergekøen

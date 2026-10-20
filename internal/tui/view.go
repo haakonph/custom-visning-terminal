@@ -46,6 +46,9 @@ func status(s model.Status) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))
 }
 func (m Model) View() tea.View {
+	if m.local != nil && len(m.local.removePending) > 0 {
+		return m.removeLocalView()
+	}
 	if m.help {
 		return m.helpView()
 	}

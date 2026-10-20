@@ -23,6 +23,8 @@ type localState struct {
 	running                    int
 	editor                     string
 	choosing                   bool
+	removePending              []model.PullRequest
+	removing                   bool
 	editorChoice               int
 	results                    []string
 	warmed                     map[string]time.Time
@@ -220,6 +222,20 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 	}
 	l := m.local
 	switch msg := msg.(type) {
+	case localRemoveResult:
+		l.removing = false
+		l.generation++
+		for i, p := range msg.rows {
+			delete(l.preparing, p.Key())
+			delete(l.statuses, p.Key())
+			result := fmt.Sprintf("%s #%d: worktree slettet · ee oppretter nytt", m.githubName(p.Repository), p.Number)
+			if msg.errors[i] != nil {
+				result = fmt.Sprintf("%s #%d: %s", m.githubName(p.Repository), p.Number, msg.errors[i])
+			}
+			l.results = append(l.results, result)
+			m.notice = result
+		}
+		return true, m.refreshLocal()
 	case localCleanupResult:
 		l.cleanupRunning = false
 		l.cleanupAt = time.Now()
