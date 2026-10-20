@@ -15,7 +15,7 @@ func (c *Client) RequestCopilotReview(ctx context.Context, p model.PullRequest) 
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" || p.Number <= 0 {
 		return errors.New("Ugyldig repository eller PR-nummer")
 	}
-	_, _, err := c.api.PullRequests.RequestReviewers(ctx, parts[0], parts[1], p.Number, gh.ReviewersRequest{Reviewers: []string{"copilot-pull-request-reviewer"}})
+	_, _, err := c.api.PullRequests.RequestReviewers(ctx, parts[0], parts[1], p.Number, gh.ReviewersRequest{Reviewers: []string{"copilot-pull-request-reviewer[bot]"}})
 	if err != nil {
 		return safeError(err)
 	}

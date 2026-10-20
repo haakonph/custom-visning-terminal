@@ -23,7 +23,7 @@ func TestRequestCopilotReview(t *testing.T) {
 				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 					t.Fatal(err)
 				}
-				if len(body.Reviewers) != 1 || body.Reviewers[0] != "copilot-pull-request-reviewer" {
+				if len(body.Reviewers) != 1 || body.Reviewers[0] != "copilot-pull-request-reviewer[bot]" {
 					t.Errorf("wrong reviewers: %v", body.Reviewers)
 				}
 				w.WriteHeader(status)
