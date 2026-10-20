@@ -639,11 +639,9 @@ uten shell. Manglende prosjektmappe eller launcher vises som en melding i appen.
 
 Press **Space** to toggle PR selection. Selection survives filters, tabs and
 provider switches, so PRs from different repositories can be opened together.
-Press **o** to open the selection in the default editor, or the highlighted PR
-when nothing is selected. **O** opens a chooser: **1** IntelliJ IDEA, **2** VS
-Code, **3** the configured custom command; **Esc** cancels. **Enter** continues
-to open the PR in your browser. Editor choice in the chooser is for that
-operation; set `editors.default` to persist your preference.
+Press **ee** to open the selection in IntelliJ, or the highlighted PR when
+nothing is selected. **ev** opens an editor chooser using j/k and Enter;
+Esc cancels. **en** opens the PR in your browser.
 
 The shared app configuration (also editable with `,` → Innstillinger) is stored at
 `os.UserConfigDir()/custom-visning/config.json` (normally
@@ -654,6 +652,15 @@ Edit it and restart the application:
 ```json
 {
   "repository_paths": ["/home/alice/src/frontend", "/home/alice/src/backend"],
+  "workspace": {
+    "warm": true,
+    "install": true,
+    "main_branch": "main",
+    "indexer": {
+      "command": "",
+      "args": ["warmup", "{path}"]
+    }
+  },
   "editors": {
     "default": "intellij",
     "intellij": {"command": "idea", "args": ["{path}"]},
@@ -684,8 +691,10 @@ mapping/cache, new bare clone. New storage defaults to:
 ```text
 ~/.local/share/custom-visning/
 ├── repos/owner/repo.git/
-├── worktrees/owner/repo/pr-142/
-├── worktrees/owner/repo/pr-156/
+├── main/owner/repo/
+├── worktrees/owner/repo/pr-142-fix-login/
+├── worktrees/owner/repo/pr-156-add-search/
+├── logs/
 ├── repositories.sqlite
 └── worktrees.sqlite
 ```
@@ -695,7 +704,24 @@ Linux respects an absolute `XDG_DATA_HOME`; macOS and Windows use
 identities, never authentication tokens. PR dashboard snapshots continue to use
 the existing account-scoped SQLite cache independently.
 
-New worktrees use detached HEADs and share their repository's Git objects.
+On startup and GitHub refresh, repositories from all loaded PR tabs are queued
+for background preparation. A background timer also keeps these main checkouts
+updated without a manual refresh. One main checkout per repository is fetched and
+fast-forwarded, at most once per five minutes while the app is running. Existing
+PR checkouts are updated only when opened. Set `workspace.warm` to false to
+disable background preparation, or change `main_branch` for repos using master.
+Registered working directories are never checked out or pulled: a separate
+main worktree shares their objects. If main is already checked out, that separate
+checkout uses `custom-visning/warm-main`. Local changes, switched branches and
+Git operations in progress prevent updating the main checkout.
+
+New PR worktrees use the PR's actual branch name when available. A branch already
+in use gets an independent `custom-visning/pr-NUMBER` branch; existing branches
+and local commits are preserved. New directories include a sanitized PR title;
+the PR number is the stable identity, so renaming a PR reuses its old directory.
+Legacy paths are reused, and clean detached checkouts are attached to a branch
+on their next opening. Dirty detached checkouts remain untouched.
+All worktrees share their repository's Git objects.
 Missing commits are fetched from the base repository's `refs/pull/NUMBER/head`,
 which also supports fork PRs; local refs use `refs/custom-visning/owner/repo/pr-NUMBER`.
 Native Git is used because `gh pr checkout --worktree` is unavailable in many
@@ -704,12 +730,12 @@ Git HTTPS authentication uses the existing `gh auth git-credential` helper.
 Install Git and GitHub CLI and run `gh auth login --hostname github.com` with
 access to the repositories. No additional authentication mechanism is introduced.
 
-Existing worktrees already at the dashboard's PR head open immediately without
-clone or fetch. When opening an outdated worktree, the app automatically advances
-it to that PR head **only if it is clean, detached, and the change is a
+Existing worktrees already at the dashboard's PR head need no clone or fetch.
+When opening an outdated worktree, the app automatically advances it to that PR
+head **only if it is clean, on its managed PR branch, and the change is a
 fast-forward**. Missing commits are fetched if necessary. This never uses reset,
-force checkout, stash, merge or rebase. Attached branches, local commits, rewritten
-PR history, and Git operations in progress require manual updates. Ignored files
+force checkout, stash, merge commits or rebase. Other branches, local commits,
+rewritten PR history, and Git operations in progress require manual updates. Ignored files
 that would be overwritten also prevent updating. Local changes are preserved.
 If fetching or checkout fails, the existing worktree still opens with an update
 notice; cancellation stops the operation.
@@ -717,8 +743,8 @@ notice; cancellation stops the operation.
 `Ready`, `Modified`, and `Outdated` appear in the selected PR's detail line (and a
 LOCAL column in wide terminals). Modified and Outdated can appear together.
 Outdated means local HEAD differs from the latest PR head reported by the
-dashboard; press **r** to refresh GitHub data and local status, then **o** to open
-and attempt a safe update. Refreshing alone never changes worktree files. An
+dashboard; refresh GitHub data, then press **ee** to open and attempt a safe update.
+Refreshing can update the main checkout but never changes PR worktree files. An
 older cached snapshot cannot detect remote changes until refreshed. There is no
 automatic merge/rebase or deletion command in this release.
 
@@ -728,6 +754,38 @@ active open operation cannot be submitted twice. Preparing indicators, recent
 per-PR results and errors remain visible while other navigation works. Local
 status is read asynchronously at startup, refresh and preparation, never during
 rendering. A failed PR does not stop the remaining selection.
+
+### Dependencies and headless IntelliJ
+
+Main checkouts and clean, current PR worktrees are prepared using their own
+root build files. Maven uses `./mvnw -B -DskipTests install` (or `mvn`), Gradle
+uses `./gradlew --no-daemon assemble -x test` (or `gradle`), and npm uses `npm ci`
+when a lockfile exists, otherwise `npm install`. Java builds prefer Maven when
+both Maven and Gradle root files exist; npm also runs for mixed projects.
+This executes the repository's build/install scripts. Set `workspace.install`
+to false to disable it. Java/Node and any required SDK versions must already be
+available in the app's environment. Monorepos should expose their build from the
+repository root. Download caches are shared through the tools' normal user
+caches; build output and node_modules stay separate per checkout.
+
+Headless indexing is enabled by setting **IntelliJ headless · kommando** in `vs`
+to a compatible launcher. For an IntelliJ installation with the Remote Development
+warmup command, configure its `bin/remote-dev-server.sh` and leave the arguments
+as `["warmup", "{path}"]`. For another version or platform, supply an executable
+wrapper and its argument list that imports/indexes the project and exits when
+finished. An empty command disables indexing and is reported in the UI. The
+normal `idea` GUI launcher is configured separately under Editor settings.
+
+Preparation runs once per checkout, commit and workspace configuration after a
+successful run. Failures are retried on a later opening/background cycle. Build and
+indexer output goes to private files under `logs/`; errors show the log path.
+Failed preparation still opens the PR with a notice so setup can be repaired in
+the IDE. Quitting cancels active preparation. Main is limited to 15 minutes per
+repository and PR opening to 20 minutes including any repository-lock wait.
+Indexing main does not guarantee reusable indexes at a new worktree path, so the
+headless command also runs for each clean, current PR checkout before opening.
+IDE detection of the PR depends on its GitHub integration; a fallback branch has
+no automatic upstream/push target, especially for fork PRs.
 
 ### Troubleshooting worktrees
 

@@ -43,6 +43,11 @@ var settingFields = []settingField{
 	{"Copilot · IntelliJ-launcher", "copilot.intellij_command", "string"},
 	{"Mattermost · serveradresse", "mattermost.server", "url"},
 	{"Mattermost · brukernavn", "mattermost.username", "string"},
+	{"Lokalt · klargjør main automatisk", "workspace.warm", "bool"},
+	{"Lokalt · installer avhengigheter", "workspace.install", "bool"},
+	{"Lokalt · hovedbranch", "workspace.main_branch", "string"},
+	{"IntelliJ headless · kommando", "workspace.indexer.command", "string"},
+	{"IntelliJ headless · argumenter (JSON)", "workspace.indexer.args", "list"},
 	{"GitHub · skjulte organisasjonsprefikser (JSON)", "github.hidden_prefixes", "list"},
 }
 
@@ -75,7 +80,7 @@ func settingsDocument() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defaults := map[string]any{"editors": local.Defaults().Editors, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
+	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
 	b, _ := json.Marshal(defaults)
 	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {

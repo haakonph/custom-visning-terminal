@@ -98,6 +98,8 @@ func (m Model) setupLines() []string {
 			"Utenfor appen: Installer Git og editoren du vil bruke. Sørg for at git og editorens launcher er tilgjengelige.",
 			"I appen: vs åpner repository paths og editorinnstillinger (IntelliJ, VS Code eller egen kommando).",
 			"Repository paths er absolutte stier til lokale repositories. Bruk editorens kommando og argumenter ved behov.",
+			"Repoer fra PR-listene klargjøres på main i bakgrunnen, med Maven/Gradle/npm fra prosjektets rot.",
+			"IntelliJ headless · kommando/argumenter i vs aktiverer indeksering før åpning. Java/Node må være installert.",
 			"Git må ha tilgang til private repositories via SSH eller din Git-credential-håndtering. API-token alene konfigurerer ikke Git.",
 			"Start appen på nytt etter endringer. ee åpner valgt element i editor, ev velger editor.",
 		}

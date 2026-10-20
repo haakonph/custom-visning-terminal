@@ -22,12 +22,20 @@ type Editors struct {
 	Custom   Editor `json:"custom"`
 }
 type Config struct {
-	RepositoryPaths []string `json:"repository_paths"`
-	Editors         Editors  `json:"editors"`
+	RepositoryPaths []string        `json:"repository_paths"`
+	Editors         Editors         `json:"editors"`
+	Workspace       WorkspaceConfig `json:"workspace"`
+}
+
+type WorkspaceConfig struct {
+	Warm       bool   `json:"warm"`
+	Install    bool   `json:"install"`
+	MainBranch string `json:"main_branch"`
+	Indexer    Editor `json:"indexer"`
 }
 
 func Defaults() Config {
-	return Config{Editors: Editors{Default: "intellij", IntelliJ: Editor{"idea", []string{"{path}"}}, VSCode: Editor{"code", []string{"--new-window", "{path}"}}}}
+	return Config{Workspace: WorkspaceConfig{Warm: true, Install: true, MainBranch: "main", Indexer: Editor{Args: []string{"warmup", "{path}"}}}, Editors: Editors{Default: "intellij", IntelliJ: Editor{"idea", []string{"{path}"}}, VSCode: Editor{"code", []string{"--new-window", "{path}"}}}}
 }
 func Directories() (config, data string, err error) {
 	config, err = os.UserConfigDir()
@@ -58,7 +66,7 @@ func LoadConfig(path string) (Config, error) {
 	c := Defaults()
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return c, appconfig.Update(path, map[string]any{"repository_paths": c.RepositoryPaths, "editors": c.Editors})
+		return c, appconfig.Update(path, map[string]any{"repository_paths": c.RepositoryPaths, "editors": c.Editors, "workspace": c.Workspace})
 	}
 	if err != nil {
 		return c, err

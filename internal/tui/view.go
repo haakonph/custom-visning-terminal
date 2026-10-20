@@ -154,6 +154,9 @@ func (m Model) View() tea.View {
 		reserved := 7
 		if m.local != nil {
 			reserved += min(3, len(m.local.results))
+			if m.local.warmNotice != "" {
+				reserved++
+			}
 		}
 		capacity := max(1, m.height-len(lines)-reserved)
 		lines = append(lines, m.groupedPRLines(rows, capacity)...)
@@ -170,6 +173,9 @@ func (m Model) View() tea.View {
 				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · v vis referanser · M kanaler", m.mmMentionCount(p.URL)))
 			}
 		}
+	}
+	if m.local != nil && m.local.warmNotice != "" {
+		lines = append(lines, muted.Render(clean(m.local.warmNotice)))
 	}
 	if m.local != nil && len(m.local.results) > 0 {
 		for _, result := range m.local.results[max(0, len(m.local.results)-3):] {

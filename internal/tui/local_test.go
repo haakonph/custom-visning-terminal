@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
@@ -104,5 +105,49 @@ func TestProgressErrorsRemainVisible(t *testing.T) {
 		if !strings.Contains(content, text) {
 			t.Fatalf("%q hidden in full dashboard: %s", text, content)
 		}
+	}
+}
+
+func TestMainWarmQueueDeduplicatesRepositoriesAcrossViews(t *testing.T) {
+	m := localModel(t)
+	m.snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo", Number: 7}}
+	if cmd := m.warmLocal(); cmd == nil || !m.local.warming || len(m.local.warmed) != 1 {
+		t.Fatal("main preparation not scheduled")
+	}
+	if cmd := m.warmLocal(); cmd != nil {
+		t.Fatal("duplicate main preparation scheduled")
+	}
+	m, cmd := update(m, localWarmResult{repository: "acme/api", err: errors.New("build failed")})
+	if cmd == nil || !m.local.warming || len(m.local.warmed) != 2 || len(m.local.results) != 1 {
+		t.Fatal("failure blocked the next repository")
+	}
+	m, cmd = update(m, localWarmResult{repository: "other/repo"})
+	if cmd != nil || m.local.warming {
+		t.Fatal("warmed repositories should wait before refreshing")
+	}
+	m.local.manager.Workspace.Warm = false
+	m.snapshot.Datasets[2].PRs = []model.PullRequest{{Repository: "third/repo"}}
+	if cmd := m.warmLocal(); cmd != nil {
+		t.Fatal("disabled warming scheduled a job")
+	}
+}
+
+func TestBackgroundPreparationCompletesWhileSettingsOpen(t *testing.T) {
+	m := localModel(t)
+	m.settings.active = true
+	m.local.warming = true
+	m.local.manager.Workspace.Warm = false
+	m, _ = update(m, localWarmResult{repository: "acme/api"})
+	if m.local.warming || !strings.Contains(m.local.warmNotice, "Main klar") || !m.settings.active {
+		t.Fatal("settings swallowed background result")
+	}
+}
+
+func TestMainWarmQueuePrefersUnpreparedRepository(t *testing.T) {
+	m := localModel(t)
+	m.local.warmed["acme/api"] = time.Now().Add(-10 * time.Minute)
+	m.snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo"}}
+	if cmd := m.warmLocal(); cmd == nil || m.local.warmed["other/repo"].IsZero() {
+		t.Fatal("slow preparation starved a new repository")
 	}
 }

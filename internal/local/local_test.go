@@ -331,8 +331,8 @@ func TestCleanWorktreeAutomaticallyFastForwards(t *testing.T) {
 	if updated.Path != first.Path || updated.Head != p.HeadOID || updated.Outdated || updated.Modified {
 		t.Fatalf("not updated: %+v", updated)
 	}
-	if _, err = git(ctx, updated.Path, "symbolic-ref", "-q", "HEAD"); err == nil {
-		t.Fatal("HEAD should remain detached")
+	if branch := run(t, updated.Path, "symbolic-ref", "--short", "HEAD"); branch != "custom-visning/pr-1" {
+		t.Fatalf("PR branch lost: %s", branch)
 	}
 }
 func TestLocalCommitsAreNotReplaced(t *testing.T) {
