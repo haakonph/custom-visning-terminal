@@ -104,7 +104,7 @@ type projectCommand struct {
 	args    []string
 }
 
-func projectCommands(path string) []projectCommand {
+func projectCommands(path string, mavenFlags []string) []projectCommand {
 	has := func(name string) bool { s, err := os.Stat(filepath.Join(path, name)); return err == nil && !s.IsDir() }
 	var result []projectCommand
 	if has("pom.xml") {
@@ -112,7 +112,8 @@ func projectCommands(path string) []projectCommand {
 		if has("mvnw") {
 			command = filepath.Join(path, "mvnw")
 		}
-		result = append(result, projectCommand{command, []string{"-B", "-DskipTests", "install"}})
+		args := append([]string{"-B", "-DskipTests"}, mavenFlags...)
+		result = append(result, projectCommand{command, append(args, "install")})
 	} else if has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") || has("settings.gradle.kts") {
 		command := "gradle"
 		if has("gradlew") {
@@ -151,7 +152,7 @@ func (w *WorktreeManager) prepareProject(ctx context.Context, path, head string)
 	}
 	var commands []projectCommand
 	if w.Workspace.Install {
-		commands = projectCommands(path)
+		commands = projectCommands(path, w.Workspace.MavenFlags)
 	}
 	if indexer := w.Workspace.Indexer; indexer.Command != "" {
 		args := make([]string, 0, len(indexer.Args)+1)

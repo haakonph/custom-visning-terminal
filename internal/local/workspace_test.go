@@ -2,12 +2,87 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestMavenFlagsConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name, config string
+		want         []string
+	}{
+		{"existing", `{"workspace":{"install":true}}`, []string{"-Dmaven.gitcommitid.skip=true"}},
+		{"custom", `{"workspace":{"maven_flags":["-U","-Pdev"]}}`, []string{"-U", "-Pdev"}},
+		{"empty", `{"workspace":{"maven_flags":[]}}`, []string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, []byte(tc.config), 0600); err != nil {
+				t.Fatal(err)
+			}
+			config, err := LoadConfig(path)
+			if err != nil || !reflect.DeepEqual(config.Workspace.MavenFlags, tc.want) {
+				t.Fatal(config, err)
+			}
+		})
+	}
+}
+
+func TestMavenFlagsReachBuildAndInvalidateCache(t *testing.T) {
+	w, p, _ := fixture(t)
+	// Create the worktree without caching an install before Maven files exist.
+	w.Workspace.Install = false
+	s, err := w.Prepare(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Workspace.Install = true
+	w.Workspace.MavenFlags = Defaults().Workspace.MavenFlags
+	for name, content := range map[string]string{
+		"pom.xml": "<project/>",
+		"mvnw":    "#!/bin/sh\nprintf '%s\\n' \"$@\" >> maven-runs\n",
+	} {
+		if err := os.WriteFile(filepath.Join(s.Path, name), []byte(content), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prepare := func() {
+		t.Helper()
+		if err := w.prepareProject(context.Background(), s.Path, s.Head); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prepare()
+	prepare()
+	runs, err := os.ReadFile(filepath.Join(s.Path, "maven-runs"))
+	if err != nil || string(runs) != "-B\n-DskipTests\n-Dmaven.gitcommitid.skip=true\ninstall\n" {
+		t.Fatalf("%s: %v", runs, err)
+	}
+	w.Workspace.MavenFlags = []string{"-U", "-Dlabel=two words; $(touch unexpected)"}
+	prepare()
+	runs, err = os.ReadFile(filepath.Join(s.Path, "maven-runs"))
+	if err != nil || !strings.HasSuffix(string(runs), "-B\n-DskipTests\n-U\n-Dlabel=two words; $(touch unexpected)\ninstall\n") || strings.Count(string(runs), "install\n") != 2 {
+		t.Fatalf("%s: %v", runs, err)
+	}
+	if _, err := os.Stat(filepath.Join(s.Path, "unexpected")); !os.IsNotExist(err) {
+		t.Fatal("shell interpreted Maven flag", err)
+	}
+	// Explicit empty flags survive a JSON round trip.
+	w.Workspace.MavenFlags = []string{}
+	data, _ := json.Marshal(w.Workspace)
+	if !strings.Contains(string(data), `"maven_flags":[]`) {
+		t.Fatal(string(data))
+	}
+	prepare()
+	runs, err = os.ReadFile(filepath.Join(s.Path, "maven-runs"))
+	if err != nil || !strings.HasSuffix(string(runs), "-B\n-DskipTests\ninstall\n") || strings.Count(string(runs), "install\n") != 3 {
+		t.Fatalf("%s: %v", runs, err)
+	}
+}
 
 func TestPRNameBranchAndTitleChange(t *testing.T) {
 	w, p, _ := fixture(t)
@@ -125,7 +200,7 @@ func TestProjectCommandsUseWrappersAndLockfile(t *testing.T) {
 		{filepath.Join(path, "mvnw"), []string{"-B", "-DskipTests", "install"}},
 		{"npm", []string{"ci", "--no-audit", "--no-fund"}},
 	}
-	if got := projectCommands(path); !reflect.DeepEqual(got, want) {
+	if got := projectCommands(path, nil); !reflect.DeepEqual(got, want) {
 		t.Fatal(got)
 	}
 	if err := os.Remove(filepath.Join(path, "pom.xml")); err != nil {
@@ -137,7 +212,7 @@ func TestProjectCommandsUseWrappersAndLockfile(t *testing.T) {
 		}
 	}
 	want[0] = projectCommand{filepath.Join(path, "gradlew"), []string{"--no-daemon", "assemble", "-x", "test"}}
-	if got := projectCommands(path); !reflect.DeepEqual(got, want) {
+	if got := projectCommands(path, []string{"-Pcustom"}); !reflect.DeepEqual(got, want) {
 		t.Fatal(got)
 	}
 }
