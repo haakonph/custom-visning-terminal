@@ -69,6 +69,9 @@ func autoMergeLabel(p model.PullRequest) string {
 }
 func queueLabel(p model.PullRequest) string {
 	state := string(p.MergeQueue)
+	if state == "NONE" {
+		return ""
+	}
 	if state == "" {
 		state = string(model.Unknown)
 	}
