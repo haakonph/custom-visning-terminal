@@ -30,6 +30,7 @@ const detailsQuery = `query($ids:[ID!]!) {
    pageInfo { hasPreviousPage startCursor }
    nodes { author { login __typename } body state comments { totalCount } }
   }
+  reviewThreads(first:100) { pageInfo { hasNextPage endCursor } nodes { isResolved } }
   autoMergeRequest { enabledAt }
   mergeQueueEntry { position state }
   reviewRequests(first:100) {
@@ -42,6 +43,7 @@ const detailsQuery = `query($ids:[ID!]!) {
 
 type details struct {
 	CopilotReviews           copilotReviews      `json:"copilotReviews"`
+	ReviewThreads            *reviewThreads      `json:"reviewThreads"`
 	AutoMergeRequest         json.RawMessage     `json:"autoMergeRequest"`
 	MergeQueueEntry          json.RawMessage     `json:"mergeQueueEntry"`
 	HeadOID                  string              `json:"headRefOid"`
@@ -138,6 +140,9 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 				failures = append(failures, err)
 			}
 			applyDetails(&rows[i], d)
+			if err := c.completeOpenComments(ctx, &rows[i], d.ReviewThreads); err != nil {
+				failures = append(failures, err)
+			}
 			if rows[i].ReviewSummary != nil && !rows[i].ReviewSummary.Complete {
 				failures = append(failures, errors.New("review summary incomplete; at most 100 reviewers and requests are included"))
 			}

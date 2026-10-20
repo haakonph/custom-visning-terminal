@@ -79,10 +79,18 @@ func autoMergeLabel(p model.PullRequest) string {
 // prInfoLabel prioritizes merge blockers in the compact table cell.
 // The full queue state remains available in the selected PR and detail views.
 func prInfoLabel(p model.PullRequest) string {
+	status := queueLabel(p)
 	if p.Mergeability == model.Conflicting {
-		return string(model.Conflicting)
+		status = string(model.Conflicting)
 	}
-	return queueLabel(p)
+	if p.OpenComments == nil {
+		return status
+	}
+	comments := fmt.Sprintf("%d åpne", *p.OpenComments)
+	if status == "" || status == string(model.Unknown) {
+		return comments
+	}
+	return status + " · " + comments
 }
 
 func queueLabel(p model.PullRequest) string {

@@ -311,3 +311,8 @@ type TaskReference struct {
 	Title        string
 	Role         string
 }
+
+type GithubOpenComment struct {
+	PullRequestID string
+	Count         int64
+}
