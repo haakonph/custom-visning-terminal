@@ -140,6 +140,7 @@ type GithubPullRequest struct {
 	AutoMerge     string
 	MergeQueue    string
 	QueuePosition int64
+	BaseRef       string
 }
 
 type GithubPullRequestReviewer struct {

@@ -59,7 +59,7 @@ func writeGitHub(ctx context.Context, q *dbgen.Queries, s model.Snapshot) error 
 				return err
 			}
 		}
-		row := dbgen.InsertGithubPullRequestsParams{ID: key, RepositoryID: repoID, Number: int64(p.Number), ProviderID: p.ID, Body: p.Body, HeadOid: p.HeadOID, HeadRef: p.HeadRef, Title: p.Title, Url: p.URL, Author: p.Author, CreatedAt: timestamp(p.CreatedAt), UpdatedAt: timestamp(p.UpdatedAt), Review: string(p.Review), Ci: string(p.CI), Mergeability: string(p.Mergeability), Draft: boolInt(p.Draft), AutoMerge: string(p.AutoMerge), MergeQueue: string(p.MergeQueue), QueuePosition: int64(p.QueuePosition)}
+		row := dbgen.InsertGithubPullRequestsParams{ID: key, RepositoryID: repoID, Number: int64(p.Number), ProviderID: p.ID, Body: p.Body, HeadOid: p.HeadOID, HeadRef: p.HeadRef, BaseRef: p.BaseRef, Title: p.Title, Url: p.URL, Author: p.Author, CreatedAt: timestamp(p.CreatedAt), UpdatedAt: timestamp(p.UpdatedAt), Review: string(p.Review), Ci: string(p.CI), Mergeability: string(p.Mergeability), Draft: boolInt(p.Draft), AutoMerge: string(p.AutoMerge), MergeQueue: string(p.MergeQueue), QueuePosition: int64(p.QueuePosition)}
 		if err := q.InsertGithubPullRequests(ctx, row); err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func readGitHub(ctx context.Context, q *dbgen.Queries) (model.Snapshot, error) {
 		if _, ok := repoNames[r.RepositoryID]; !ok {
 			return out, errors.New("missing GitHub repository")
 		}
-		prs[r.ID] = &model.PullRequest{ID: r.ProviderID, Repository: repoNames[r.RepositoryID], Number: int(r.Number), Body: r.Body, HeadOID: r.HeadOid, HeadRef: r.HeadRef, Title: r.Title, URL: r.Url, Author: r.Author, Draft: r.Draft != 0, CreatedAt: created, UpdatedAt: updated, Review: model.Status(r.Review), CI: model.Status(r.Ci), Mergeability: model.Status(r.Mergeability), AutoMerge: model.Status(r.AutoMerge), MergeQueue: model.Status(r.MergeQueue), QueuePosition: int(r.QueuePosition)}
+		prs[r.ID] = &model.PullRequest{ID: r.ProviderID, Repository: repoNames[r.RepositoryID], Number: int(r.Number), Body: r.Body, HeadOID: r.HeadOid, HeadRef: r.HeadRef, BaseRef: r.BaseRef, Title: r.Title, URL: r.Url, Author: r.Author, Draft: r.Draft != 0, CreatedAt: created, UpdatedAt: updated, Review: model.Status(r.Review), CI: model.Status(r.Ci), Mergeability: model.Status(r.Mergeability), AutoMerge: model.Status(r.AutoMerge), MergeQueue: model.Status(r.MergeQueue), QueuePosition: int(r.QueuePosition)}
 	}
 	comments, err := q.ListGithubOpenComments(ctx)
 	if err != nil {

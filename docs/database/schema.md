@@ -133,6 +133,7 @@ erDiagram
         TEXT auto_merge
         TEXT merge_queue
         INTEGER queue_position
+        TEXT base_ref
     }
     github_repositories {
         INTEGER id PK

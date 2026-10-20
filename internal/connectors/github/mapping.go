@@ -21,7 +21,7 @@ func mapIssue(i *gh.Issue) model.PullRequest {
 
 const detailsQuery = `query($ids:[ID!]!) {
  nodes(ids:$ids) { ... on PullRequest {
-  id body headRefName headRefOid isDraft reviewDecision mergeable
+  id body baseRefName headRefName headRefOid isDraft reviewDecision mergeable
   latestOpinionatedReviews(first:100) {
    pageInfo { hasNextPage }
    nodes { state author { login } }
@@ -44,6 +44,7 @@ const detailsQuery = `query($ids:[ID!]!) {
 type details struct {
 	CopilotReviews           copilotReviews      `json:"copilotReviews"`
 	ReviewThreads            *reviewThreads      `json:"reviewThreads"`
+	BaseRef                  string              `json:"baseRefName"`
 	AutoMergeRequest         json.RawMessage     `json:"autoMergeRequest"`
 	MergeQueueEntry          json.RawMessage     `json:"mergeQueueEntry"`
 	HeadOID                  string              `json:"headRefOid"`
@@ -180,6 +181,7 @@ func applyDetails(p *model.PullRequest, d *details) {
 	}
 	p.Body = d.Body
 	p.HeadRef = d.HeadRef
+	p.BaseRef = d.BaseRef
 	p.HeadOID = d.HeadOID
 	p.Draft = d.IsDraft
 

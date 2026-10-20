@@ -76,6 +76,12 @@ func (m Model) groupedPRLines(rows []model.PullRequest, capacity int) []string {
 	for _, p := range rows {
 		counts[m.prGroupKey(p)]++
 	}
+	var known []model.PullRequest
+	for _, dataset := range m.snapshot.Datasets {
+		known = append(known, dataset.PRs...)
+	}
+	known = append(known, rows...)
+	stacks := model.PRStacks(known)
 	var lines, headings []string
 	selectedLine := 0
 	for i, p := range rows {
@@ -90,7 +96,7 @@ func (m Model) groupedPRLines(rows []model.PullRequest, capacity int) []string {
 		}
 		rowModel := m
 		rowModel.width = max(1, m.width-3)
-		lines = append(lines, "   "+rowModel.row(p, false, i == m.selected))
+		lines = append(lines, "   "+rowModel.stackRow(p, i == m.selected, stacks[p.Key()]))
 		headings = append(headings, heading)
 	}
 	start := max(0, selectedLine-capacity+1)
@@ -103,4 +109,12 @@ func (m Model) groupedPRLines(rows []model.PullRequest, capacity int) []string {
 		return append([]string{headings[start-1]}, lines[start:min(len(lines), start+capacity-1)]...)
 	}
 	return lines[start:min(len(lines), start+capacity)]
+}
+
+// Add stack position to the title, preserving the original PR identity.
+func (m Model) stackRow(p model.PullRequest, selected bool, stack model.StackPosition) string {
+	if stack.Total > 1 {
+		p.Title = fmt.Sprintf("[stack %d/%d] %s", stack.Position, stack.Total, p.Title)
+	}
+	return m.row(p, false, selected)
 }
