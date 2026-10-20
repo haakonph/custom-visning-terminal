@@ -30,7 +30,7 @@ const detailsQuery = `query($ids:[ID!]!) {
    pageInfo { hasPreviousPage startCursor }
    nodes { author { login __typename } body state comments { totalCount } }
   }
-  reviewThreads(first:100) { pageInfo { hasNextPage endCursor } nodes { isResolved } }
+  reviewThreads(first:100) { pageInfo { hasNextPage endCursor } nodes { isResolved comments(first:1) { nodes { author { __typename } } } } }
   autoMergeRequest { enabledAt }
   mergeQueueEntry { position state }
   reviewRequests(first:100) {

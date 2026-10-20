@@ -5,7 +5,13 @@
 
 package dbgen
 
-import "context"
+import (
+	"context"
+)
+
+const insertGithubOpenComments = `-- name: InsertGithubOpenComments :exec
+INSERT INTO github_open_comments (pull_request_id, count) VALUES (?1, ?2)
+`
 
 type InsertGithubOpenCommentsParams struct {
 	PullRequestID string
@@ -13,16 +19,16 @@ type InsertGithubOpenCommentsParams struct {
 }
 
 func (q *Queries) InsertGithubOpenComments(ctx context.Context, arg InsertGithubOpenCommentsParams) error {
-	_, err := q.db.ExecContext(ctx, `-- name: InsertGithubOpenComments :exec
-INSERT INTO github_open_comments (pull_request_id, count) VALUES (?1, ?2)
-`, arg.PullRequestID, arg.Count)
+	_, err := q.db.ExecContext(ctx, insertGithubOpenComments, arg.PullRequestID, arg.Count)
 	return err
 }
 
-func (q *Queries) ListGithubOpenComments(ctx context.Context) ([]GithubOpenComment, error) {
-	rows, err := q.db.QueryContext(ctx, `-- name: ListGithubOpenComments :many
+const listGithubOpenComments = `-- name: ListGithubOpenComments :many
 SELECT pull_request_id, count FROM github_open_comments ORDER BY pull_request_id
-`)
+`
+
+func (q *Queries) ListGithubOpenComments(ctx context.Context) ([]GithubOpenComment, error) {
+	rows, err := q.db.QueryContext(ctx, listGithubOpenComments)
 	if err != nil {
 		return nil, err
 	}
@@ -38,5 +44,8 @@ SELECT pull_request_id, count FROM github_open_comments ORDER BY pull_request_id
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

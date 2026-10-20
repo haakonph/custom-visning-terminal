@@ -103,6 +103,10 @@ erDiagram
         INTEGER position PK
         TEXT label
     }
+    github_open_comments {
+        TEXT pull_request_id PK,FK
+        INTEGER count
+    }
     github_pull_request_reviewers {
         TEXT pull_request_id PK,FK
         TEXT kind PK
@@ -271,6 +275,7 @@ erDiagram
     copilot_events |o..o{ copilot_usage : fk_0
     github_pull_requests |o..o{ github_copilot_reviews : fk_0
     github_pull_requests |o..o{ github_labels : fk_0
+    github_pull_requests |o..o{ github_open_comments : fk_0
     github_pull_requests |o..o{ github_pull_request_reviewers : fk_0
     github_repositories |o..o{ github_pull_requests : fk_0
     accounts |o..o{ github_repositories : fk_0

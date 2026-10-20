@@ -109,6 +109,11 @@ CREATE TABLE github_labels (
     PRIMARY KEY (pull_request_id, position)
 );
 
+CREATE TABLE github_open_comments (
+ pull_request_id TEXT PRIMARY KEY REFERENCES github_pull_requests(id) ON DELETE CASCADE,
+ count INTEGER NOT NULL CHECK(count >= 0)
+);
+
 CREATE TABLE github_pull_request_reviewers (
     pull_request_id TEXT NOT NULL REFERENCES github_pull_requests(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK (kind IN ('user', 'team')),

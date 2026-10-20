@@ -115,6 +115,11 @@ type GithubLabel struct {
 	Label         string
 }
 
+type GithubOpenComment struct {
+	PullRequestID string
+	Count         int64
+}
+
 type GithubPullRequest struct {
 	ID            string
 	RepositoryID  int64
@@ -310,9 +315,4 @@ type TaskReference struct {
 	ReferenceKey string
 	Title        string
 	Role         string
-}
-
-type GithubOpenComment struct {
-	PullRequestID string
-	Count         int64
 }
