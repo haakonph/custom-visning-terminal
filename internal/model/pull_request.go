@@ -86,6 +86,12 @@ type Source interface {
 	User(context.Context) (string, error)
 	List(context.Context, View, string) (Result, error)
 }
+
+// AutoMergeSource changes GitHub's merge-when-ready setting and returns the
+// server's current merge status, including merge queue membership.
+type AutoMergeSource interface {
+	SetAutoMerge(context.Context, PullRequest, bool) (PullRequest, error)
+}
 type Dataset struct {
 	PRs      []PullRequest `json:"prs"`
 	SyncedAt time.Time     `json:"synced_at"`

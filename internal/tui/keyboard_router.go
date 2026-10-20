@@ -35,6 +35,10 @@ func (m Model) keyboardNavigation() bool {
 	return true
 }
 func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if result, ok := msg.(autoMergeMsg); ok {
+		next, cmd := m.finishAutoMerge(result)
+		return next, cmd, true
+	}
 	if m.internalKey {
 		return m, nil, false
 	}
@@ -393,7 +397,7 @@ func sequenceHint(prefix string) string {
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':
-		return "s melding · k arkiver · d slett · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
+		return "+ automerge på · - automerge av · s melding · k arkiver · d slett · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
 	}
 	return fmt.Sprint(prefix)
 }
