@@ -179,3 +179,29 @@ func TestCopilotReviewLabel(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestOpenCommentsInfo(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	for _, tc := range []struct {
+		count  int
+		status model.Status
+		want   string
+	}{
+		{0, model.Mergeable, "0 åpne"},
+		{3, model.Mergeable, "3 åpne"},
+		{12, model.Conflicting, "CONFLICT · 12 åpne"},
+	} {
+		p := model.PullRequest{OpenComments: &tc.count, Mergeability: tc.status, MergeQueue: "NONE"}
+		if got := prInfoLabel(p); got != tc.want {
+			t.Fatalf("got %q, want %q", got, tc.want)
+		}
+		for _, width := range []int{100, 120, 140, 160, 200} {
+			m.width = width
+			row := ansi.Strip(m.row(p, false, false))
+			if !strings.Contains(row, tc.want) || ansi.StringWidth(row) > width {
+				t.Fatalf("width %d: %q", width, row)
+			}
+		}
+	}
+}

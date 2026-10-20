@@ -38,6 +38,8 @@ const (
 )
 
 type PullRequest struct {
+	// OpenComments is the number of unresolved review threads; nil means unavailable.
+	OpenComments       *int           `json:"open_comments,omitempty"`
 	ID                 string         `json:"id"`
 	Repository         string         `json:"repository"`
 	Number             int            `json:"number"`

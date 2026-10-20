@@ -63,6 +63,11 @@ func writeGitHub(ctx context.Context, q *dbgen.Queries, s model.Snapshot) error 
 		if err := q.InsertGithubPullRequests(ctx, row); err != nil {
 			return err
 		}
+		if p.OpenComments != nil {
+			if err := q.InsertGithubOpenComments(ctx, dbgen.InsertGithubOpenCommentsParams{PullRequestID: key, Count: int64(*p.OpenComments)}); err != nil {
+				return err
+			}
+		}
 		if summary := p.ReviewSummary; summary != nil {
 			if err := q.InsertGithubReviewSummaries(ctx, dbgen.InsertGithubReviewSummariesParams{
 				PullRequestID: key, Approved: int64(summary.Approved), Changes: int64(summary.Changes), Pending: int64(summary.Pending), PendingTeams: int64(summary.PendingTeams), Complete: boolInt(summary.Complete), Fallback: boolInt(summary.Fallback),
@@ -140,6 +145,18 @@ func readGitHub(ctx context.Context, q *dbgen.Queries) (model.Snapshot, error) {
 			return out, errors.New("missing GitHub repository")
 		}
 		prs[r.ID] = &model.PullRequest{ID: r.ProviderID, Repository: repoNames[r.RepositoryID], Number: int(r.Number), Body: r.Body, HeadOID: r.HeadOid, HeadRef: r.HeadRef, Title: r.Title, URL: r.Url, Author: r.Author, Draft: r.Draft != 0, CreatedAt: created, UpdatedAt: updated, Review: model.Status(r.Review), CI: model.Status(r.Ci), Mergeability: model.Status(r.Mergeability), AutoMerge: model.Status(r.AutoMerge), MergeQueue: model.Status(r.MergeQueue), QueuePosition: int(r.QueuePosition)}
+	}
+	comments, err := q.ListGithubOpenComments(ctx)
+	if err != nil {
+		return out, err
+	}
+	for _, comment := range comments {
+		p := prs[comment.PullRequestID]
+		if p == nil {
+			return out, errors.New("missing GitHub pull request")
+		}
+		count := int(comment.Count)
+		p.OpenComments = &count
 	}
 	summaries, err := q.ListGithubReviewSummaries(ctx)
 	if err != nil {

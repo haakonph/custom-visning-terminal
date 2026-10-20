@@ -60,6 +60,9 @@ func (m Model) detailLines() []string {
 		lines = append(lines, "CONFLICT: PR-en har mergekonflikter som må løses før den kan merges.")
 	}
 	lines = append(lines, reviewSummaryLabel(d.pr))
+	if d.pr.OpenComments != nil {
+		lines = append(lines, fmt.Sprintf("Åpne kommentarer: %d (uløste reviewtråder)", *d.pr.OpenComments))
+	}
 	if d.pr.ReviewSummary != nil && d.pr.ReviewSummary.Fallback {
 		lines = append(lines, "Vurderingene gjelder denne PR-en. GitHubs regler avgjør om den kan merges.")
 	}
