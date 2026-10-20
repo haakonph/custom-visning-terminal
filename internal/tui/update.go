@@ -18,7 +18,10 @@ import (
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if result, ok := msg.(notificationResult); ok {
 		if result.failed {
-			m.notice = "Kunne ikke vise skrivebordsvarsel. Kontroller varslingstillatelser og varslingsverktøy."
+			m.notice = "Kunne ikke vise eller åpne skrivebordsvarsel. Kontroller varslingstillatelser og varslingsverktøy."
+			if runtime.GOOS == "darwin" {
+				m.notice += " Installer terminal-notifier med: brew install terminal-notifier"
+			}
 		}
 		return m, nil
 	}

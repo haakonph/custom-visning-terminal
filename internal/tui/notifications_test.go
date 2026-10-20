@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -93,14 +94,54 @@ func TestNotificationsIgnoreIncompleteResults(t *testing.T) {
 }
 
 func TestNotificationTextIsPassedAsData(t *testing.T) {
-	event := desktopNotification{`CI "done"`, "$(touch /tmp/unsafe)\n<script>"}
+	event := desktopNotification{`CI "done"`, "$(touch /tmp/unsafe)\n<script>", "https://github.com/a/b/pull/1"}
 	name, args := notificationCommand("darwin", event)
-	if name != "osascript" || !reflect.DeepEqual(args[len(args)-3:], []string{"--", event.title, event.body}) {
+	if name != "terminal-notifier" || !reflect.DeepEqual(args, []string{"-title", event.title, "-message", event.body, "-open", event.url}) {
 		t.Fatal(name, args)
 	}
 	name, args = notificationCommand("linux", event)
-	if name != "notify-send" || !reflect.DeepEqual(args, []string{"--app-name=custom-visning", "--", event.title, event.body}) {
+	if name != "notify-send" || !reflect.DeepEqual(args, []string{"--app-name=custom-visning", "--action=default=Åpne PR", "--wait", "--expire-time=30000", "--", event.title, event.body}) {
 		t.Fatal(name, args)
+	}
+}
+
+func TestNotificationClickOpensOnlyItsPR(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform, output, url string
+		failure                     bool
+		wantOpens                   int
+		wantErr                     bool
+	}{
+		{"click", "linux", "default\n", "https://github.com/a/b/pull/1", false, 1, false},
+		{"dismiss", "linux", "", "https://github.com/a/b/pull/1", false, 0, false},
+		{"other action", "linux", "other", "https://github.com/a/b/pull/1", false, 0, false},
+		{"failed delivery", "linux", "default", "https://github.com/a/b/pull/1", true, 0, true},
+		{"mac delegates click", "darwin", "", "https://github.com/a/b/pull/1", false, 0, false},
+		{"unsafe URL", "darwin", "", "file:///tmp/test", false, 0, true},
+		{"wrong host", "darwin", "", "https://github.com.evil.test/a/b/pull/1", false, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opens, runs := 0, 0
+			err := deliverNotification(context.Background(), tc.platform, desktopNotification{url: tc.url}, func(context.Context, string, ...string) ([]byte, error) {
+				runs++
+				if tc.failure {
+					return nil, errors.New("failed")
+				}
+				return []byte(tc.output), nil
+			}, func(_ context.Context, link string) error {
+				opens++
+				if link != tc.url {
+					t.Fatal(link)
+				}
+				return nil
+			})
+			if opens != tc.wantOpens || (err != nil) != tc.wantErr {
+				t.Fatal(opens, err)
+			}
+			if (tc.name == "unsafe URL" || tc.name == "wrong host") && runs != 0 {
+				t.Fatal("unsafe URL delivered")
+			}
+		})
 	}
 }
 

@@ -1175,7 +1175,12 @@ fem minutter for bakgrunnsfaner. `au` kan også utløse varsler. Appen må kjør
 den oppretter ingen bakgrunnstjeneste. CI som starter og fullføres på samme
 commit mellom to oppdateringer, kan ikke alltid oppdages.
 
-macOS bruker innebygd `osascript`; tillat varsler for Script Editor/osascript i
-systeminnstillingene ved behov. Linux krever `notify-send` og en aktiv
-skrivebordsøkt med varslingstjeneste. Andre plattformer støttes ikke foreløpig.
+Klikk på varselet for å åpne den aktuelle PR-en på GitHub i standardnettleseren.
+macOS krever `terminal-notifier`: installer med `brew install terminal-notifier`
+og tillat varsler for terminal-notifier i systeminnstillingene ved behov.
+Linux krever en versjon av `notify-send` med `--action`/`--wait` og en aktiv
+skrivebordsøkt med støtte for varslingshandlinger. Klikk på varselet eller
+**Åpne PR**, avhengig av skrivebordsmiljø. Appen venter på Linux-handlingen i
+opptil ti minutter mens den kjører; dette blokkerer ikke andre varsler eller
+navigasjon. Avvisning eller utløp åpner ingenting. Andre plattformer støttes ikke foreløpig.
 Ved sendefeil vises en melding i appen; hendelsen sendes ikke automatisk på nytt.
