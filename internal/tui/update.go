@@ -22,7 +22,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key, ok := msg.(tea.KeyPressMsg); !ok || key.String() != "ctrl+c" {
 			if _, resize := msg.(tea.WindowSizeMsg); !resize {
 				switch msg.(type) {
-				case tea.KeyPressMsg:
+				case tea.KeyPressMsg, tea.PasteMsg:
 					return m.updateSetupWizard(msg)
 				}
 			}
