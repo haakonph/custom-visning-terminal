@@ -16,19 +16,19 @@ import (
 )
 
 type setupWizard struct {
-	fields      []settingField
-	values      []string
-	index       int
-	input       textinput.Model
-	busy, valid bool
-	notice      string
-	queue       []string
+	fields          []settingField
+	values          []string
+	index           int
+	input           textinput.Model
+	busy, valid     bool
+	loginMattermost bool
+	notice          string
+	queue           []string
 }
 type setupValidated struct {
 	wizard *setupWizard
 	github *github.Client
 	jira   *jira.Client
-	token  string
 	err    error
 }
 
@@ -41,7 +41,7 @@ func (m Model) startSetupWizard(provider string, queue []string) Model {
 	case "jira":
 		w.fields = []settingField{{"Jira · serveradresse", "jira.base_url", "url"}, {"Jira · PAT", "JIRA_TOKEN", "secret"}}
 	case "mattermost":
-		w.fields = []settingField{{"Mattermost · serveradresse", "mattermost.server", "url"}, {"Mattermost · brukernavn", "mattermost.username", "string"}, {"Mattermost · PAT", "MATTERMOST_TOKEN", "secret"}}
+		w.fields = []settingField{{"Mattermost · serveradresse", "mattermost.server", "url"}, {"Mattermost · brukernavn", "mattermost.username", "string"}}
 	default:
 		return m
 	}
@@ -82,7 +82,7 @@ func (m Model) wizardView() tea.View {
 		lines[2] = "Validerer tilkobling …"
 	}
 	if w.valid {
-		lines[2] = "Tilkoblingen virker. Enter fortsetter med neste integrasjon."
+		lines[2] = "Oppsett klart. Enter fortsetter."
 	}
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], max(1, m.width), "…")
@@ -114,9 +114,15 @@ func (m Model) updateSetupWizard(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if w.valid {
 				if len(w.queue) > 0 {
 					m = m.startSetupWizard(w.queue[0], w.queue[1:])
+					m.setup.wizard.loginMattermost = w.loginMattermost
 					return m, m.setup.wizard.input.Focus()
 				}
 				m.setup = setupState{}
+				if w.loginMattermost && m.mmReader != nil {
+					next, _ := m.viewProvider("c")
+					m = next.(Model)
+					return m, m.mmStart()
+				}
 				return m, nil
 			}
 			value := strings.TrimSpace(w.input.Value())
@@ -175,14 +181,7 @@ func validateSetup(parent context.Context, w *setupWizard, provider string, v []
 			_, r.err = r.jira.Search(ctx, "assignee = currentUser() AND resolution = Unresolved")
 		}
 	case "mattermost":
-		var api *mm.API
-		api, r.err = mm.NewAPI(v[0])
-		if r.err == nil {
-			api.ExpectAccount(v[1])
-			api.SetToken(v[2])
-			_, r.err = api.Me(ctx)
-		}
-		r.token = v[2]
+		_, r.err = mm.NewAPI(v[0])
 	}
 	return r
 }
@@ -204,9 +203,9 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 	}
 	if m.setup.provider == "mattermost" {
 		var err error
-		m, err = m.withMattermostSettings(mm.Config{Server: w.values[0], Username: w.values[1]}, r.token)
+		m, err = m.withMattermostSettings(mm.Config{Server: w.values[0], Username: w.values[1]}, os.Getenv("MATTERMOST_TOKEN"))
 		if err != nil {
-			w.notice = "Tilkobling OK, men lokalt oppsett feilet."
+			w.notice = "Kunne ikke klargjøre lokalt Mattermost-oppsett."
 			return m, nil
 		}
 	}
@@ -217,11 +216,12 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 	if r.jira != nil {
 		cmd = m.refreshJira()
 	}
-	if m.setup.provider == "mattermost" {
-		cmd = m.mmStart()
-	}
 	w.valid = true
 	w.notice = "Validert mot API-et."
+	if m.setup.provider == "mattermost" {
+		w.loginMattermost = true
+		w.notice = "Oppsett lagret. Fortsett for å logge inn med passord og eventuell TOTP-kode."
+	}
 	// Remove credentials from the form once the authenticated clients own them.
 	for i, f := range w.fields {
 		if f.kind == "secret" {
