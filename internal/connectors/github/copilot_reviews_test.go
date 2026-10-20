@@ -99,3 +99,15 @@ func TestCopilotReviewRejectsRepeatedCursor(t *testing.T) {
 		t.Fatal("expected pagination error")
 	}
 }
+
+func TestCopilotReviewIdentityAndPendingDraft(t *testing.T) {
+	var d details
+	if err := json.Unmarshal([]byte(`{"copilotReviews":{"nodes":[{"id":"submitted","author":{"login":"Copilot","__typename":"Bot"},"state":"COMMENTED"},{"id":"draft","author":{"login":"Copilot","__typename":"Bot"},"state":"PENDING"}]}}`), &d); err != nil {
+		t.Fatal(err)
+	}
+	var p model.PullRequest
+	applyCopilotReview(&p, &d)
+	if p.CopilotReview == nil || p.CopilotReview.ID != "submitted" {
+		t.Fatalf("expected the completed review identity, got %+v", p.CopilotReview)
+	}
+}

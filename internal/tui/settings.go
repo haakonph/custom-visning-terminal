@@ -57,6 +57,8 @@ var settingFields = []settingField{
 	{"Oppdatering · PR-detaljer", "refresh.details", "duration"},
 	{"Oppdatering · lokal aktiv", "refresh.local_active", "duration"},
 	{"Oppdatering · lokal bakgrunn", "refresh.local_background", "duration"},
+	{"Varsler · CI ferdig", "notifications.ci", "bool"},
+	{"Varsler · Copilot-review", "notifications.copilot", "bool"},
 }
 
 type settingsState struct {
@@ -88,7 +90,7 @@ func settingsDocument() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "refresh": defaultRefreshOptions(), "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
+	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "refresh": defaultRefreshOptions(), "notifications": defaultNotificationOptions(), "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
 	b, _ := json.Marshal(defaults)
 	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
@@ -319,6 +321,10 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if err := s.loadValues(); err != nil {
 				s.notice = err.Error()
+			}
+			if strings.HasPrefix(field.path, "notifications.") {
+				m.loadNotifications()
+				s.notice = "Varslingsinnstillinger tatt i bruk."
 			}
 			if strings.HasPrefix(field.path, "refresh.") {
 				m.loadRefresh()

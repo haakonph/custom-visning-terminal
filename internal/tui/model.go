@@ -16,6 +16,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	notifications    notificationState
 	auto             refreshState
 	setup            setupState
 	version          string
@@ -94,6 +95,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	tasks.snoozes = s
 	m := Model{auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadRefresh()
+	m.loadNotifications()
 	m.loadJiraPattern()
 	m.loadGitHubDisplay()
 	return m

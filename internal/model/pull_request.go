@@ -67,6 +67,7 @@ type PullRequest struct {
 }
 
 type CopilotReview struct {
+	ID             string `json:"id,omitempty"`
 	Recommendation string `json:"recommendation"`
 	Comments       int    `json:"comments"`
 }
