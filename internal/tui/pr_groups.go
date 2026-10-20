@@ -2,13 +2,20 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
-// A PR appears once, under its first Jira key. Related views use the issue
-// being viewed, even when it is not the first key mentioned in the PR.
+const dependabotGroup = "Dependabot"
+
+// Review requests from Dependabot share one group. Other PRs appear once,
+// under their first Jira key, or the issue being viewed in related views.
 func (m Model) prGroupKey(p model.PullRequest) string {
+	if (m.active == model.Reviews || m.active == model.TeamReviews) &&
+		(strings.EqualFold(p.Author, "dependabot") || strings.EqualFold(p.Author, "dependabot[bot]")) {
+		return dependabotGroup
+	}
 	if m.relatedKey != "" {
 		return m.relatedKey
 	}
@@ -19,18 +26,19 @@ func (m Model) prGroupKey(p model.PullRequest) string {
 }
 
 // Preserve the source order within groups and order groups by their first PR.
-// Keep unlinked PRs together at the end without modifying the cached dataset.
+// Keep unlinked PRs together, followed by Dependabot review requests, without
+// modifying the cached dataset.
 func (m Model) groupPRs(rows []model.PullRequest) []model.PullRequest {
 	groups := map[string][]model.PullRequest{}
 	var keys []string
 	for _, p := range rows {
 		key := m.prGroupKey(p)
-		if _, exists := groups[key]; !exists && key != "" {
+		if _, exists := groups[key]; !exists && key != "" && key != dependabotGroup {
 			keys = append(keys, key)
 		}
 		groups[key] = append(groups[key], p)
 	}
-	keys = append(keys, "")
+	keys = append(keys, "", dependabotGroup)
 	result := make([]model.PullRequest, 0, len(rows))
 	for _, key := range keys {
 		result = append(result, groups[key]...)
@@ -42,7 +50,7 @@ func (m Model) prGroupHeading(key string, count int) string {
 	label := key
 	if key == "" {
 		label = "Uten Jira-sak"
-	} else if m.jira != nil {
+	} else if key != dependabotGroup && m.jira != nil {
 		for _, issue := range m.jira.rows {
 			if issue.Key == key {
 				label += " · " + issue.Title

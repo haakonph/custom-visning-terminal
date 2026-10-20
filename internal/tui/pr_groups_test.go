@@ -74,6 +74,60 @@ func TestPRGroupingKeySourcesAndRelatedIssue(t *testing.T) {
 	}
 }
 
+func TestDependabotReviewGroupIsLast(t *testing.T) {
+	for _, view := range []model.View{model.Reviews, model.TeamReviews} {
+		t.Run(view.String(), func(t *testing.T) {
+			m := ready(t)
+			m.active = view
+			rows := groupedFixture()
+			rows[0].Author = "dependabot[bot]" // Even a Jira-linked bot PR belongs at the end.
+			rows[2].Author = "DEPENDABOT"      // GraphQL login and case variants also match.
+			rows = append(rows, model.PullRequest{Number: 5, URL: "human", Author: "dependabot-helper", Title: "Unlinked human PR"})
+			rows = append(rows, model.PullRequest{Number: 6, URL: "bot", Author: "dependabot[bot]", Title: "Update dependency"})
+			m.snapshot.Datasets[view].PRs = rows
+			var numbers []int
+			for _, p := range m.filtered() {
+				numbers = append(numbers, p.Number)
+			}
+			if !reflect.DeepEqual(numbers, []int{4, 2, 5, 1, 3, 6}) {
+				t.Fatal(numbers)
+			}
+			if rows[0].Number != 1 {
+				t.Fatal("grouping changed cached order")
+			}
+			m.height, m.width = 40, 160
+			text := ansi.Strip(m.View().Content)
+			if strings.Count(text, "▼ Dependabot · 3 PR") != 1 || strings.Index(text, "▼ Dependabot") < strings.Index(text, "▼ Uten Jira-sak") {
+				t.Fatalf("missing final Dependabot group: %s", text)
+			}
+			m.selected = 3
+			if refs := m.currentReferences(); len(refs) != 1 || refs[0].URL != rows[0].URL {
+				t.Fatal("selected a different PR", refs)
+			}
+			m.input.SetValue("XYZ-2")
+			filtered := m.filtered()
+			if len(filtered) != 2 || filtered[0].Number != 4 || filtered[1].Number != 3 {
+				t.Fatal(filtered)
+			}
+		})
+	}
+}
+
+func TestDependabotGroupingOnlyAppliesToReviewViews(t *testing.T) {
+	m := ready(t)
+	p := model.PullRequest{Author: "dependabot[bot]", Title: "ABC-1 Update dependency"}
+	for _, view := range []model.View{model.Open, model.Drafts} {
+		m.active = view
+		if got := m.prGroupKey(p); got != "ABC-1" {
+			t.Fatalf("%s: %q", view, got)
+		}
+	}
+	m.active, m.relatedKey = model.Reviews, "XYZ-2"
+	if got := m.prGroupKey(p); got != dependabotGroup {
+		t.Fatal(got)
+	}
+}
+
 func TestGroupedPRViewportKeepsSelectedRow(t *testing.T) {
 	m := ready(t)
 	m.width = 100
