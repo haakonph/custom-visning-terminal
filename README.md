@@ -1142,3 +1142,8 @@ meldinger og kanalvalg i SQLite gir offline-lesing. `rg` går fra en melding til
 cachet GitHub-PR, og `rc` i GitHub viser Mattermost-referansene tilbake.
 
 Se [Mattermost-oppsett, tastatursnarveier og begrensninger](docs/mattermost.md).
+
+
+### Be om ny Copilot-review
+
+Velg én eller flere PR-er og trykk `ar` (handling → review), også etter en tidligere Copilot-review. Handlingen fungerer fra PR-detaljer og GitHub-relasjoner. GitHub må tillate Copilot code review for kontoen og repositoryet. Appen viser hvor mange forespørsler som ble sendt; ved feil stoppes resten. `au` henter oppdatert review-status. På Jira beholder `ar` handlingen for å fjerne egen tilordning.

@@ -66,6 +66,9 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 		case "+", "-":
 			return m.startAutoMerge(refs, k == "+")
 		case "f", "m", "r":
+			if k == "r" && allProvider(refs, "github") {
+				return m.startCopilotReview(refs)
+			}
 			if allProvider(refs, "jira") {
 				m.sequenceRefs = refs
 				return m.startJiraAction(k)
