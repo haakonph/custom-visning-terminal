@@ -28,7 +28,10 @@ type localState struct {
 	warming                    bool
 	warmNotice                 string
 	warmTimerStarted           bool
+	cleanupRunning             bool
+	cleanupAt                  time.Time
 }
+type localCleanupResult struct{ err error }
 type localWarmTick struct{}
 
 func localWarmTimer() tea.Cmd {
@@ -87,11 +90,26 @@ func (m *Model) refreshLocal() tea.Cmd {
 		return result
 	}
 	var timer tea.Cmd
-	if m.local.manager.Workspace.Warm && !m.local.warmTimerStarted {
+	if !m.local.warmTimerStarted {
 		m.local.warmTimerStarted = true
 		timer = localWarmTimer()
 	}
-	return tea.Batch(status, m.warmLocal(), timer)
+	return tea.Batch(status, m.warmLocal(), m.cleanupIntelliJ(true), timer)
+}
+
+func (m *Model) cleanupIntelliJ(force bool) tea.Cmd {
+	l := m.local
+	source, ok := m.source.(local.PRClosureSource)
+	if !ok || l.cleanupRunning || (!force && time.Since(l.cleanupAt) < 5*time.Minute) {
+		return nil
+	}
+	l.cleanupRunning = true
+	manager, parent := l.manager, m.ctx
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+		defer cancel()
+		return localCleanupResult{manager.CleanupIntelliJ(ctx, source)}
+	}
 }
 
 func (m *Model) warmLocal() tea.Cmd {
@@ -183,8 +201,15 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 	}
 	l := m.local
 	switch msg := msg.(type) {
+	case localCleanupResult:
+		l.cleanupRunning = false
+		l.cleanupAt = time.Now()
+		if msg.err != nil {
+			l.results = append(l.results, "IntelliJ-opprydding: "+msg.err.Error())
+		}
+		return true, nil
 	case localWarmTick:
-		return true, tea.Batch(m.warmLocal(), localWarmTimer())
+		return true, tea.Batch(m.warmLocal(), m.cleanupIntelliJ(false), localWarmTimer())
 	case localWarmResult:
 		l.warming = false
 		l.warmed[msg.repository] = time.Now()
