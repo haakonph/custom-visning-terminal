@@ -349,6 +349,58 @@ git push origin v0.1.0
 Dependabot sjekker Go-moduler og GitHub Actions ukentlig og grupperer kompatible
 minor-/patch-oppdateringer.
 
+## Automatisk oppdatering
+
+Automatisk oppdatering er på som standard. GitHub og Jira hentes hvert minutt
+mens visningen er aktiv, og hvert femte minutt i bakgrunnen. GitHub oppdaterer
+alle PR-faner; Jira oppdaterer bare søk som har vært åpnet i denne kjøringen,
+inkludert egendefinert JQL. Ett automatisk GitHub-listesøk og ett Jira-søk kjøres
+om gangen. Åpne PR-detaljer hentes hvert 30. sekund. Lokal Git-status leses hvert
+15. sekund i GitHub-visningen og hvert minutt i bakgrunnen. Denne lokale
+statusavlesningen utfører ingen fetch eller endringer i worktrees.
+
+Copilot beholder visningsintervallet på tre sekunder og import hvert andre
+sekund. Mattermost beholder polling hvert 30. sekund, også i bakgrunnen.
+Snooze sjekkes lokalt hvert sekund. Eksisterende main-klargjøring og
+IntelliJ-opprydding beholder fem minutters intervall.
+
+`vs` har innstillinger for automatisk GitHub-/Jira-/lokal oppdatering og
+intervallene. Endringene tas i bruk straks. Eksempel på `refresh` i config.json:
+
+```json
+{
+  "refresh": {
+    "enabled": true,
+    "active": "1m",
+    "background": "5m",
+    "details": "30s",
+    "local_active": "15s",
+    "local_background": "1m"
+  }
+}
+```
+
+Intervaller støtter Go-varigheter fra `5s` til `24h`; ugyldige verdier i filen
+bruker standardintervallet. Intervallene regnes fra siste avsluttede henting.
+`au` oppdaterer umiddelbart, også når automatisk oppdatering er slått av, men
+starter ikke en kopi av en allerede pågående henting av samme datasett.
+Jira-søk som endres av brukeren kansellerer eldre henting; et bakgrunnssvar
+kan aldri erstatte resultatene til det aktive søket.
+
+Markør, filter og detaljrulling beholdes ved oppdatering. Feil beholder tidligere
+data, viser en advarsel og øker intervallet gradvis til maksimalt 30 minutter
+(eller valgt intervall dersom dette er lengre). GitHub- og Jira-klientene
+respekterer `Retry-After`; GitHub respekterer også `X-RateLimit-Reset`. Pausen
+gjelder hele klienten, slik at andre faner ikke fortsetter å belaste et begrenset
+API. `au` omgår ventetiden i visningen, men ikke serverens rate-limit-pause.
+
+GitHub bruker fortsatt paginerte REST-søk og samlet GraphQL-berikelse. Fullstendig
+teammedlemskap gjenbrukes i 15 minutter per klient/konto; delvise svar caches ikke.
+Jira beholder paginert REST v2 POST-søk med eksplisitte felter og original
+`ORDER BY`. Hele resultatet hentes for å oppdage både nye saker og saker som ikke
+lenger matcher JQL. Et rent `updated`-filter ville beholdt slike utgåtte saker.
+Vi innfører derfor ikke inkrementelle Jira-søk eller én HTTP-forespørsel per sak.
+
 ## API-referanser
 
 - [Bubble Tea v2 upgrade guide](https://github.com/charmbracelet/bubbletea/blob/main/UPGRADE_GUIDE_V2.md)
@@ -385,7 +437,7 @@ Ugyldig Jira-konfigurasjon rapporteres uten å hindre oppstart av GitHub.
 i navigasjonsmodus. Mens du redigerer et filter eller JQL, skrives bokstavene
 som vanlig tekst; avslutt redigeringen før du bytter. Begge visninger beholder
 valgt fane, filter, markert rad og data. Byttet utløser ingen ny henting etter
-første åpning; bruk `au` når du vil oppdatere. Snarveiene vises øverst i begge visninger.
+første åpning; automatisk polling holder data oppdatert, og `au` henter straks. Snarveiene vises øverst i begge visninger.
 GitHub-feil og Jira-feil håndteres hver for seg under kjøring.
 
 Standardfanene er **Mine**, **Prosjekt**, **Uten ansvarlig** og **Aktiv sprint**.
@@ -486,7 +538,7 @@ metadata og beskrivelse i klartekst, med mapper `0700` og filer `0600`. Slett
 undermappen for å fjerne lokale Jira-data. Ved oppstart/søk vises eventuell cache
 mens data hentes. Feil beholder forrige resultat og flytter ikke siste vellykkede
 synkronisering. Alle sider må lykkes før et nytt resultat erstatter cachen.
-Jiras `ORDER BY` beholdes. Oppdateringer skjer ved oppstart, søk/fanebytte og `au`.
+Jiras `ORDER BY` beholdes. Oppdateringer skjer ved oppstart, søk/fanebytte, `au` og automatisk polling.
 Nye søk kansellerer forrige søk, og forsinkede svar ignoreres.
 
 Klienten har 30 sekunders request-timeout og to minutter per søk. Ved ugyldig JQL,

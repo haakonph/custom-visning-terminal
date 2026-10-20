@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+
+	"github.com/haakonph/custom-visning-terminal/internal/polling"
 )
 
 var issueKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*-[1-9][0-9]*$`)
@@ -34,7 +36,7 @@ func New(base, token string) (*Client, error) {
 	if strings.TrimSpace(token) == "" {
 		return nil, errors.New("set JIRA_TOKEN to a Jira personal access token")
 	}
-	return &Client{u, token, &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{u, token, &http.Client{Transport: &polling.Transport{}, Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
 // Search retains Jira's ORDER BY and follows the server's actual page size.

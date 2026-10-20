@@ -89,7 +89,7 @@ func snoozeTimer() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.initProviders(), snoozeTimer(), m.mmStart(), mmTimer())
+	return tea.Batch(m.initProviders(), refreshTimer(), snoozeTimer(), m.mmStart(), mmTimer())
 }
 
 func (m Model) snoozeLines() []string {

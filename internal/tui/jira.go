@@ -85,6 +85,28 @@ func (j *jiraState) currentQuery() string {
 func (m *Model) refreshJira() tea.Cmd {
 	j := m.jira
 	query := j.currentQuery()
+	if m.auto.jiraCancel != nil {
+		m.auto.jiraCancel()
+		m.auto.jiraCancel = nil
+		for _, job := range m.auto.jira {
+			if job.busy {
+				job.busy = false
+				job.started = time.Now()
+			}
+		}
+	}
+	if j.loading && query == j.query {
+		return nil
+	}
+	if m.auto.jira == nil {
+		m.auto.jira = map[string]*refreshJob{}
+	}
+	job := m.auto.jira[query]
+	if job == nil {
+		job = &refreshJob{}
+		m.auto.jira[query] = job
+	}
+	job.started = time.Now()
 	if query != j.query {
 		j.rows = nil
 		j.synced = time.Time{}
@@ -157,7 +179,17 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 			j.notice = msg.err.Error()
 			return m, nil
 		}
+		selectedKey := ""
+		if rows := j.filtered(); j.selected < len(rows) {
+			selectedKey = rows[j.selected].Key
+		}
 		j.rows = msg.rows
+		for i, row := range j.filtered() {
+			if row.Key == selectedKey {
+				j.selected = i
+				break
+			}
+		}
 		if j.detail != nil {
 			for _, issue := range msg.rows {
 				if issue.Key == j.detail.Key {
@@ -340,7 +372,7 @@ func (m Model) jiraView() tea.View {
 	lines = append(lines, m.snoozeLines()...)
 	sync := "aldri"
 	if !j.synced.IsZero() {
-		sync = j.synced.Local().Format("2006-01-02 15:04:05")
+		sync = syncAge(j.synced)
 	}
 	state := "klar"
 	if j.loading {

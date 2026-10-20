@@ -12,6 +12,7 @@ import (
 )
 
 type detailState struct {
+	synced  time.Time
 	pr      model.PullRequest
 	data    model.PRDetails
 	loading bool
@@ -26,14 +27,22 @@ type detailMsg struct {
 }
 
 func (m *Model) loadDetails() tea.Cmd {
+	if m.detail.loading {
+		return nil
+	}
+	if m.detail.request == 0 {
+		m.auto.detail = refreshJob{}
+	}
 	source, ok := m.source.(model.DetailSource)
 	if !ok {
 		m.detail.err = fmt.Errorf("Detaljer støttes ikke av denne datakilden")
+		m.auto.detail.complete(time.Now(), true)
 		return nil
 	}
 	m.detailSequence++
 	m.detail.request = m.detailSequence
 	m.detail.loading = true
+	m.auto.detail.started = time.Now()
 	m.detail.err = nil
 	request, pr, parent := m.detail.request, m.detail.pr, m.ctx
 	return func() tea.Msg {
@@ -45,7 +54,7 @@ func (m *Model) loadDetails() tea.Cmd {
 }
 func (m Model) detailLines() []string {
 	d := m.detail
-	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(d.pr.Repository), d.pr.Number, d.pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", ""}
+	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(d.pr.Repository), d.pr.Number, d.pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", "Oppdatert: " + syncAge(d.synced), ""}
 	lines = append(lines, "Jira: "+strings.Join(d.pr.JiraKeys(m.jiraPattern), ", "), "Automerge: "+autoMergeLabel(d.pr)+" · Queue: "+queueLabel(d.pr), "a+ automerge på (merge when ready) · a- av")
 	if d.pr.Mergeability == model.Conflicting {
 		lines = append(lines, "CONFLICT: PR-en har mergekonflikter som må løses før den kan merges.")
@@ -117,4 +126,25 @@ func (m Model) detailView() tea.View {
 	view := tea.NewView(strings.Join(lines[offset:min(len(lines), offset+height)], "\n"))
 	view.AltScreen = true
 	return view
+}
+
+// Failed sections keep their prior data until a complete section is available.
+func retainDetailSections(old, next model.PRDetails) model.PRDetails {
+	for _, warning := range next.Warnings {
+		switch {
+		case strings.HasPrefix(warning, "Filer:"):
+			if len(old.Files) > 0 {
+				next.Files = old.Files
+			}
+		case strings.HasPrefix(warning, "Actions:"):
+			if len(old.Checks) > 0 {
+				next.Checks = old.Checks
+			}
+		case strings.HasPrefix(warning, "Kommentarer:"), strings.HasPrefix(warning, "Kodekommentarer:"), strings.HasPrefix(warning, "Reviews:"):
+			if len(old.Comments) > 0 {
+				next.Comments = old.Comments
+			}
+		}
+	}
+	return next
 }

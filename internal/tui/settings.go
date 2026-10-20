@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -50,6 +51,12 @@ var settingFields = []settingField{
 	{"IntelliJ headless · kommando", "workspace.indexer.command", "string"},
 	{"IntelliJ headless · argumenter (JSON)", "workspace.indexer.args", "list"},
 	{"GitHub · skjulte organisasjonsprefikser (JSON)", "github.hidden_prefixes", "list"},
+	{"Oppdatering · automatisk", "refresh.enabled", "bool"},
+	{"Oppdatering · aktiv visning", "refresh.active", "duration"},
+	{"Oppdatering · bakgrunn", "refresh.background", "duration"},
+	{"Oppdatering · PR-detaljer", "refresh.details", "duration"},
+	{"Oppdatering · lokal aktiv", "refresh.local_active", "duration"},
+	{"Oppdatering · lokal bakgrunn", "refresh.local_background", "duration"},
 }
 
 type settingsState struct {
@@ -81,7 +88,7 @@ func settingsDocument() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
+	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "refresh": defaultRefreshOptions(), "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
 	b, _ := json.Marshal(defaults)
 	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
@@ -174,6 +181,12 @@ func parseSetting(field settingField, text string) (any, error) {
 		if !filepath.IsAbs(value) {
 			return nil, fmt.Errorf("bruk en absolutt filsti")
 		}
+	case "duration":
+		d, err := time.ParseDuration(value)
+		if err != nil || d < 5*time.Second || d > 24*time.Hour {
+			return nil, fmt.Errorf("bruk et intervall fra 5s til 24h, f.eks. 1m")
+		}
+		return value, nil
 	case "port":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 1 || n > 65535 {
@@ -306,6 +319,10 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if err := s.loadValues(); err != nil {
 				s.notice = err.Error()
+			}
+			if strings.HasPrefix(field.path, "refresh.") {
+				m.loadRefresh()
+				s.notice = "Oppdateringsinnstillinger tatt i bruk."
 			}
 			if field.path == "github.hidden_prefixes" {
 				m.loadGitHubDisplay()

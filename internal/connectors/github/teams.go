@@ -4,10 +4,16 @@ import (
 	"context"
 	gh "github.com/google/go-github/v93/github"
 	"sort"
+	"time"
 )
 
 // Teams includes memberships across all accessible organizations, not a repo's teams.
 func (c *Client) Teams(ctx context.Context) ([]string, error) {
+	c.teamsMu.Lock()
+	defer c.teamsMu.Unlock()
+	if !c.teamsAt.IsZero() && time.Since(c.teamsAt) < 15*time.Minute {
+		return append([]string(nil), c.teams...), nil
+	}
 	seen := map[string]bool{}
 	for page := 1; page != 0; {
 		teams, response, err := c.api.Teams.ListUserTeams(ctx, &gh.ListOptions{Page: page, PerPage: 100})
@@ -25,7 +31,9 @@ func (c *Client) Teams(ctx context.Context) ([]string, error) {
 		}
 		page = next
 	}
-	return teamNames(seen), nil
+	c.teams = teamNames(seen)
+	c.teamsAt = time.Now()
+	return append([]string(nil), c.teams...), nil
 }
 func teamNames(seen map[string]bool) []string {
 	names := make([]string, 0, len(seen))

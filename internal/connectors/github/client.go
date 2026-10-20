@@ -9,12 +9,20 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	gh "github.com/google/go-github/v93/github"
+
+	"github.com/haakonph/custom-visning-terminal/internal/polling"
 )
 
-type Client struct{ api *gh.Client }
+type Client struct {
+	api     *gh.Client
+	teamsMu sync.Mutex
+	teamsAt time.Time
+	teams   []string
+}
 
 func New(token string) (*Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
@@ -31,7 +39,7 @@ func NewWithHTTP(token string, client *http.Client, options ...gh.ClientOptionsF
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	copyClient.Transport = retryTransport{base: base}
+	copyClient.Transport = retryTransport{base: &polling.Transport{Base: base}}
 	opts := append([]gh.ClientOptionsFunc{gh.WithHTTPClient(&copyClient), gh.WithAuthToken(token)}, options...)
 	api, err := gh.NewClient(opts...)
 	if err != nil {

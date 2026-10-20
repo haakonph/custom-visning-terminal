@@ -64,7 +64,9 @@ func (m Model) WithLocal(manager *local.WorktreeManager, editors local.Editors) 
 	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: m.chosen, statuses: map[string]local.Status{}, preparing: map[string]bool{}, updating: map[string]bool{}, warmed: map[string]time.Time{}}
 	return m
 }
-func (m *Model) refreshLocal() tea.Cmd {
+func (m *Model) refreshLocal() tea.Cmd { return m.refreshLocalWithNetwork(true) }
+
+func (m *Model) refreshLocalWithNetwork(network bool) tea.Cmd {
 	if m.local == nil {
 		return nil
 	}
@@ -97,12 +99,15 @@ func (m *Model) refreshLocal() tea.Cmd {
 		}
 		return result
 	}
+	if !network {
+		return status
+	}
 	var timer tea.Cmd
 	if !m.local.warmTimerStarted {
 		m.local.warmTimerStarted = true
 		timer = localWarmTimer()
 	}
-	return tea.Batch(status, m.warmLocal(), m.cleanupIntelliJ(true), timer)
+	return tea.Batch(status, m.warmLocal(), m.cleanupIntelliJ(false), timer)
 }
 
 func (m *Model) cleanupIntelliJ(force bool) tea.Cmd {
