@@ -133,3 +133,8 @@ func Merge(old, fresh []PullRequest) []PullRequest {
 	Sort(out)
 	return out
 }
+
+// CopilotReviewSource requests a new GitHub Copilot code review.
+type CopilotReviewSource interface {
+	RequestCopilotReview(context.Context, PullRequest) error
+}

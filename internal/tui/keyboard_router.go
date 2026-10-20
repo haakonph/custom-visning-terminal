@@ -39,6 +39,14 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		next, cmd := m.finishAutoMerge(result)
 		return next, cmd, true
 	}
+	if result, ok := msg.(copilotReviewRequested); ok {
+		m.reviewRequestBusy = false
+		m.sequenceNotice = fmt.Sprintf("Ny Copilot-review forespurt for %d PR-er; au henter status", result.count)
+		if result.err != nil {
+			m.sequenceNotice = result.err.Error()
+		}
+		return m, nil, true
+	}
 	if m.internalKey {
 		return m, nil, false
 	}
@@ -400,7 +408,7 @@ func sequenceHint(prefix string) string {
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':
-		return "+ automerge på · - automerge av · s melding · k arkiver · d slett · w slett worktree (GitHub) · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
+		return "+ automerge på · - automerge av · r ny Copilot-review (GitHub) · s melding · k arkiver · d slett · w slett worktree (GitHub) · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
 	}
 	return fmt.Sprint(prefix)
 }

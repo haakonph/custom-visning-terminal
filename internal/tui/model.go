@@ -26,12 +26,13 @@ type Model struct {
 	sequenceRefs     []model.TaskReference
 	internalKey      bool
 
-	sequence         string
-	sequenceNotice   string
-	autoMergeBusy    bool
-	autoMergeVersion uint64
-	jiraAction       *jiraActionState
-	jiraChosen       map[string]jira.Issue
+	sequence          string
+	sequenceNotice    string
+	autoMergeBusy     bool
+	reviewRequestBusy bool
+	autoMergeVersion  uint64
+	jiraAction        *jiraActionState
+	jiraChosen        map[string]jira.Issue
 
 	detail               *detailState
 	detailSequence       uint64
