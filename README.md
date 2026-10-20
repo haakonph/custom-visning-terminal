@@ -222,7 +222,9 @@ Alle fire PR-fanene grupperer PR-er under Jira-saken, på tvers av repoer.
 Gruppene viser Jira-nøkkel, sakstittel når den er lastet fra Jira, og antall PR-er.
 Første nøkkel i tittel, beskrivelse eller branchnavn bestemmer gruppen; hver PR
 vises én gang, og alle Jira-koblinger beholdes. Relaterte PR-er grupperes under
-saken du kom fra. PR-er uten nøkkel samles nederst under **Uten Jira-sak**.
+saken du kom fra. PR-er uten nøkkel samles under **Uten Jira-sak** til slutt.
+I **My Review Requests** og **Team Review Requests** samles alle PR-er fra
+Dependabot i en egen **Dependabot**-gruppe helt nederst, også når de har Jira-nøkkel.
 Gruppene følger rekkefølgen til første PR, med eksisterende sortering innad.
 Søk og filtre brukes før gruppering. Gruppeoverskrifter hoppes over ved
 navigasjon og markering; handlinger gjelder fortsatt de valgte PR-ene.
