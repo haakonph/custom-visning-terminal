@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 	"strings"
@@ -11,6 +12,41 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
+
+type closureSource struct{ fakeSource }
+
+func (*closureSource) Closed(context.Context, model.PullRequest) (bool, error) {
+	return false, nil
+}
+
+func TestIntelliJCleanupRunsWithoutMainWarming(t *testing.T) {
+	m := localModel(t)
+	m.source = &closureSource{}
+	m.local.manager.Workspace.Warm = false
+	if cmd := m.refreshLocal(); cmd == nil || !m.local.warmTimerStarted || !m.local.cleanupRunning {
+		t.Fatal("startup did not schedule cleanup independently of main warming")
+	}
+	if cmd := m.cleanupIntelliJ(true); cmd != nil {
+		t.Fatal("overlapping cleanup scheduled")
+	}
+	m.settings.active = true
+	m, _ = update(m, localCleanupResult{err: errors.New("offline")})
+	if m.local.cleanupRunning || m.local.cleanupAt.IsZero() || !m.settings.active || len(m.local.results) != 1 {
+		t.Fatal("settings swallowed cleanup result")
+	}
+	if cmd := m.cleanupIntelliJ(false); cmd != nil {
+		t.Fatal("background cleanup ignored interval")
+	}
+	if cmd := m.cleanupIntelliJ(true); cmd == nil {
+		t.Fatal("refresh did not retry cleanup")
+	}
+	m, _ = update(m, localCleanupResult{})
+	m.local.cleanupAt = time.Now().Add(-6 * time.Minute)
+	m, cmd := update(m, localWarmTick{})
+	if cmd == nil || !m.local.cleanupRunning || m.local.warming {
+		t.Fatal("background timer did not clean up with main warming disabled")
+	}
+}
 
 func localModel(t *testing.T) Model {
 	t.Helper()

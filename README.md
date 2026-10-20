@@ -748,6 +748,19 @@ Refreshing can update the main checkout but never changes PR worktree files. An
 older cached snapshot cannot detect remote changes until refreshed. There is no
 automatic merge/rebase or deletion command in this release.
 
+The app automatically removes its managed PR worktrees from IntelliJ IDEA's
+recent-project list once GitHub confirms that the PR is closed or merged.
+It checks at startup, on GitHub refresh and every five minutes while running,
+including when `workspace.warm` is disabled. Old worktrees tracked by the app
+are included even when the PR is no longer in any dashboard tab. Disappearing
+from a review queue, incomplete searches, API errors and inaccessible PRs do
+not trigger removal. Worktree files, local edits and Git branches are retained.
+Standard IntelliJ IDEA/Community settings directories on Linux, macOS and
+Windows are supported, including legacy settings directories. Custom IDEA
+configuration directories are not discovered. IntelliJ may keep its recent
+projects in memory while running; changes may only appear after restarting
+the IDE, and later app checks retry if IntelliJ writes an old entry back.
+
 Preparation runs asynchronously, with up to three preparation jobs and serialized
 clone/fetch/worktree operations per repository. Selection is deduplicated; an
 active open operation cannot be submitted twice. Preparing indicators, recent
