@@ -242,7 +242,7 @@ branchnavn. Nøklene fjernes fra viste PR-titler, inkludert tomme `[]`, `{}` og
 vises `AUTO` (`ON`/`OFF`/`UNKNOWN`) og `INFO`. `INFO` viser `CONFLICT` ved
 mergekonflikter, ellers køplass og køstatus. I tillegg vises antall uløste
 reviewtråder fra brukere som `3 åpne` (én per tråd, uten bot-tråder og løste tråder).
-`0 åpne` betyr at alle brukertrådene er løst; ved manglende data skjules antallet.
+Antallet vises bare når det finnes åpne brukertråder; ved 0 eller manglende data skjules det.
 Antallet lagres i cache og vises også i detaljvisningen.
 Konflikter prioriteres i kolonnen; full køstatus beholdes under tabellen og i
 detaljvisningen, som også forklarer eventuelle mergekonflikter.

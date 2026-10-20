@@ -83,7 +83,7 @@ func prInfoLabel(p model.PullRequest) string {
 	if p.Mergeability == model.Conflicting {
 		status = string(model.Conflicting)
 	}
-	if p.OpenComments == nil {
+	if p.OpenComments == nil || *p.OpenComments <= 0 {
 		return status
 	}
 	comments := fmt.Sprintf("%d åpne", *p.OpenComments)
