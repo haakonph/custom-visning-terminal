@@ -9,9 +9,62 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
+
+func TestExistingPathSkipsUpdateLocksAndLeavesCheckoutUntouched(t *testing.T) {
+	w, p, _ := fixture(t)
+	s, err := w.Prepare(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.HeadOID = strings.Repeat("a", 40)
+	file := filepath.Join(s.Path, "local-edit")
+	if err := os.WriteFile(file, []byte("keep me"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	unlock := w.Repositories.lock(strings.ToLower(p.Repository))
+	defer unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	path, err := w.ExistingPath(ctx, p)
+	if err != nil || path != s.Path {
+		t.Fatalf("existing checkout blocked by update: %q %v", path, err)
+	}
+	if run(t, path, "rev-parse", "HEAD") != s.Head {
+		t.Fatal("opening moved HEAD")
+	}
+	if data, err := os.ReadFile(file); err != nil || string(data) != "keep me" {
+		t.Fatalf("local edit changed: %q %v", data, err)
+	}
+}
+
+func TestExistingPathRejectsInvalidCheckout(t *testing.T) {
+	w, p, source := fixture(t)
+	if path, err := w.ExistingPath(context.Background(), p); err != nil || path != "" {
+		t.Fatalf("missing checkout: %q %v", path, err)
+	}
+	s, err := w.Prepare(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(s.Path, "nested")
+	if err := os.Mkdir(nested, 0700); err != nil {
+		t.Fatal(err)
+	}
+	w.entries[key(p)] = Status{Path: nested}
+	if _, err := w.ExistingPath(context.Background(), p); err == nil {
+		t.Fatal("accepted nested directory")
+	}
+	w.entries[key(p)] = s
+	run(t, source, "remote", "add", "origin", "https://github.com/other/repo.git")
+	run(t, s.Path, "remote", "set-url", "origin", "https://github.com/other/repo.git")
+	if _, err := w.ExistingPath(context.Background(), p); err == nil {
+		t.Fatal("accepted unrelated remote")
+	}
+}
 
 func TestIdentity(t *testing.T) {
 	for _, v := range []string{"git@github.com:Owner/Repo.git", "https://github.com/Owner/Repo.git", "ssh://git@github.com/Owner/Repo.git"} {

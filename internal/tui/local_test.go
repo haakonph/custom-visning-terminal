@@ -3,7 +3,10 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +15,36 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
+
+func TestExistingWorktreeLaunchesBeforeProjectPreparation(t *testing.T) {
+	m := localModel(t)
+	p := m.filtered()[0]
+	path := filepath.Join(m.local.manager.Repositories.Dir, "worktrees", strings.ToLower(p.Repository), fmt.Sprintf("pr-%d", p.Number))
+	if err := os.MkdirAll(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init"},
+		{"-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "initial"},
+		{"remote", "add", "origin", "https://github.com/" + p.Repository + ".git"},
+	} {
+		if output, err := exec.Command("git", append([]string{"-C", path}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %s: %v", args, output, err)
+		}
+	}
+	// No preparation is needed to launch an existing checkout, even when it
+	// contains a Maven project and Maven is unavailable.
+	if err := os.WriteFile(filepath.Join(path, "pom.xml"), []byte("<project/>"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	m.local.launcher.Editors.IntelliJ.Args = []string{"--version"}
+	m.local.queue = []model.PullRequest{p}
+	msg := m.nextLocal()()
+	opened, ok := msg.(localOpened)
+	if !ok || opened.path != path {
+		t.Fatalf("expected editor launch before preparation, got %#v", msg)
+	}
+}
 
 type closureSource struct{ fakeSource }
 
@@ -141,6 +174,32 @@ func TestProgressErrorsRemainVisible(t *testing.T) {
 		if !strings.Contains(content, text) {
 			t.Fatalf("%q hidden in full dashboard: %s", text, content)
 		}
+	}
+}
+
+func TestOpenedWorktreeUpdatesInBackgroundAndContinuesQueue(t *testing.T) {
+	m := localModel(t)
+	p, q := m.filtered()[0], m.filtered()[1]
+	m.local.running = 1
+	m.local.preparing[p.Key()] = true
+	m.local.preparing[q.Key()] = true
+	m.local.queue = []model.PullRequest{q}
+	m, cmd := update(m, localOpened{p: p, path: "/tmp/existing"})
+	if cmd == nil || m.local.running != 1 || len(m.local.queue) != 0 {
+		t.Fatal("background update blocked next editor")
+	}
+	if m.localLabel(p) != "Opened · Updating" || !strings.Contains(m.View().Content, "1 updating") {
+		t.Fatal("background update is not visible")
+	}
+	if m.openLocal("") != nil {
+		t.Fatal("duplicate open accepted during background update")
+	}
+	m, _ = update(m, localResult{p: p, status: local.Status{Path: "/tmp/existing"}, err: errors.New("offline"), updated: true})
+	if m.local.running != 1 || m.local.preparing[p.Key()] || m.local.updating[p.Key()] {
+		t.Fatal("update completion changed another opening job")
+	}
+	if !strings.Contains(m.notice, "opened; background update failed: offline") {
+		t.Fatal(m.notice)
 	}
 }
 

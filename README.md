@@ -731,15 +731,20 @@ Git HTTPS authentication uses the existing `gh auth git-credential` helper.
 Install Git and GitHub CLI and run `gh auth login --hostname github.com` with
 access to the repositories. No additional authentication mechanism is introduced.
 
-Existing worktrees already at the dashboard's PR head need no clone or fetch.
+Existing worktrees open after a quick local check of their repository identity
+and worktree root. The editor launches before waiting for repository locks,
+scanning local changes, fetching commits, or preparing the Maven project. These
+tasks continue in the background with `Opened · Updating` shown in the terminal.
+The next selected worktree can open while previous ones are still updating.
+Worktrees already at the dashboard's PR head need no clone or fetch.
 When opening an outdated worktree, the app automatically advances it to that PR
 head **only if it is clean, on its managed PR branch, and the change is a
 fast-forward**. Missing commits are fetched if necessary. This never uses reset,
 force checkout, stash, merge commits or rebase. Other branches, local commits,
 rewritten PR history, and Git operations in progress require manual updates. Ignored files
 that would be overwritten also prevent updating. Local changes are preserved.
-If fetching or checkout fails, the existing worktree still opens with an update
-notice; cancellation stops the operation.
+If fetching or checkout fails, the editor remains open and an update notice is
+shown; cancellation stops the background operation.
 
 `Ready`, `Modified`, and `Outdated` appear in the selected PR's detail line (and a
 LOCAL column in wide terminals). Modified and Outdated can appear together.
@@ -762,7 +767,7 @@ configuration directories are not discovered. IntelliJ may keep its recent
 projects in memory while running; changes may only appear after restarting
 the IDE, and later app checks retry if IntelliJ writes an old entry back.
 
-Preparation runs asynchronously, with up to three preparation jobs and serialized
+Opening runs asynchronously, with up to three opening jobs and serialized
 clone/fetch/worktree operations per repository. Selection is deduplicated; an
 active open operation cannot be submitted twice. Preparing indicators, recent
 per-PR results and errors remain visible while other navigation works. Local

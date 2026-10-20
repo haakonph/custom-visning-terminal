@@ -18,6 +18,7 @@ type localState struct {
 	chosen                     map[string]model.PullRequest
 	statuses                   map[string]local.Status
 	preparing                  map[string]bool
+	updating                   map[string]bool
 	queue                      []model.PullRequest
 	running                    int
 	editor                     string
@@ -43,9 +44,14 @@ type localWarmResult struct {
 	err        error
 }
 type localResult struct {
-	p      model.PullRequest
-	status local.Status
-	err    error
+	p       model.PullRequest
+	status  local.Status
+	err     error
+	updated bool
+}
+type localOpened struct {
+	p    model.PullRequest
+	path string
 }
 type localStatuses struct {
 	values     map[string]local.Status
@@ -53,7 +59,7 @@ type localStatuses struct {
 }
 
 func (m Model) WithLocal(manager *local.WorktreeManager, editors local.Editors) Model {
-	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: m.chosen, statuses: map[string]local.Status{}, preparing: map[string]bool{}, warmed: map[string]time.Time{}}
+	m.local = &localState{manager: manager, launcher: local.EditorLauncher{Editors: editors}, chosen: m.chosen, statuses: map[string]local.Status{}, preparing: map[string]bool{}, updating: map[string]bool{}, warmed: map[string]time.Time{}}
 	return m
 }
 func (m *Model) refreshLocal() tea.Cmd {
@@ -146,7 +152,7 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 		return nil
 	}
 	l := m.local
-	if l.running > 0 {
+	if l.running > 0 || len(l.preparing) > 0 {
 		m.notice = "An open operation is already running"
 		return nil
 	}
@@ -170,8 +176,8 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 	return m.nextLocal()
 }
 
-// At most three Git jobs are scheduled. The repository manager serializes all
-// operations for one repository, including worktree metadata changes.
+// At most three opening jobs are scheduled. Existing worktrees release their
+// opening slot before updates, which the repository manager serializes per repo.
 func (m *Model) nextLocal() tea.Cmd {
 	l := m.local
 	cmds := []tea.Cmd{}
@@ -183,6 +189,19 @@ func (m *Model) nextLocal() tea.Cmd {
 		cmds = append(cmds, func() tea.Msg {
 			ctx, cancel := context.WithTimeout(parent, 20*time.Minute)
 			defer cancel()
+			path, err := manager.ExistingPath(ctx, p)
+			if err != nil {
+				return localResult{p: p, err: err}
+			}
+			if path != "" {
+				if err := ctx.Err(); err != nil {
+					return localResult{p: p, err: err}
+				}
+				if err := launcher.Launch(editor, path); err != nil {
+					return localResult{p: p, status: local.Status{Path: path}, err: err}
+				}
+				return localOpened{p: p, path: path}
+			}
 			s, err := manager.Prepare(ctx, p)
 			if err == nil && ctx.Err() != nil {
 				err = ctx.Err()
@@ -190,7 +209,7 @@ func (m *Model) nextLocal() tea.Cmd {
 			if err == nil {
 				err = launcher.Launch(editor, s.Path)
 			}
-			return localResult{p, s, err}
+			return localResult{p: p, status: s, err: err}
 		})
 	}
 	return tea.Batch(cmds...)
@@ -234,14 +253,36 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return true, m.refreshLocal()
 		}
 		return true, nil
-	case localResult:
+	case localOpened:
 		l.running--
+		l.updating[msg.p.Key()] = true
+		l.statuses[msg.p.Key()] = local.Status{Path: msg.path}
+		m.notice = fmt.Sprintf("%s #%d: opened; updating in background", m.githubName(msg.p.Repository), msg.p.Number)
+		manager, parent := l.manager, m.ctx
+		refresh := func() tea.Msg {
+			ctx, cancel := context.WithTimeout(parent, 20*time.Minute)
+			defer cancel()
+			s, err := manager.Prepare(ctx, msg.p)
+			if s.Path == "" {
+				s.Path = msg.path
+			}
+			return localResult{p: msg.p, status: s, err: err, updated: true}
+		}
+		return true, tea.Batch(m.nextLocal(), refresh)
+	case localResult:
+		if !msg.updated {
+			l.running--
+		}
+		delete(l.updating, msg.p.Key())
 		delete(l.preparing, msg.p.Key())
 		s := msg.status
 		result := fmt.Sprintf("%s #%d: opened (%s)", m.githubName(msg.p.Repository), msg.p.Number, s.String())
 		if msg.err != nil {
 			s.Error = msg.err.Error()
 			result = fmt.Sprintf("%s #%d: %s", m.githubName(msg.p.Repository), msg.p.Number, msg.err)
+			if msg.updated {
+				result = fmt.Sprintf("%s #%d: opened; background update failed: %s", m.githubName(msg.p.Repository), msg.p.Number, msg.err)
+			}
 		}
 		l.statuses[msg.p.Key()] = s
 		l.results = append(l.results, result)
@@ -253,6 +294,9 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 func (m Model) localLabel(p model.PullRequest) string {
 	if m.local == nil {
 		return "Not downloaded"
+	}
+	if m.local.updating[p.Key()] {
+		return "Opened · Updating"
 	}
 	if m.local.preparing[p.Key()] {
 		return "Preparing"
