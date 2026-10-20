@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
@@ -15,6 +16,9 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if next, cmd, handled := m.autoMessage(msg); handled {
+		return next, cmd
+	}
 	if r, ok := msg.(setupValidated); ok {
 		return m.finishSetupValidation(r)
 	}
@@ -45,7 +49,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.settings.active {
 		switch msg.(type) {
-		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, detailMsg, copilotTick, copilotResult, copilotOpenMsg, mmTick, mmResult:
 		default:
 			return m.updateSettings(msg)
 		}
@@ -58,7 +62,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if result, ok := msg.(detailMsg); ok {
 		if m.detail != nil && m.detail.request == result.request {
 			m.detail.loading = false
-			m.detail.data = result.data
+			if result.err == nil {
+				m.detail.data = retainDetailSections(m.detail.data, result.data)
+				if len(result.data.Warnings) == 0 {
+					m.detail.synced = time.Now()
+				}
+			}
 			m.detail.err = result.err
 		}
 		return m, nil
@@ -90,7 +99,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.settings.active {
 		switch msg.(type) {
-		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, detailMsg, copilotTick, copilotResult, copilotOpenMsg, mmTick, mmResult:
 		default:
 			return m.updateSettings(msg)
 		}
@@ -125,7 +134,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.copilotActive {
 		switch msg.(type) {
-		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult:
+		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, detailMsg, copilotTick, copilotResult, copilotOpenMsg, mmTick, mmResult:
 		default:
 			return m.updateCopilot(msg)
 		}
@@ -225,6 +234,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			data.PRs = msg.result.PRs
 			model.Sort(data.PRs)
 			data.SyncedAt = msg.at
+			if m.detail != nil {
+				for _, pr := range data.PRs {
+					if pr.Key() == m.detail.pr.Key() {
+						m.detail.pr = pr
+						break
+					}
+				}
+			}
 		} else {
 			data.PRs = model.Merge(data.PRs, msg.result.PRs)
 			if m.warnings[msg.view] == "" {

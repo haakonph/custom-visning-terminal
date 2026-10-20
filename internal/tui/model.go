@@ -16,6 +16,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	auto             refreshState
 	setup            setupState
 	version          string
 	previousProvider string
@@ -90,25 +91,24 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	s := newSnooze()
 	tasks := newTasks()
 	tasks.snoozes = s
-	m := Model{entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m := Model{auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m.loadRefresh()
 	m.loadJiraPattern()
 	m.loadGitHubDisplay()
 	return m
 }
 func (m Model) initProviders() tea.Cmd {
+	cmds := []tea.Cmd{}
 	if m.copilotActive {
-		return m.refreshCopilot()
+		cmds = append(cmds, m.refreshCopilot())
 	}
 	if m.jiraActive {
-		if m.source != nil {
-			return tea.Batch(m.refreshJira(), m.bootstrap())
-		}
-		return m.refreshJira()
+		cmds = append(cmds, m.refreshJira())
 	}
-	if m.source == nil {
-		return nil
+	if m.source != nil {
+		cmds = append(cmds, m.bootstrap())
 	}
-	return m.bootstrap()
+	return tea.Batch(cmds...)
 }
 func (m Model) bootstrap() tea.Cmd {
 	if m.source == nil {
@@ -147,6 +147,7 @@ func (m *Model) refresh(view model.View) tea.Cmd {
 		return nil
 	}
 	m.loading[view] = true
+	m.auto.github[view].started = time.Now()
 	source, user, parent := m.source, m.snapshot.User, m.ctx
 	version := m.autoMergeVersion
 	return func() tea.Msg {

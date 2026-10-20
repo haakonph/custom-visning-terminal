@@ -339,3 +339,43 @@ func TestCancellationDuringRetryWait(t *testing.T) {
 		t.Fatalf("retry wait ignored cancellation: %v", err)
 	}
 }
+
+func TestTeamMembershipCacheIsScopedAndOnlyStoresCompleteResults(t *testing.T) {
+	calls := 0
+	c := fixture(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		writeJSON(w, []any{map[string]any{"slug": "core", "organization": map[string]any{"login": "acme"}}})
+	})
+	first, err := c.Teams(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	first[0] = "changed"
+	second, err := c.Teams(context.Background())
+	if err != nil || calls != 1 || second[0] != "acme/core" {
+		t.Fatal("membership cache not reused safely", second, err, calls)
+	}
+	c.teamsAt = time.Now().Add(-16 * time.Minute)
+	if _, err := c.Teams(context.Background()); err != nil || calls != 2 {
+		t.Fatal("membership TTL not honored")
+	}
+}
+
+func TestIncompleteTeamMembershipIsNotCached(t *testing.T) {
+	calls := 0
+	c := fixture(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		writeJSON(w, []any{map[string]any{"slug": "core", "organization": map[string]any{"login": "acme"}}})
+	})
+	if _, err := c.Teams(context.Background()); err == nil {
+		t.Fatal("expected access error")
+	}
+	teams, err := c.Teams(context.Background())
+	if err != nil || calls != 2 || len(teams) != 1 {
+		t.Fatal("failed membership response cached", teams, err, calls)
+	}
+}

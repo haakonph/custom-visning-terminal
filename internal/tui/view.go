@@ -127,7 +127,7 @@ func (m Model) View() tea.View {
 	}
 	sync := "never"
 	if at := m.snapshot.Datasets[m.active].SyncedAt; !at.IsZero() {
-		sync = at.Local().Format("2006-01-02 15:04:05")
+		sync = syncAge(at)
 	}
 	state := "ready"
 	if m.loading[m.active] {

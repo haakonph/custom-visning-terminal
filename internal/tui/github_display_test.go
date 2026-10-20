@@ -53,7 +53,17 @@ func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
 	}
 	opened, _ := m.openSettings()
 	m = opened.(Model)
-	m = editSetting(t, m, len(settingFields)-1, `[]`)
+	index := -1
+	for i, field := range settingFields {
+		if field.path == "github.hidden_prefixes" {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		t.Fatal("GitHub display setting missing")
+	}
+	m = editSetting(t, m, index, `[]`)
 	if m.settings.editing {
 		t.Fatal(m.settings.notice)
 	}
