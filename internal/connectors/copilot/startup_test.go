@@ -11,9 +11,35 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
+
+func TestCloseCancelsWorkerBeforeWaitingForDataLock(t *testing.T) {
+	o := testOptions(t)
+	o.Enabled = false
+	s := service(t, o)
+	s.Start(context.Background())
+	cancelled := make(chan struct{})
+	cancel := s.cancel
+	s.cancel = func() { close(cancelled); cancel() }
+
+	// A scan can own the data lock when the user quits. Close must signal
+	// cancellation without waiting for that lock to become available.
+	s.mu.Lock()
+	closed := make(chan error, 1)
+	go func() { closed <- s.Close() }()
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Error("Close waited for the data lock before cancelling the worker")
+	}
+	s.mu.Unlock()
+	if err := <-closed; err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestDeferredStartupPreservesUnreadableStore(t *testing.T) {
 	o := testOptions(t)

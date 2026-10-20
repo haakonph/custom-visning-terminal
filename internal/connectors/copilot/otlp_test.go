@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	logs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	metrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
@@ -19,6 +20,53 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestCloseDoesNotWaitForIncompleteExport(t *testing.T) {
+	o := testOptions(t)
+	s := service(t, o)
+	// Persisted history must survive a client that stalls halfway through an
+	// export when the user exits the dashboard.
+	s.ingestLocked([]Event{{SessionID: "saved", Key: "1", Source: "local", Content: "history"}})
+	entered, finished := make(chan struct{}), make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(entered)
+		defer close(finished)
+		s.handler().ServeHTTP(w, r)
+	}))
+	defer server.Close()
+	s.receiver = server.Config
+	conn, err := net.DialTimeout("tcp", server.Listener.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := fmt.Fprintf(conn, "POST /v1/logs HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{", server.Listener.Addr()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("receiver did not start reading the export")
+	}
+	started := time.Now()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Errorf("incomplete export delayed shutdown by %v", elapsed)
+	}
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("export handler remained blocked after Close")
+	}
+	reopened := service(t, o)
+	defer reopened.Close()
+	detail, err := reopened.Detail(context.Background(), "saved")
+	if err != nil || len(detail.Events) != 1 || detail.Events[0].Content != "history" {
+		t.Fatalf("shutdown lost collected history: %v %v", detail, err)
+	}
+}
 
 func attribute(k string, v any) any {
 	value := map[string]any{}
