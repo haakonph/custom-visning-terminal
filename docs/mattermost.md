@@ -58,7 +58,9 @@ offentlige kanaler i teamene dine, samt private kanaler du er medlem av. Skriv
 for å søke lokalt i navn og team, bruk pilene, og Enter for å slå overvåkning
 av/på. Valgene huskes per server og brukernavn. Overvåkning endrer ikke
 medlemskap på serveren. En offentlig kanal kan kreve medlemskap etter serverens
-tilgangsregler; slike feil vises uten å forkaste lokal historikk.
+tilgangsregler; slike feil vises med kanalnavn uten å forkaste lokal historikk.
+Hvis serveren nekter tilgang til slettede meldinger, forsøker appen vanlig lesing
+automatisk. Da kan slettinger bli liggende i den lokale historikken.
 
 Hver overvåket kanal får en horisontal tab. Tab-raden flytter seg slik at aktiv
 tab er synlig. Meldinger viser tidspunkt, avsender og innhold. Overskrifter,

@@ -3,6 +3,7 @@ package mattermost
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -126,7 +127,7 @@ func (s *Service) Sync(ctx context.Context) error {
 		}
 		posts, err := s.API.Posts(ctx, c.ID, c.SyncedAt)
 		if err != nil {
-			failures = append(failures, err)
+			failures = append(failures, fmt.Errorf("#%s: %w", c.Name, err))
 			if errors.Is(err, ErrSession) {
 				break
 			}

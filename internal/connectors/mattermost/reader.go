@@ -125,6 +125,10 @@ func (a *API) Channels(ctx context.Context) ([]model.MattermostChannel, error) {
 func (a *API) Posts(ctx context.Context, channel string, since int64) ([]model.MattermostPost, error) {
 	if since == 0 {
 		list, _, err := a.sdk.GetPostsForChannel(ctx, channel, 0, 60, "", false, true)
+		// Reading deleted posts requires an extra permission on some servers.
+		if errors.Is(apiError(err), ErrAccess) {
+			list, _, err = a.sdk.GetPostsForChannel(ctx, channel, 0, 60, "", false, false)
+		}
 		if err != nil {
 			return nil, apiError(err)
 		}
@@ -132,7 +136,11 @@ func (a *API) Posts(ctx context.Context, channel string, since int64) ([]model.M
 	}
 	// The SDK's GetPostsSince doesn't expose include_deleted. Use its authenticated
 	// transport with that option to retain tombstones as well as edited posts.
-	resp, err := a.sdk.DoAPIGet(ctx, fmt.Sprintf("/channels/%s/posts?since=%d&include_deleted=true", url.PathEscape(channel), max(int64(0), since-1)), "")
+	route := fmt.Sprintf("/channels/%s/posts?since=%d", url.PathEscape(channel), max(int64(0), since-1))
+	resp, err := a.sdk.DoAPIGet(ctx, route+"&include_deleted=true", "")
+	if errors.Is(apiError(err), ErrAccess) {
+		resp, err = a.sdk.DoAPIGet(ctx, route, "")
+	}
 	if err != nil {
 		return nil, apiError(err)
 	}
@@ -152,6 +160,9 @@ func (a *API) Thread(ctx context.Context, id string) ([]model.MattermostPost, er
 }
 func (a *API) History(ctx context.Context, channel, before string) ([]model.MattermostPost, error) {
 	list, _, err := a.sdk.GetPostsBefore(ctx, channel, before, 0, 60, "", false, true)
+	if errors.Is(apiError(err), ErrAccess) {
+		list, _, err = a.sdk.GetPostsBefore(ctx, channel, before, 0, 60, "", false, false)
+	}
 	if err != nil {
 		return nil, apiError(err)
 	}
