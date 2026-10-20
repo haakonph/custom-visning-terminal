@@ -267,7 +267,19 @@ func (w *WorktreeManager) addPRBranch(ctx context.Context, repo, path, head stri
 			return branch, nil
 		}
 	}
-	return "", fmt.Errorf("PR branch is already in use; inspect git worktree list")
+	// Retain old branches (including local commits) when recreating a checkout
+	// after a rewritten PR head. Find an unused managed branch instead.
+	for suffix := 2; ; suffix++ {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		branch := fmt.Sprintf("%s-%d", fallback, suffix)
+		if _, err := git(ctx, repo, "rev-parse", "--verify", "refs/heads/"+branch); err == nil {
+			continue
+		}
+		_, err := git(ctx, repo, "worktree", "add", "-b", branch, "--", path, head)
+		return branch, err
+	}
 }
 
 // prCommit resolves the dashboard head locally, fetching the base PR ref
@@ -437,6 +449,13 @@ func (w *WorktreeManager) Remove(ctx context.Context, p model.PullRequest) error
 	}
 	if err := checkGitOperation(ctx, path); err != nil {
 		return err
+	}
+	refs, err := git(ctx, path, "for-each-ref", "--contains="+s.Head, "--format=%(refname)")
+	if err != nil {
+		return err
+	}
+	if refs == "" {
+		return fmt.Errorf("worktree has detached commits; create a branch before deleting")
 	}
 	// Git checks dirty/locked worktrees again. Never force removal.
 	if _, err := git(ctx, physical, "worktree", "remove", "--", path); err != nil {
