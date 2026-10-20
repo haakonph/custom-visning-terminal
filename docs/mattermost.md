@@ -58,7 +58,9 @@ offentlige kanaler i teamene dine, samt private kanaler du er medlem av. Skriv
 for å søke lokalt i navn og team, bruk pilene, og Enter for å slå overvåkning
 av/på. Valgene huskes per server og brukernavn. Overvåkning endrer ikke
 medlemskap på serveren. En offentlig kanal kan kreve medlemskap etter serverens
-tilgangsregler; slike feil vises uten å forkaste lokal historikk.
+tilgangsregler; slike feil vises med kanalnavn uten å forkaste lokal historikk.
+Appen ber aldri om slettede meldinger. Meldinger som slettes på serveren, kan
+derfor bli liggende i den lokale historikken.
 
 Hver overvåket kanal får en horisontal tab. Tab-raden flytter seg slik at aktiv
 tab er synlig. Meldinger viser tidspunkt, avsender og innhold. Overskrifter,
@@ -98,16 +100,15 @@ meldinger, trådrøtter, synkroniseringsmarkør, lesestatus og PR-relasjoner.
 
 Første synkronisering henter opptil 60 siste meldinger per valgt kanal. Videre
 hentes endringer siden siste servermarkør med én millisekunds overlapp og
-id-basert deduplisering. Redigeringer erstatter innhold; slettetombstones tømmer
-lokalt innhold og fjerner PR-relasjoner. Markøren avanserer bare etter vellykket
+id-basert deduplisering. Redigeringer erstatter innhold. Markøren avanserer bare etter vellykket
 henting og bruker serverens tidsstempler. Eldre historie hentes bare med `ah`,
 og tråder ved `d`. Feil i én kanal forkaster ikke vellykket synkronisering i andre.
 
 Automatiske oppdateringer bruker polling hvert 30. sekund, også når en annen
 provider vises. WebSocket er ikke implementert. Cachen kan leses uten nett;
-API-feil vises i statuslinjen. En offline sletting blir først kjent når serveren
-returnerer den ved neste synkronisering; serverens retention- og tilgangsregler
-kan begrense hvilke historiske endringer som er tilgjengelige.
+API-feil vises i statuslinjen. Slettede meldinger hentes ikke; serverens
+retention- og tilgangsregler kan begrense hvilke historiske endringer som er
+tilgjengelige.
 
 `ab` med Enter-bekreftelse fjerner Mattermost-tabellinnhold for **alle** lokale kontoer,
 kanalvalg og PR-relasjoner. Dette påvirker ikke GitHub-, Jira- eller Copilot-data.

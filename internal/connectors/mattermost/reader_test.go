@@ -199,23 +199,6 @@ func TestLoginTOTP(t *testing.T) {
 		t.Fatal(token, err)
 	}
 }
-func TestSinceIncludesDeleted(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("since") != "99" || r.URL.Query().Get("include_deleted") != "true" {
-			t.Error(r.URL.String())
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"order":["p"],"posts":{"p":{"id":"p","channel_id":"c","update_at":200,"delete_at":200}}}`))
-	}))
-	defer srv.Close()
-	a, _ := NewAPI(srv.URL)
-	a.sdk.HTTPClient = srv.Client()
-	a.SetToken("t")
-	posts, err := a.Posts(context.Background(), "c", 100)
-	if err != nil || len(posts) != 1 || posts[0].DeletedAt != 200 {
-		t.Fatal(posts, err)
-	}
-}
 func TestServerValidation(t *testing.T) {
 	for _, server := range []string{"http://chat.example", "https://user:password@chat.example", "https://chat.example?token=secret", "https://chat.example#fragment", ""} {
 		if _, err := NewAPI(server); err == nil {
@@ -272,7 +255,7 @@ func TestPartialAccessFailureKeepsSuccessfulChannels(t *testing.T) {
 	if err = s.Select("d", true); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.Sync(ctx); !errors.Is(err, ErrAccess) {
+	if err = s.Sync(ctx); !errors.Is(err, ErrAccess) || !strings.Contains(err.Error(), "#b:") {
 		t.Fatal(err)
 	}
 	if len(s.Data.Posts) != 1 || s.Data.Channels[0].SyncedAt != 100 || s.Data.Channels[1].SyncedAt != 0 {
@@ -295,5 +278,80 @@ func TestPartialAccessFailureKeepsSuccessfulChannels(t *testing.T) {
 	}
 	if s.Data.Posts[0].Message != "fresh" {
 		t.Fatal(s.Data.Posts)
+	}
+}
+
+func TestPostsNeverRequestDeletedMessages(t *testing.T) {
+	for _, operation := range []string{"initial", "since", "history", "thread"} {
+		for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusUnauthorized, http.StatusInternalServerError} {
+			t.Run(operation+"/"+http.StatusText(status), func(t *testing.T) {
+				var queries []string
+				srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					queries = append(queries, r.URL.RawQuery)
+					wantPath := "/api/v4/channels/c/posts"
+					if operation == "thread" {
+						wantPath = "/api/v4/posts/p/thread"
+					}
+					if r.URL.Path != wantPath || !strings.EqualFold(r.Header.Get("Authorization"), "Bearer test-token") {
+						t.Error("unexpected request", r.URL, r.Header.Get("Authorization"))
+					}
+					q := r.URL.Query()
+					if q.Has("include_deleted") {
+						t.Error("request includes deleted messages", r.URL)
+					}
+					if operation == "since" && q.Get("since") != "99" {
+						t.Error("lost incremental cursor")
+					}
+					if operation == "history" && q.Get("before") != "p" {
+						t.Error("lost history cursor")
+					}
+					w.Header().Set("Content-Type", "application/json")
+					code := status
+					if code != http.StatusOK {
+						w.WriteHeader(code)
+						_ = json.NewEncoder(w).Encode(map[string]any{"id": "test.error", "message": "sensitive upstream body", "status_code": code})
+						return
+					}
+					_, _ = w.Write([]byte(`{"order":["p"],"posts":{"p":{"id":"p","channel_id":"c","message":"visible"}}}`))
+				}))
+				defer srv.Close()
+				a, _ := NewAPI(srv.URL)
+				a.sdk.HTTPClient = srv.Client()
+				a.SetToken("test-token")
+				var posts []model.MattermostPost
+				var err error
+				switch operation {
+				case "initial":
+					posts, err = a.Posts(context.Background(), "c", 0)
+				case "since":
+					posts, err = a.Posts(context.Background(), "c", 100)
+				case "history":
+					posts, err = a.History(context.Background(), "c", "p")
+				case "thread":
+					posts, err = a.Thread(context.Background(), "p")
+				}
+				if len(queries) != 1 {
+					t.Fatalf("requests = %v, want exactly one", queries)
+				}
+				switch status {
+				case http.StatusOK:
+					if err != nil || len(posts) != 1 || posts[0].Message != "visible" {
+						t.Fatal(posts, err)
+					}
+				case http.StatusForbidden:
+					if !errors.Is(err, ErrAccess) {
+						t.Fatal(err)
+					}
+				case http.StatusUnauthorized:
+					if !errors.Is(err, ErrSession) {
+						t.Fatal(err)
+					}
+				default:
+					if err == nil || strings.Contains(err.Error(), "sensitive") {
+						t.Fatal(err)
+					}
+				}
+			})
+		}
 	}
 }
