@@ -1,6 +1,8 @@
 package github
 
 import (
+	"context"
+	"errors"
 	"strings"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -106,10 +108,10 @@ func applyReview(p *model.PullRequest, d *details) {
 // summary body rather than GitHub's branch-protection review decision.
 func applyCopilotReview(p *model.PullRequest, d *details) {
 	p.CopilotReview = nil
-	if len(d.CopilotReviews.Nodes) == 0 {
+	r := latestCopilotReview(d.CopilotReviews)
+	if r == nil {
 		return
 	}
-	r := d.CopilotReviews.Nodes[0]
 	recommendation := "Comments"
 	if r.State == "DISMISSED" {
 		recommendation = "Dismissed"
@@ -129,4 +131,71 @@ func applyCopilotReview(p *model.PullRequest, d *details) {
 		}
 	}
 	p.CopilotReview = &model.CopilotReview{Recommendation: recommendation, Comments: r.Comments.TotalCount}
+}
+
+type copilotReview struct {
+	Author *struct {
+		Login string `json:"login"`
+		Type  string `json:"__typename"`
+	} `json:"author"`
+	Body     string `json:"body"`
+	State    string `json:"state"`
+	Comments struct {
+		TotalCount int `json:"totalCount"`
+	} `json:"comments"`
+}
+type copilotReviews struct {
+	PageInfo struct {
+		HasPreviousPage bool   `json:"hasPreviousPage"`
+		StartCursor     string `json:"startCursor"`
+	} `json:"pageInfo"`
+	Nodes []*copilotReview `json:"nodes"`
+}
+
+func latestCopilotReview(reviews copilotReviews) *copilotReview {
+	for i := len(reviews.Nodes) - 1; i >= 0; i-- {
+		r := reviews.Nodes[i]
+		if r == nil || r.Author == nil || r.Author.Type != "Bot" {
+			continue
+		}
+		login := strings.ToLower(strings.TrimSuffix(r.Author.Login, "[bot]"))
+		if login == "copilot" || login == "copilot-pull-request-reviewer" {
+			return r
+		}
+	}
+	return nil
+}
+
+// Read backwards until the latest Copilot review is found, including when more
+// than 100 human reviews were submitted after it.
+func (c *Client) completeCopilotReviews(ctx context.Context, id string, d *details) error {
+	seen := map[string]bool{}
+	for latestCopilotReview(d.CopilotReviews) == nil && d.CopilotReviews.PageInfo.HasPreviousPage {
+		cursor := d.CopilotReviews.PageInfo.StartCursor
+		if cursor == "" || seen[cursor] {
+			return errors.New("Copilot review pagination incomplete")
+		}
+		seen[cursor] = true
+		req, err := c.api.NewRequest(ctx, "POST", "graphql", map[string]any{
+			"query":     `query($id:ID!,$before:String!) { node(id:$id) { ... on PullRequest { copilotReviews: reviews(last:100,before:$before) { pageInfo { hasPreviousPage startCursor } nodes { author { login __typename } body state comments { totalCount } } } } } }`,
+			"variables": map[string]any{"id": id, "before": cursor},
+		})
+		if err != nil {
+			return errors.New("could not create Copilot review request")
+		}
+		var response struct {
+			Data struct {
+				Node *details `json:"node"`
+			} `json:"data"`
+			Errors []any `json:"errors"`
+		}
+		if _, err := c.api.Do(req, &response); err != nil {
+			return safeError(err)
+		}
+		if len(response.Errors) > 0 || response.Data.Node == nil {
+			return errors.New("could not read Copilot reviews")
+		}
+		d.CopilotReviews = response.Data.Node.CopilotReviews
+	}
+	return nil
 }
