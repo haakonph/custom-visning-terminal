@@ -15,6 +15,19 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if r, ok := msg.(setupValidated); ok {
+		return m.finishSetupValidation(r)
+	}
+	if m.setup.wizard != nil {
+		if key, ok := msg.(tea.KeyPressMsg); !ok || key.String() != "ctrl+c" {
+			if _, resize := msg.(tea.WindowSizeMsg); !resize {
+				switch msg.(type) {
+				case tea.KeyPressMsg:
+					return m.updateSetupWizard(msg)
+				}
+			}
+		}
+	}
 	if _, ok := msg.(tea.KeyPressMsg); ok && m.sequence == "" && m.jiraAction == nil {
 		m.sequenceNotice = ""
 	}

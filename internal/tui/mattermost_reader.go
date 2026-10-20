@@ -835,10 +835,16 @@ func openMattermostBrowser(ctx context.Context, link string) error {
 // WithMattermostConfig prepares local state only; authentication runs as a command.
 // A partial setup remains editable in settings and does not prevent app startup.
 func (m Model) WithMattermostConfig() (Model, error) {
+	return m.withMattermostConfigToken(os.Getenv("MATTERMOST_TOKEN"))
+}
+func (m Model) withMattermostConfigToken(token string) (Model, error) {
 	c, err := mm.LoadConfig()
 	if err != nil {
 		return m, err
 	}
+	return m.withMattermostSettings(c, token)
+}
+func (m Model) withMattermostSettings(c mm.Config, token string) (Model, error) {
 	if c.Server == "" || c.Username == "" {
 		return m, nil
 	}
@@ -858,5 +864,5 @@ func (m Model) WithMattermostConfig() (Model, error) {
 	if err := mm.SaveConfig(c); err != nil {
 		return m, err
 	}
-	return m.WithMattermostReader(service, api, mm.Keychain{Server: c.Server, Account: c.Username}, c.Username, os.Getenv("MATTERMOST_TOKEN")), nil
+	return m.WithMattermostReader(service, api, mm.Keychain{Server: c.Server, Account: c.Username}, c.Username, token), nil
 }
