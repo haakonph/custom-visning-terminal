@@ -23,6 +23,14 @@ func (m *Model) loadGitHubDisplay() {
 
 // Names are shortened only when rendering. URLs and stored identities stay intact.
 func (m Model) githubName(name string) string {
+	name = m.githubOrganizationName(name)
+	if owner, repository, ok := strings.Cut(name, "/"); ok {
+		return owner + "/" + strings.TrimPrefix(repository, "glsk-")
+	}
+	return strings.TrimPrefix(name, "glsk-")
+}
+
+func (m Model) githubOrganizationName(name string) string {
 	prefixes := m.githubHiddenPrefixes
 	if prefixes == nil {
 		prefixes = defaultGitHubPrefixes
@@ -43,7 +51,7 @@ func (m Model) githubName(name string) string {
 func (m Model) githubTeams(teams []string) string {
 	names := make([]string, len(teams))
 	for i, team := range teams {
-		names[i] = m.githubName(team)
+		names[i] = m.githubOrganizationName(team)
 	}
 	return strings.Join(names, ", ")
 }

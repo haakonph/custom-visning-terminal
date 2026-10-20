@@ -232,7 +232,10 @@ navigasjon og markering; handlinger gjelder fortsatt de valgte PR-ene.
 Organisasjonsprefikset `skatteetaten-ghe/` skjules i viste repository- og teamnavn,
 og i GitHub-referanser i oppgaver, arkiv og relaterte visninger. Velg
 **GitHub · skjulte organisasjonsprefikser** i `vs` for å endre listen; `[]` viser
-fulle navn. Innstillingen `github.hidden_prefixes` endrer bare presentasjonen.
+fulle organisasjonsnavn. Innstillingen `github.hidden_prefixes` endrer bare presentasjonen.
+Prefikset `glsk-` skjules også i reponavn, for eksempel blir
+`skatteetaten-ghe/glsk-service` vist som `service`. Dette gjelder også
+GitHub-referanser og AI-visningen. Teamnavn, URL-er og lagrede repoidentiteter beholdes.
 
 GraphQL `nodes(ids:)` beriker opptil 40 PR-er per kall med draft-status,
 reviewDecision, requested reviewers/teams, siste commits statusCheckRollup og
