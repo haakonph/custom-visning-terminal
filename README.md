@@ -45,6 +45,14 @@ go install ./cmd/custom-visning
 
 ## Oppsettshjelp i appen
 
+Ved oppstart sjekker appen lokalt oppsett for GitHub, Jira og Mattermost. Hvis
+noe mangler, får du spørsmål om å fullføre oppsettet. Velg integrasjon med j/k
+eller piltastene og trykk Enter for oppsettshjelp, eller bruk `vs` for innstillinger.
+Esc fortsetter til dashboardet (lokale oppgaver hvis ingen tjeneste er klar).
+Valgfrie integrasjoner kan hoppes over; forespørselen vises igjen ved neste
+oppstart så lenge oppsett mangler. `--copilot` starter fortsatt AI-visningen direkte.
+Sjekken gjelder lokal konfigurasjon; den bekrefter ikke tokenets tilgang på serveren.
+
 Appen kan startes uten GitHub-innlogging. Når du åpner en visning som mangler
 oppsett (`vg` GitHub, `vt` Jira, `va` AI eller `vc` Mattermost), får du hjelp
 med konkrete steg for innstillinger, innlogging og nødvendig oppsett utenfor

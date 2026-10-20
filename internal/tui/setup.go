@@ -8,9 +8,55 @@ import (
 )
 
 type setupState struct {
-	provider string
-	problem  string
-	offset   int
+	provider        string
+	problem         string
+	offset          int
+	missing         []string
+	selected        int
+	problemProvider string
+}
+
+// WithStartupSetup offers to repair missing integrations without blocking local work.
+// Readiness here means local configuration; network authentication stays asynchronous.
+func (m Model) WithStartupSetup() Model {
+	// Copilot-only startup deliberately works without the other integrations.
+	if m.copilotActive {
+		return m
+	}
+	var missing []string
+	for _, check := range []struct {
+		provider string
+		missing  bool
+	}{
+		{"github", m.source == nil},
+		{"jira", m.jira == nil},
+		{"mattermost", m.mmReader == nil},
+	} {
+		if check.missing || m.setup.provider == check.provider {
+			missing = append(missing, check.provider)
+		}
+	}
+	if len(missing) == 0 {
+		return m
+	}
+	// Keep explicit startup requests (for example --jira) first in the list.
+	selected := 0
+	for i, provider := range missing {
+		if provider == m.setup.provider {
+			selected = i
+		}
+	}
+	previous := m.setup
+	m = m.WithSetup("startup")
+	m.setup.problem = previous.problem
+	m.setup.problemProvider = previous.provider
+	m.setup.missing = missing
+	m.setup.selected = selected
+	m.revealStartupSelection()
+	if m.source == nil && !m.jiraActive && (m.mmReader == nil || !m.mmReader.active) {
+		m.tasks.active = true
+	}
+	return m
 }
 
 // WithSetup opens guidance without discarding the current provider or selection.
@@ -30,6 +76,25 @@ func (m Model) WithSetupProblem(provider, problem string) Model {
 
 func (m Model) setupLines() []string {
 	switch m.setup.provider {
+	case "startup":
+		lines := []string{
+			"Oppsettet er ikke klart. Vil du fullføre det nå?",
+			"Velg en integrasjon og trykk Enter for hjelp med det som mangler:",
+			"",
+		}
+		labels := map[string]string{
+			"github":     "GitHub · innlogging mangler",
+			"jira":       "Jira · serveradresse eller token mangler eller må rettes",
+			"mattermost": "Mattermost · server, brukernavn eller lokalt oppsett mangler",
+		}
+		for i, provider := range m.setup.missing {
+			prefix := "  "
+			if i == m.setup.selected {
+				prefix = "> "
+			}
+			lines = append(lines, prefix+labels[provider])
+		}
+		return append(lines, "", "Integrasjonene er valgfrie. Esc fortsetter uten å endre oppsettet.", "Forespørselen vises igjen ved neste oppstart hvis oppsett fortsatt mangler.")
 	case "github":
 		return []string{
 			"GitHub · innlogging og tilgang",
@@ -132,6 +197,10 @@ func (m Model) setupView() tea.View {
 	lines := []string{accent.Render(" OPPSETTSHJELP · " + m.setup.provider)}
 	lines = append(lines, body[start:min(len(body), start+capacity)]...)
 	lines = append(lines, "vs innstillinger · vg/vt/va/vc sider · j/k bla · Enter prøv igjen · Esc tilbake")
+	if m.setup.provider == "startup" {
+		lines[0] = accent.Render(" OPPSETT VED OPPSTART")
+		lines[len(lines)-1] = "j/k velg · Enter fiks oppsett · vs innstillinger · Esc fortsett"
+	}
 	if len(lines) > m.height {
 		lines = lines[:max(1, m.height)]
 	}
@@ -144,6 +213,25 @@ func (m Model) setupView() tea.View {
 }
 
 func (m Model) updateSetup(k string) (tea.Model, tea.Cmd) {
+	if m.setup.provider == "startup" {
+		switch k {
+		case "j", "down":
+			m.setup.selected = min(m.setup.selected+1, len(m.setup.missing)-1)
+			m.revealStartupSelection()
+			return m, nil
+		case "k", "up":
+			m.setup.selected = max(0, m.setup.selected-1)
+			m.revealStartupSelection()
+			return m, nil
+		case "enter":
+			provider := m.setup.missing[m.setup.selected]
+			problem := ""
+			if provider == m.setup.problemProvider {
+				problem = m.setup.problem
+			}
+			return m.WithSetupProblem(provider, problem), nil
+		}
+	}
 	switch k {
 	case "v":
 		m.sequence = "v"
@@ -170,4 +258,21 @@ func (m Model) updateSetup(k string) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m *Model) revealStartupSelection() {
+	start := 0
+	if m.setup.problem != "" {
+		start = len(strings.Split(ansi.Hardwrap(clean(m.setup.problem), max(1, m.width), true), "\n")) + 1
+	}
+	lines := m.setupLines()
+	for _, line := range lines[:3+m.setup.selected] {
+		start += len(strings.Split(ansi.Hardwrap(clean(line), max(1, m.width), true), "\n"))
+	}
+	capacity := max(1, m.height-2)
+	if start < m.setup.offset {
+		m.setup.offset = start
+	} else if start >= m.setup.offset+capacity {
+		m.setup.offset = start - capacity + 1
+	}
 }
