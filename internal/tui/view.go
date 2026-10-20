@@ -222,7 +222,10 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	repository := m.githubName(p.Repository)
 	if m.width >= 100 {
 		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"INFO", prInfoLabel(p), 14, p.Mergeability == model.Conflicting}}
-		if m.width >= 140 {
+		if m.width >= 120 {
+			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 19, false})
+		}
+		if m.width >= 160 {
 			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})
 		}
 	} else if m.width >= 60 {

@@ -53,6 +53,7 @@ type PullRequest struct {
 	Labels             []string       `json:"labels"`
 	RequestedReviewers []string       `json:"requested_reviewers"`
 	RequestedTeams     []string       `json:"requested_teams"`
+	CopilotReview      *CopilotReview `json:"copilot_review,omitempty"`
 	ReviewSummary      *ReviewSummary `json:"review_summary,omitempty"`
 	Review             Status         `json:"review"`
 	CI                 Status         `json:"ci"`
@@ -60,6 +61,11 @@ type PullRequest struct {
 	MergeQueue         Status         `json:"merge_queue,omitempty"`
 	QueuePosition      int            `json:"queue_position,omitempty"`
 	Mergeability       Status         `json:"mergeability"`
+}
+
+type CopilotReview struct {
+	Recommendation string `json:"recommendation"`
+	Comments       int    `json:"comments"`
 }
 
 // ReviewSummary counts current opinions per reviewer, with outstanding requests

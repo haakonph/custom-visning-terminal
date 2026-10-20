@@ -101,3 +101,32 @@ func applyReview(p *model.PullRequest, d *details) {
 		p.Review = model.Pending
 	}
 }
+
+// Copilot submits COMMENTED reviews, so its recommendation must come from the
+// summary body rather than GitHub's branch-protection review decision.
+func applyCopilotReview(p *model.PullRequest, d *details) {
+	p.CopilotReview = nil
+	if len(d.CopilotReviews.Nodes) == 0 {
+		return
+	}
+	r := d.CopilotReviews.Nodes[0]
+	recommendation := "Comments"
+	if r.State == "DISMISSED" {
+		recommendation = "Dismissed"
+	} else {
+		for _, line := range strings.Split(strings.ToLower(r.Body), "\n") {
+			switch {
+			case strings.Contains(line, "approval recommended"):
+				recommendation = "Approval"
+			case strings.Contains(line, "changes recommended"), strings.Contains(line, "changes requested"):
+				recommendation = "Changes"
+			case strings.Contains(line, "review recommended"), strings.Contains(line, "further review recommended"):
+				recommendation = "Review"
+			default:
+				continue
+			}
+			break
+		}
+	}
+	p.CopilotReview = &model.CopilotReview{Recommendation: recommendation, Comments: r.Comments.TotalCount}
+}
