@@ -67,3 +67,46 @@ func TestWizardContinuesOneIntegrationAtATime(t *testing.T) {
 		t.Fatal("cannot leave wizard")
 	}
 }
+
+func TestWizardPastesAddressAndMaskedToken(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t).startSetupWizard("jira", nil)
+	defer m.cancel()
+	m, _ = update(m, tea.PasteMsg{Content: "https://jira.example.test/context"})
+	if got := m.setup.wizard.input.Value(); got != "https://jira.example.test/context" {
+		t.Fatalf("pasted address lost: %q", got)
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.setup.wizard.index != 1 {
+		t.Fatal("address did not advance to token")
+	}
+	const token = "pasted-secret-token"
+	m, _ = update(m, tea.PasteMsg{Content: token})
+	if m.setup.wizard.input.Value() != token {
+		t.Fatal("pasted token lost")
+	}
+	if strings.Contains(m.View().Content, token) {
+		t.Fatal("pasted token exposed")
+	}
+	raw, err := os.ReadFile(appconfig.Path())
+	if err != nil || strings.Contains(string(raw), token) {
+		t.Fatal("pasted token persisted", err)
+	}
+}
+
+func TestWizardIgnoresPasteWhileValidatingOrComplete(t *testing.T) {
+	for _, state := range []string{"busy", "valid"} {
+		t.Run(state, func(t *testing.T) {
+			isolateSetup(t)
+			m := ready(t).startSetupWizard("github", nil)
+			defer m.cancel()
+			m.setup.wizard.input.SetValue("original")
+			m.setup.wizard.busy = state == "busy"
+			m.setup.wizard.valid = state == "valid"
+			m, _ = update(m, tea.PasteMsg{Content: "unexpected"})
+			if m.setup.wizard.input.Value() != "original" {
+				t.Fatal("paste changed inactive field")
+			}
+		})
+	}
+}
