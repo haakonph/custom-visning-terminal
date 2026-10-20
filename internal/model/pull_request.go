@@ -31,6 +31,8 @@ const (
 	ChangesRequested Status = "CHANGES"
 	Pass             Status = "PASS"
 	Fail             Status = "FAIL"
+	Warning          Status = "WARNING"
+	Texts            Status = "TEKSTER"
 	Mergeable        Status = "MERGEABLE"
 	Conflicting      Status = "CONFLICT"
 )

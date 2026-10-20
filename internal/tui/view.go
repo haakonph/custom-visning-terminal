@@ -38,7 +38,7 @@ func status(s model.Status) string {
 		color = "108"
 	case model.Fail, model.ChangesRequested:
 		color = "174"
-	case model.Pending:
+	case model.Pending, model.Warning, model.Texts:
 		color = "179"
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(s))

@@ -273,6 +273,8 @@ GitHub-integrasjonen støtter bare GitHub.com. Jira Data Center 10 støttes sepa
 SDK-uavhengige `model.Source`-grensesnittet, slik at andre tjenester kan kobles på
 uten å flytte datainnhenting inn i renderingen. Ingen database eller webserver.
 
+CI-kolonnen viser `FAIL` når en påkrevd sjekk feiler, og `WARNING` når bare valgfrie sjekker feiler. Feil i sjekker med `tekst-sync` i navnet vises som `TEKSTER`, også når sjekken er påkrevd. Ved flere feil prioriteres `FAIL`, deretter `WARNING` og `TEKSTER`. Sjekker som kjører, vises fortsatt som `PENDING`; vellykkede sjekker gir `PASS`.
+
 ## Utvikling, tester og CI
 
 ```bash
