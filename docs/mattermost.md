@@ -6,7 +6,9 @@ GitHub. Den eksisterende incoming-webhooken for sending av PR-lenker er uendret.
 ## Oppsett og autentisering
 
 Start `custom-visning`, og åpne chat med `vc`. Når oppsett mangler, vises
-oppsettshjelpen. Velg `vs`, fyll ut **Mattermost · serveradresse** og
+oppsettshjelpen. Veiviseren (`f`) ber om serveradresse og brukernavn, og åpner
+vanlig innlogging med passord og eventuell TOTP-kode når oppsettet er ferdig.
+PAT er valgfritt via `ap`. For å bruke innstillingene i stedet: Velg `vs`, fyll ut **Mattermost · serveradresse** og
 **Mattermost · brukernavn** (ikke e-postadresse), og trykk Esc. Enter eller `vc`
 tar førstegangsoppsettet i bruk uten omstart. Endring av en allerede tilkoblet
 konto krever omstart. `vh` åpner oppsettshjelpen igjen fra en visning.

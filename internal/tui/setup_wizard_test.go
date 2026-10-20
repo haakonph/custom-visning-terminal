@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
+	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 )
 
 func TestWizardMaskedSecretsAndSequentialFields(t *testing.T) {
@@ -108,5 +109,55 @@ func TestWizardIgnoresPasteWhileValidatingOrComplete(t *testing.T) {
 				t.Fatal("paste changed inactive field")
 			}
 		})
+	}
+}
+
+func TestMattermostWizardDefaultsToLogin(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t).startSetupWizard("mattermost", nil)
+	defer m.cancel()
+	if len(m.setup.wizard.fields) != 2 {
+		t.Fatal("Mattermost setup must only ask for server and username")
+	}
+	m.setup.wizard.input.SetValue("https://chat.example.org/context")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.setup.wizard.input.SetValue("alice")
+	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("missing setup command")
+	}
+	result := cmd().(setupValidated)
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	next, _ := m.finishSetupValidation(result)
+	m = next.(Model)
+	if !m.setup.wizard.valid || m.mmReader == nil {
+		t.Fatal("setup did not prepare reader")
+	}
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil || m.setup.provider != "" || !m.mmReader.active {
+		t.Fatal("setup did not open Mattermost")
+	}
+	m, _ = update(m, mmResult{data: m.mmReader.data, err: mm.ErrSession})
+	if m.mmReader.mode != "Password" {
+		t.Fatal("setup did not default to password login")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m, _ = sequence(m, "ap")
+	if m.mmReader.mode != "PAT" {
+		t.Fatal("PAT alternative is unavailable")
+	}
+}
+
+func TestWizardRetainsMattermostLoginAcrossQueue(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t).startSetupWizard("mattermost", []string{"github"})
+	defer m.cancel()
+	m.setup.wizard.valid = true
+	m.setup.wizard.loginMattermost = true
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.setup.provider != "github" || !m.setup.wizard.loginMattermost {
+		t.Fatal("queued setup lost pending Mattermost login")
 	}
 }
