@@ -667,6 +667,12 @@ Press **ee** to open the selection in IntelliJ, or the highlighted PR when
 nothing is selected. **ev** opens an editor chooser using j/k and Enter;
 Esc cancels. **en** opens the PR in your browser.
 
+In the GitHub view, **aw** deletes the selected PRs' local worktrees (or the
+highlighted PR if nothing is selected). Review the confirmation and press **y**;
+**n** or **Esc** cancels. Local changes, untracked files, locks and ongoing Git
+operations prevent removal. Ignored files in the checkout are removed. Branches
+and commits remain. Press **ee** afterwards to create a fresh worktree.
+
 The shared app configuration (also editable with `,` → Innstillinger) is stored at
 `os.UserConfigDir()/custom-visning/config.json` (normally
 `~/.config/custom-visning/config.json` on Linux or

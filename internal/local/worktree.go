@@ -402,3 +402,48 @@ func (w *WorktreeManager) remember(p model.PullRequest, s Status) error {
 	w.entries[key(p)] = s
 	return storage.Save(filepath.Join(w.Repositories.Dir, "worktrees.json"), w.entries)
 }
+
+// Remove deletes only the selected linked checkout. Branches and commits remain.
+func (w *WorktreeManager) Remove(ctx context.Context, p model.PullRequest) error {
+	if !validIdentity(p.Repository) || p.Number <= 0 {
+		return fmt.Errorf("invalid PR identity")
+	}
+	unlock := w.Repositories.lock(strings.ToLower(p.Repository))
+	defer unlock()
+	path, err := w.ExistingPath(ctx, p)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		return fmt.Errorf("no local worktree for %s", key(p))
+	}
+	physical, err := common(ctx, path)
+	if err != nil {
+		return err
+	}
+	unlockPhysical := w.Repositories.lock("path:" + physical)
+	defer unlockPhysical()
+	// The main checkout has a .git directory; linked worktrees have a file.
+	info, err := os.Lstat(filepath.Join(path, ".git"))
+	if err != nil || !info.Mode().IsRegular() {
+		return fmt.Errorf("refusing to remove main checkout or invalid worktree: %s", path)
+	}
+	s, err := inspect(ctx, path, path, p.HeadOID)
+	if err != nil {
+		return err
+	}
+	if s.Modified {
+		return fmt.Errorf("worktree has local changes or untracked files; commit, stash or move them before deleting")
+	}
+	if err := checkGitOperation(ctx, path); err != nil {
+		return err
+	}
+	// Git checks dirty/locked worktrees again. Never force removal.
+	if _, err := git(ctx, physical, "worktree", "remove", "--", path); err != nil {
+		return fmt.Errorf("could not remove worktree (check local changes, submodules or worktree locks): %w", err)
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	delete(w.entries, key(p))
+	return storage.Save(filepath.Join(w.Repositories.Dir, "worktrees.json"), w.entries)
+}

@@ -55,6 +55,9 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cancel()
 		return m, tea.Quit, true
 	}
+	if m.local != nil && len(m.local.removePending) > 0 {
+		return m.removeLocalKey(k)
+	}
 	if m.jiraAction != nil {
 		next, cmd := m.jiraActionKey(k)
 		return next, cmd, true
@@ -397,7 +400,7 @@ func sequenceHint(prefix string) string {
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':
-		return "+ automerge på · - automerge av · s melding · k arkiver · d slett · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
+		return "+ automerge på · - automerge av · s melding · k arkiver · d slett · w slett worktree (GitHub) · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
 	}
 	return fmt.Sprint(prefix)
 }

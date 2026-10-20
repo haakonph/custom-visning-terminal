@@ -117,6 +117,9 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 				return m, m.mmRead()
 			}
 		case "w":
+			if m.visibleProvider() == "github" {
+				return m.beginRemoveLocal(refs)
+			}
 			if m.visibleProvider() == "mattermost" {
 				return m.dispatchKey("-")
 			}
