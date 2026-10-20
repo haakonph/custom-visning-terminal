@@ -60,6 +60,12 @@ av/på. Valgene huskes per server og brukernavn. Overvåkning endrer ikke
 medlemskap på serveren. En offentlig kanal kan kreve medlemskap etter serverens
 tilgangsregler; slike feil vises uten å forkaste lokal historikk.
 
+Direktemeldinger og gruppesamtaler oppdages på tvers av team og overvåkes
+automatisk første gang. De kan slås av/på med `vk`, og valget huskes.
+GitHub-lenker i disse meldingene indekseres på samme måte som kanalmeldinger.
+Dette gjelder synkronisert historikk: de 60 siste meldingene ved første synk,
+med eldre meldinger via `ah`, ikke et fullstendig søk i all DM-historikk.
+
 Hver overvåket kanal får en horisontal tab. Tab-raden flytter seg slik at aktiv
 tab er synlig. Meldinger viser tidspunkt, avsender og innhold. Overskrifter,
 fet/kursiv tekst, inline-kode, kodeblokker og sitater får terminalstil; øvrig

@@ -297,3 +297,56 @@ func TestPartialAccessFailureKeepsSuccessfulChannels(t *testing.T) {
 		t.Fatal(s.Data.Posts)
 	}
 }
+
+func TestDiscoverTeamlessDirectAndGroupMessages(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v4/users/me/teams":
+			_, _ = w.Write([]byte(`[]`))
+		case "/api/v4/users/me/channels":
+			_, _ = w.Write([]byte(`[{"id":"dm","type":"D","name":"alice__bob"},{"id":"group","type":"G","display_name":"Bob, Carol"},{"id":"deleted","type":"D","delete_at":1},{"id":"public","type":"O"}]`))
+		default:
+			t.Errorf("unexpected endpoint %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	a, err := NewAPI(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.sdk.HTTPClient = srv.Client()
+	channels, err := a.Channels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(channels) != 2 {
+		t.Fatalf("channels: %+v", channels)
+	}
+	if channels[0].ID != "dm" || channels[0].DisplayName != "DM / alice__bob" || !channels[0].Selected {
+		t.Fatalf("direct message: %+v", channels[0])
+	}
+	if channels[1].ID != "group" || channels[1].DisplayName != "Group DM / Bob, Carol" || !channels[1].Selected {
+		t.Fatalf("group message: %+v", channels[1])
+	}
+	f := &fakeReader{channels: channels}
+	s, err := OpenService(f, filepath.Join(t.TempDir(), "mattermost.sqlite"), "https://chat.example", "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Discover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Select("dm", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Discover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range s.Data.Channels {
+		if c.ID == "dm" && c.Selected {
+			t.Fatal("discovery reset disabled DM monitoring")
+		}
+	}
+}

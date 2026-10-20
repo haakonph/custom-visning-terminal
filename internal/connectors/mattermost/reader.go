@@ -120,6 +120,31 @@ func (a *API) Channels(ctx context.Context) ([]model.MattermostChannel, error) {
 			}
 		}
 	}
+	// DMs are not scoped to a team. This endpoint returns only conversations
+	// the authenticated user belongs to, including group messages.
+	resp, err := a.sdk.DoAPIGet(ctx, "/users/me/channels", "")
+	if err != nil {
+		return nil, apiError(err)
+	}
+	defer resp.Body.Close()
+	var conversations []*mm.Channel
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&conversations); err != nil {
+		return nil, errors.New("Invalid Mattermost conversations response")
+	}
+	for _, c := range conversations {
+		if c.DeleteAt != 0 || (c.Type != "D" && c.Type != "G") {
+			continue
+		}
+		label := c.DisplayName
+		if label == "" {
+			label = c.Name
+		}
+		kind := "DM"
+		if c.Type == "G" {
+			kind = "Group DM"
+		}
+		out = append(out, model.MattermostChannel{ID: c.Id, Name: c.Name, DisplayName: kind + " / " + label, Selected: true})
+	}
 	return out, nil
 }
 func (a *API) Posts(ctx context.Context, channel string, since int64) ([]model.MattermostPost, error) {
