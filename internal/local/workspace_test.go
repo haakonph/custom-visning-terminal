@@ -34,6 +34,8 @@ func TestMavenFlagsConfig(t *testing.T) {
 
 func TestMavenFlagsReachBuildAndInvalidateCache(t *testing.T) {
 	w, p, _ := fixture(t)
+	// Create the worktree without caching an install before Maven files exist.
+	w.Workspace.Install = false
 	s, err := w.Prepare(context.Background(), p)
 	if err != nil {
 		t.Fatal(err)
