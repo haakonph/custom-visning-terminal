@@ -25,7 +25,7 @@ func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
 		if ansi.StringWidth(row) > width {
 			t.Fatalf("row exceeds width %d: %q", width, row)
 		}
-		if width >= 100 && (!strings.Contains(header, "AUTO") || !strings.Contains(row, "ON") || !strings.Contains(row, "#2 QUEUED")) {
+		if width >= 100 && (!strings.Contains(header, "AUTO") || !strings.Contains(header, "INFO") || strings.Contains(header, "QUEUE") || !strings.Contains(row, "ON") || !strings.Contains(row, "#2 QUEUED")) {
 			t.Fatal(row)
 		}
 	}
@@ -66,6 +66,51 @@ func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
 	m.loadGitHubDisplay()
 	if m.githubName("other/glsk-service") != "service" || m.githubName(p.Repository) != "skatteetaten-ghe/service" {
 		t.Fatal("custom prefix ignored")
+	}
+}
+
+func TestPRInfoPrioritizesConflicts(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	for _, tc := range []struct {
+		name     string
+		merge    model.Status
+		queue    model.Status
+		position int
+		want     string
+	}{
+		{"conflict without queue", model.Conflicting, "NONE", 0, "CONFLICT"},
+		{"conflict in queue", model.Conflicting, "QUEUED", 2, "CONFLICT"},
+		{"conflict with unknown queue", model.Conflicting, model.Unknown, 0, "CONFLICT"},
+		{"queued", model.Mergeable, "QUEUED", 2, "#2 QUEUED"},
+		{"no queue", model.Mergeable, "NONE", 0, ""},
+		{"unknown", model.Unknown, model.Unknown, 0, "UNKNOWN"},
+		{"missing", "", "", 0, "UNKNOWN"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := model.PullRequest{Title: "Example", Mergeability: tc.merge, MergeQueue: tc.queue, QueuePosition: tc.position}
+			if got := prInfoLabel(p); got != tc.want {
+				t.Fatalf("info = %q, want %q", got, tc.want)
+			}
+			for _, width := range []int{100, 120, 140, 200} {
+				m.width = width
+				for _, selected := range []bool{false, true} {
+					row := ansi.Strip(m.row(p, false, selected))
+					if !strings.Contains(row, tc.want) || ansi.StringWidth(row) > width {
+						t.Fatalf("width=%d selected=%t: %q", width, selected, row)
+					}
+				}
+			}
+			m.width = 60
+			m.detail = &detailState{pr: p}
+			details := strings.Join(m.detailLines(), "\n")
+			if strings.Contains(details, "CONFLICT:") != (tc.merge == model.Conflicting) {
+				t.Fatalf("incorrect conflict explanation: %s", details)
+			}
+			if !strings.Contains(details, "Queue: "+queueLabel(p)) {
+				t.Fatalf("queue status missing from details: %s", details)
+			}
+		})
 	}
 }
 

@@ -223,7 +223,10 @@ også fra tidligere cache i Team Review Requests.
 GitHub-tabellen har egen Jira-kolonne med nøkler fra PR-tittel, beskrivelse og
 branchnavn. Nøklene fjernes fra viste PR-titler, inkludert tomme `[]`, `{}` og
 `()`. Originaltekst og lenker beholdes for søk og handlinger. Fra 100 kolonner
-vises `AUTO` (`ON`/`OFF`/`UNKNOWN`) og `QUEUE` (plass og status, eller tomt felt når PR-en ikke er i kø).
+vises `AUTO` (`ON`/`OFF`/`UNKNOWN`) og `INFO`. `INFO` viser `CONFLICT` ved
+mergekonflikter, ellers køplass og køstatus (tomt felt når PR-en ikke er i kø).
+Konflikter prioriteres i kolonnen; full køstatus beholdes under tabellen og i
+detaljvisningen, som også forklarer eventuelle mergekonflikter.
 Statusene finnes også under tabellen og i detaljvisningen på smalere terminaler.
 
 Alle fire PR-fanene grupperer PR-er under Jira-saken, på tvers av repoer.
