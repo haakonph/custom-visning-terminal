@@ -79,8 +79,12 @@ func (m Model) removeLocalKey(k string) (tea.Model, tea.Cmd, bool) {
 
 func (m Model) removeLocalView() tea.View {
 	lines := []string{"Slette lokale worktrees?", ""}
-	for _, p := range m.local.removePending {
+	shown := min(len(m.local.removePending), max(1, m.height-10))
+	for _, p := range m.local.removePending[:shown] {
 		lines = append(lines, fmt.Sprintf("  %s #%d · %s", clean(p.Repository), p.Number, clean(p.Title)))
+	}
+	if shown < len(m.local.removePending) {
+		lines = append(lines, fmt.Sprintf("  … og %d flere valgte PR-er", len(m.local.removePending)-shown))
 	}
 	lines = append(lines, "", "Worktree-mappene, inkludert ignorerte filer, fjernes.", "Lokale endringer og usporede filer stopper sletting. Grener og commits beholdes.", "Bruk ee etter sletting for å opprette et nytt worktree.", "", "y slett · n/Esc avbryt")
 	view := tea.NewView(strings.Join(lines, "\n"))
