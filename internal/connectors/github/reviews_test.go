@@ -114,7 +114,7 @@ func TestReviewFallbackEnrichment(t *testing.T) {
 			if !strings.Contains(req.Query, "latestOpinionatedReviews(first:100)") || !strings.Contains(req.Query, "nodes { state author { login } }") {
 				t.Error("missing opinionated review query")
 			}
-			if !strings.Contains(req.Query, `copilotReviews: reviews(last:1, author:"copilot-pull-request-reviewer")`) || !strings.Contains(req.Query, "comments { totalCount }") {
+			if !strings.Contains(req.Query, `copilotReviews: reviews(last:100)`) || !strings.Contains(req.Query, "comments { totalCount }") {
 				t.Error("missing latest Copilot review query")
 			}
 			writeJSON(w, map[string]any{"data": map[string]any{"nodes": []any{map[string]any{

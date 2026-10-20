@@ -26,8 +26,9 @@ const detailsQuery = `query($ids:[ID!]!) {
    pageInfo { hasNextPage }
    nodes { state author { login } }
   }
-  copilotReviews: reviews(last:1, author:"copilot-pull-request-reviewer") {
-   nodes { body state comments { totalCount } }
+  copilotReviews: reviews(last:100) {
+   pageInfo { hasPreviousPage startCursor }
+   nodes { author { login __typename } body state comments { totalCount } }
   }
   autoMergeRequest { enabledAt }
   mergeQueueEntry { position state }
@@ -40,15 +41,7 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
-	CopilotReviews struct {
-		Nodes []struct {
-			Body     string `json:"body"`
-			State    string `json:"state"`
-			Comments struct {
-				TotalCount int `json:"totalCount"`
-			} `json:"comments"`
-		} `json:"nodes"`
-	} `json:"copilotReviews"`
+	CopilotReviews           copilotReviews      `json:"copilotReviews"`
 	AutoMergeRequest         json.RawMessage     `json:"autoMergeRequest"`
 	MergeQueueEntry          json.RawMessage     `json:"mergeQueueEntry"`
 	HeadOID                  string              `json:"headRefOid"`
@@ -140,6 +133,9 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 						d.Commits.Nodes = nil
 					}
 				}
+			}
+			if err := c.completeCopilotReviews(ctx, rows[i].ID, d); err != nil {
+				failures = append(failures, err)
 			}
 			applyDetails(&rows[i], d)
 			if rows[i].ReviewSummary != nil && !rows[i].ReviewSummary.Complete {
