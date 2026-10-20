@@ -72,6 +72,7 @@ func OptionsFromEnv() (Options, error) {
 
 // Service owns its importer, private store and optional loopback OTLP receiver.
 type Service struct {
+	lifecycleMu sync.Mutex
 	loadOnce    sync.Once
 	loadErr     error
 	mu          sync.Mutex
@@ -165,6 +166,8 @@ func storeReadError(path, reason string) error {
 }
 
 func (s *Service) Start(parent context.Context) {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
 	s.mu.Lock()
 	if s.started {
 		s.mu.Unlock()
@@ -218,19 +221,25 @@ func (s *Service) Start(parent context.Context) {
 	}()
 }
 func (s *Service) Close() error {
-	s.mu.Lock()
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	// Cancel before taking the data lock: an import or save may hold it while
+	// the worker still needs cancellation to finish its current scan.
 	cancel, done, server := s.cancel, s.done, s.receiver
-	s.mu.Unlock()
 	if cancel != nil {
 		cancel()
-		<-done
 	}
 	if server != nil {
-		ctx, c := context.WithTimeout(context.Background(), 5*time.Second)
+		// Give exports a brief chance to finish. Idle connections and incomplete
+		// requests must not keep the shell waiting after the TUI has disappeared.
+		ctx, c := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		defer c()
 		if err := server.Shutdown(ctx); err != nil {
 			_ = server.Close()
 		}
+	}
+	if done != nil {
+		<-done
 	}
 	if err := s.load(); err != nil {
 		return err
