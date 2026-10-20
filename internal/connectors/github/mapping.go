@@ -26,6 +26,9 @@ const detailsQuery = `query($ids:[ID!]!) {
    pageInfo { hasNextPage }
    nodes { state author { login } }
   }
+  copilotReviews: reviews(last:1, author:"copilot-pull-request-reviewer") {
+   nodes { body state comments { totalCount } }
+  }
   autoMergeRequest { enabledAt }
   mergeQueueEntry { position state }
   reviewRequests(first:100) {
@@ -37,6 +40,15 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
+	CopilotReviews struct {
+		Nodes []struct {
+			Body     string `json:"body"`
+			State    string `json:"state"`
+			Comments struct {
+				TotalCount int `json:"totalCount"`
+			} `json:"comments"`
+		} `json:"nodes"`
+	} `json:"copilotReviews"`
 	AutoMergeRequest         json.RawMessage     `json:"autoMergeRequest"`
 	MergeQueueEntry          json.RawMessage     `json:"mergeQueueEntry"`
 	HeadOID                  string              `json:"headRefOid"`
@@ -202,6 +214,7 @@ func applyDetails(p *model.PullRequest, d *details) {
 		}
 	}
 	applyReview(p, d)
+	applyCopilotReview(p, d)
 	if len(d.Commits.Nodes) > 0 && d.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
 		p.CI = checkStatus(d.Commits.Nodes[0].Commit.StatusCheckRollup)
 	}

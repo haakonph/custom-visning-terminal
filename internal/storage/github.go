@@ -70,6 +70,11 @@ func writeGitHub(ctx context.Context, q *dbgen.Queries, s model.Snapshot) error 
 				return err
 			}
 		}
+		if r := p.CopilotReview; r != nil {
+			if err := q.InsertGithubCopilotReviews(ctx, dbgen.InsertGithubCopilotReviewsParams{PullRequestID: key, Recommendation: r.Recommendation, Comments: int64(r.Comments)}); err != nil {
+				return err
+			}
+		}
 		for pos, label := range p.Labels {
 			if err := q.InsertGithubLabels(ctx, dbgen.InsertGithubLabelsParams{PullRequestID: key, Position: int64(pos), Label: label}); err != nil {
 				return err
@@ -146,6 +151,17 @@ func readGitHub(ctx context.Context, q *dbgen.Queries) (model.Snapshot, error) {
 			return out, errors.New("missing GitHub pull request")
 		}
 		p.ReviewSummary = &model.ReviewSummary{Approved: int(summary.Approved), Changes: int(summary.Changes), Pending: int(summary.Pending), PendingTeams: int(summary.PendingTeams), Complete: summary.Complete != 0, Fallback: summary.Fallback != 0}
+	}
+	copilotReviews, err := q.ListGithubCopilotReviews(ctx)
+	if err != nil {
+		return out, err
+	}
+	for _, r := range copilotReviews {
+		p := prs[r.PullRequestID]
+		if p == nil {
+			return out, errors.New("missing GitHub pull request")
+		}
+		p.CopilotReview = &model.CopilotReview{Recommendation: r.Recommendation, Comments: int(r.Comments)}
 	}
 	labels, err := q.ListGithubLabels(ctx)
 	if err != nil {

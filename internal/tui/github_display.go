@@ -105,6 +105,9 @@ func reviewSummaryLabel(p model.PullRequest) string {
 		state = model.Unknown
 	}
 	label := "Review: " + string(state)
+	if p.CopilotReview != nil {
+		label += " · Copilot: " + copilotReviewLabel(p)
+	}
 	s := p.ReviewSummary
 	if s == nil {
 		return label
@@ -122,4 +125,23 @@ func reviewSummaryLabel(p model.PullRequest) string {
 		label += " · delvis opptelling"
 	}
 	return label
+}
+
+func copilotReviewLabel(p model.PullRequest) string {
+	r := p.CopilotReview
+	if r == nil {
+		return "—"
+	}
+	icon := "💬"
+	switch r.Recommendation {
+	case "Approval":
+		icon = "🟢"
+	case "Changes":
+		icon = "🔴"
+	case "Review":
+		icon = "🟡"
+	case "Dismissed":
+		icon = "⚪"
+	}
+	return fmt.Sprintf("%s %s · %d", icon, r.Recommendation, r.Comments)
 }

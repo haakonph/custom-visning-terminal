@@ -96,6 +96,12 @@ CREATE TABLE entity_links (
     PRIMARY KEY (source_provider, source_url, target_provider, target_url)
 );
 
+CREATE TABLE github_copilot_reviews (
+    pull_request_id TEXT PRIMARY KEY REFERENCES github_pull_requests(id) ON DELETE CASCADE,
+    recommendation TEXT NOT NULL,
+    comments INTEGER NOT NULL
+);
+
 CREATE TABLE github_labels (
     pull_request_id TEXT NOT NULL REFERENCES github_pull_requests(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,

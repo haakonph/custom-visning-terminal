@@ -293,6 +293,13 @@ status merkes `(GitHub)`. Review-opptellingen lagres i cachen. Opptil 100 review
 og 100 forespørsler leses per PR; manglende eller avkortede data markeres som
 delvis opptelling, og fallback-statusen forblir `UNKNOWN`.
 
+Copilots siste review vises separat som for eksempel `🟢 Approval · 3`, der
+tallet er antall kommentarer i dette reviewet. Kortstatusene er `Approval`,
+`Changes`, `Review`, `Comments` (uten gjenkjent anbefaling) og `Dismissed`.
+Uten Copilot-review vises `—`. Feltet vises i tabellen fra 120 kolonner, samt
+under tabellen og i detaljvisningen, og lagres i cachen. Anbefalingen leses fra
+Copilots reviewtekst og endrer ikke GitHubs samlede review-status.
+
 Ufullstendige søk, feil på en senere side, utilgjengelige team eller ufullstendig
 berikelse markeres som delvise. Cachede rader beholdes, og tidspunktet for siste
 fullstendige synkronisering flyttes ikke. Dette kan inkludere PR-er som siden er

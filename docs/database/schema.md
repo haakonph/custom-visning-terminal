@@ -93,6 +93,11 @@ erDiagram
         TEXT target_key
         TEXT target_title
     }
+    github_copilot_reviews {
+        TEXT pull_request_id PK,FK
+        TEXT recommendation
+        INTEGER comments
+    }
     github_labels {
         TEXT pull_request_id PK,FK
         INTEGER position PK
@@ -264,6 +269,7 @@ erDiagram
     copilot_sessions |o..o{ copilot_events : fk_0
     copilot_sessions |o..o{ copilot_traces : fk_0
     copilot_events |o..o{ copilot_usage : fk_0
+    github_pull_requests |o..o{ github_copilot_reviews : fk_0
     github_pull_requests |o..o{ github_labels : fk_0
     github_pull_requests |o..o{ github_pull_request_reviewers : fk_0
     github_repositories |o..o{ github_pull_requests : fk_0

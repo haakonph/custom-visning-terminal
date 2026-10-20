@@ -166,3 +166,16 @@ func TestReviewSummaryRendering(t *testing.T) {
 		}
 	}
 }
+
+func TestCopilotReviewLabel(t *testing.T) {
+	if got := copilotReviewLabel(model.PullRequest{}); got != "—" {
+		t.Fatal(got)
+	}
+	p := model.PullRequest{CopilotReview: &model.CopilotReview{Recommendation: "Approval", Comments: 3}}
+	if got := copilotReviewLabel(p); got != "🟢 Approval · 3" {
+		t.Fatal(got)
+	}
+	if got := reviewSummaryLabel(p); !strings.Contains(got, "Copilot: 🟢 Approval · 3") {
+		t.Fatal(got)
+	}
+}

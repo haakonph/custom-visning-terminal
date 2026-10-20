@@ -103,6 +103,12 @@ type EntityLink struct {
 	TargetTitle    string
 }
 
+type GithubCopilotReview struct {
+	PullRequestID  string
+	Recommendation string
+	Comments       int64
+}
+
 type GithubLabel struct {
 	PullRequestID string
 	Position      int64
