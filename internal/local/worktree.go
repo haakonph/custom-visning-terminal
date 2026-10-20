@@ -143,6 +143,38 @@ func (w *WorktreeManager) Status(ctx context.Context, p model.PullRequest) Statu
 	}
 	return s
 }
+
+// ExistingPath validates a reusable worktree using local metadata only. It does
+// not wait for repository update locks or scan working files, so callers can
+// launch the editor before preparing an update.
+func (w *WorktreeManager) ExistingPath(ctx context.Context, p model.PullRequest) (string, error) {
+	if !validIdentity(p.Repository) || p.Number <= 0 {
+		return "", fmt.Errorf("invalid PR identity")
+	}
+	path := w.path(p)
+	if _, err := os.Lstat(path); os.IsNotExist(err) {
+		return "", nil
+	} else if err != nil {
+		return "", err
+	}
+	if !w.Repositories.matches(ctx, path, strings.ToLower(p.Repository)) {
+		return "", fmt.Errorf("%s is not a matching GitHub worktree; left untouched", path)
+	}
+	top, err := git(ctx, path, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	a, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	b, err := filepath.EvalSymlinks(top)
+	if err != nil || a != b {
+		return "", fmt.Errorf("%s is not a worktree root", path)
+	}
+	return path, nil
+}
+
 func (w *WorktreeManager) Prepare(ctx context.Context, p model.PullRequest) (Status, error) {
 	if !validIdentity(p.Repository) || p.Number <= 0 {
 		return Status{}, fmt.Errorf("invalid PR identity")

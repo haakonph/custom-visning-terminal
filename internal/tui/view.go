@@ -134,8 +134,8 @@ func (m Model) View() tea.View {
 		state = "authenticating…"
 	}
 	lines = append(lines, muted.Render(fmt.Sprintf(" %s · last full sync: %s", state, sync)))
-	if m.local != nil && m.local.running > 0 {
-		lines = append(lines, fmt.Sprintf(" Worktrees: %d preparing/queued · %d completed", m.local.running+len(m.local.queue), len(m.local.results)))
+	if m.local != nil && len(m.local.preparing) > 0 {
+		lines = append(lines, fmt.Sprintf(" Worktrees: %d preparing/queued · %d updating · %d completed", m.local.running+len(m.local.queue), len(m.local.updating), len(m.local.results)))
 	}
 	if m.filtering || m.input.Value() != "" {
 		lines = append(lines, m.input.View())
