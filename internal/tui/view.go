@@ -36,7 +36,7 @@ func status(s model.Status) string {
 	switch s {
 	case model.Approved, model.Pass:
 		color = "108"
-	case model.Fail, model.ChangesRequested:
+	case model.Fail, model.ChangesRequested, model.Conflicting:
 		color = "174"
 	case model.Pending, model.Warning:
 		color = "179"
@@ -221,7 +221,7 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	jira := strings.Join(p.JiraKeys(m.jiraPattern), ", ")
 	repository := m.githubName(p.Repository)
 	if m.width >= 100 {
-		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"QUEUE", queueLabel(p), 14, false}}
+		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"INFO", prInfoLabel(p), 14, p.Mergeability == model.Conflicting}}
 		if m.width >= 140 {
 			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})
 		}

@@ -75,6 +75,16 @@ func autoMergeLabel(p model.PullRequest) string {
 	}
 	return string(p.AutoMerge)
 }
+
+// prInfoLabel prioritizes merge blockers in the compact table cell.
+// The full queue state remains available in the selected PR and detail views.
+func prInfoLabel(p model.PullRequest) string {
+	if p.Mergeability == model.Conflicting {
+		return string(model.Conflicting)
+	}
+	return queueLabel(p)
+}
+
 func queueLabel(p model.PullRequest) string {
 	state := string(p.MergeQueue)
 	if state == "NONE" {
