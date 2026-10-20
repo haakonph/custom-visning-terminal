@@ -26,6 +26,35 @@ func editSetting(t *testing.T, m Model, index int, value string) Model {
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	return m
 }
+
+func TestSettingsMavenFlags(t *testing.T) {
+	m := jiraModel(t)
+	defer m.cancel()
+	m, _ = sequence(m, "vs")
+	index := -1
+	for i, field := range settingFields {
+		if field.path == "workspace.maven_flags" {
+			index = i
+		}
+	}
+	if index < 0 || !strings.Contains(m.settings.values[index], "-Dmaven.gitcommitid.skip=true") {
+		t.Fatal("Maven flags default missing from settings")
+	}
+	for _, value := range []string{`["-U","-Pdev"]`, `[]`} {
+		m = editSetting(t, m, index, value)
+		config, err := local.LoadConfig(appconfig.Path())
+		if err != nil || m.settings.editing {
+			t.Fatal(m.settings.notice, err)
+		}
+		if value == `[]` {
+			if len(config.Workspace.MavenFlags) != 0 {
+				t.Fatal(config.Workspace.MavenFlags)
+			}
+		} else if strings.Join(config.Workspace.MavenFlags, " ") != "-U -Pdev" {
+			t.Fatal(config.Workspace.MavenFlags)
+		}
+	}
+}
 func TestSettingsSaveReloadAndReset(t *testing.T) {
 	for _, jiraActive := range []bool{false, true} {
 		m := jiraModel(t)

@@ -46,6 +46,7 @@ var settingFields = []settingField{
 	{"Lokalt · klargjør main automatisk", "workspace.warm", "bool"},
 	{"Lokalt · installer avhengigheter", "workspace.install", "bool"},
 	{"Lokalt · hovedbranch", "workspace.main_branch", "string"},
+	{"Lokalt · Maven-flagg (JSON)", "workspace.maven_flags", "list"},
 	{"IntelliJ headless · kommando", "workspace.indexer.command", "string"},
 	{"IntelliJ headless · argumenter (JSON)", "workspace.indexer.args", "list"},
 	{"GitHub · skjulte organisasjonsprefikser (JSON)", "github.hidden_prefixes", "list"},

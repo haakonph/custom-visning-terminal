@@ -656,6 +656,7 @@ Edit it and restart the application:
     "warm": true,
     "install": true,
     "main_branch": "main",
+    "maven_flags": ["-Dmaven.gitcommitid.skip=true"],
     "indexer": {
       "command": "",
       "args": ["warmup", "{path}"]
@@ -771,7 +772,7 @@ rendering. A failed PR does not stop the remaining selection.
 ### Dependencies and headless IntelliJ
 
 Main checkouts and clean, current PR worktrees are prepared using their own
-root build files. Maven uses `./mvnw -B -DskipTests install` (or `mvn`), Gradle
+root build files. Maven uses `./mvnw -B -DskipTests -Dmaven.gitcommitid.skip=true install` (or `mvn`), Gradle
 uses `./gradlew --no-daemon assemble -x test` (or `gradle`), and npm uses `npm ci`
 when a lockfile exists, otherwise `npm install`. Java builds prefer Maven when
 both Maven and Gradle root files exist; npm also runs for mixed projects.
@@ -780,6 +781,14 @@ to false to disable it. Java/Node and any required SDK versions must already be
 available in the app's environment. Monorepos should expose their build from the
 repository root. Download caches are shared through the tools' normal user
 caches; build output and node_modules stay separate per checkout.
+
+Configure Maven flags in `vs` under **Lokalt · Maven-flagg (JSON)** or using
+`workspace.maven_flags`, for example
+`["-Dmaven.gitcommitid.skip=true", "-U", "-Pdev"]`. This list replaces the default
+flags; use `[]` to remove them. Each entry is passed as a separate argument,
+without shell interpretation, before `install`. Existing configurations inherit
+the default when the field is absent. Flags apply to both main and PR preparation;
+changing them invalidates the preparation cache on the next eligible run.
 
 Headless indexing is enabled by setting **IntelliJ headless · kommando** in `vs`
 to a compatible launcher. For an IntelliJ installation with the Remote Development

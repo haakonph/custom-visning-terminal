@@ -28,14 +28,15 @@ type Config struct {
 }
 
 type WorkspaceConfig struct {
-	Warm       bool   `json:"warm"`
-	Install    bool   `json:"install"`
-	MainBranch string `json:"main_branch"`
-	Indexer    Editor `json:"indexer"`
+	Warm       bool     `json:"warm"`
+	Install    bool     `json:"install"`
+	MainBranch string   `json:"main_branch"`
+	MavenFlags []string `json:"maven_flags"`
+	Indexer    Editor   `json:"indexer"`
 }
 
 func Defaults() Config {
-	return Config{Workspace: WorkspaceConfig{Warm: true, Install: true, MainBranch: "main", Indexer: Editor{Args: []string{"warmup", "{path}"}}}, Editors: Editors{Default: "intellij", IntelliJ: Editor{"idea", []string{"{path}"}}, VSCode: Editor{"code", []string{"--new-window", "{path}"}}}}
+	return Config{Workspace: WorkspaceConfig{Warm: true, Install: true, MainBranch: "main", MavenFlags: []string{"-Dmaven.gitcommitid.skip=true"}, Indexer: Editor{Args: []string{"warmup", "{path}"}}}, Editors: Editors{Default: "intellij", IntelliJ: Editor{"idea", []string{"{path}"}}, VSCode: Editor{"code", []string{"--new-window", "{path}"}}}}
 }
 func Directories() (config, data string, err error) {
 	config, err = os.UserConfigDir()
