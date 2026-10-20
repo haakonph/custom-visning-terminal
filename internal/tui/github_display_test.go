@@ -15,11 +15,11 @@ func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_CONFIG", filepath.Join(t.TempDir(), "config.json"))
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	p := model.PullRequest{Repository: "skatteetaten-ghe/service", Title: "[ABC-123] Fix login", URL: "https://github.com/skatteetaten-ghe/service/pull/1", Number: 1, AutoMerge: "ON", MergeQueue: "QUEUED", QueuePosition: 2}
+	p := model.PullRequest{Repository: "skatteetaten-ghe/glsk-service", Title: "[ABC-123] Fix login", URL: "https://github.com/skatteetaten-ghe/glsk-service/pull/1", Number: 1, AutoMerge: "ON", MergeQueue: "QUEUED", QueuePosition: 2}
 	for _, width := range []int{40, 60, 100, 120, 140, 200} {
 		m.width = width
 		header, row := ansi.Strip(m.row(p, true, false)), ansi.Strip(m.row(p, false, false))
-		if !strings.Contains(header, "JIRA") || !strings.Contains(row, "ABC-123") || strings.Contains(row, "skatteetaten-ghe") || strings.Contains(row, "[ABC-123]") {
+		if !strings.Contains(header, "JIRA") || !strings.Contains(row, "ABC-123") || strings.Contains(row, "skatteetaten-ghe") || strings.Contains(row, "glsk-") || strings.Contains(row, "[ABC-123]") {
 			t.Fatalf("width=%d\n%s\n%s", width, header, row)
 		}
 		if ansi.StringWidth(row) > width {
@@ -36,20 +36,35 @@ func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
 	if m.githubName("other/skatteetaten-ghe/service") != "other/skatteetaten-ghe/service" {
 		t.Fatal("removed non-prefix")
 	}
+	for name, want := range map[string]string{
+		"glsk-service":                   "service",
+		"other/glsk-service":             "other/service",
+		"other/glsk-service#1":           "other/service#1",
+		"other/service-glsk-api":         "other/service-glsk-api",
+		"glsk-owner/service":             "glsk-owner/service",
+		"skatteetaten-ghe/glsk-glsk-api": "glsk-api",
+	} {
+		if got := m.githubName(name); got != want {
+			t.Fatalf("githubName(%q) = %q, want %q", name, got, want)
+		}
+	}
+	if got := m.githubTeams([]string{"skatteetaten-ghe/glsk-team", "other/glsk-team"}); got != "glsk-team, other/glsk-team" {
+		t.Fatal(got)
+	}
 	opened, _ := m.openSettings()
 	m = opened.(Model)
 	m = editSetting(t, m, len(settingFields)-1, `[]`)
 	if m.settings.editing {
 		t.Fatal(m.settings.notice)
 	}
-	if m.githubName(p.Repository) != p.Repository {
-		t.Fatal("empty configuration should show full name")
+	if m.githubName(p.Repository) != "skatteetaten-ghe/service" {
+		t.Fatal("empty configuration should show organization and hide repository prefix")
 	}
 	if err := appconfig.Update(appconfig.Path(), map[string]any{"github": map[string]any{"hidden_prefixes": []string{"other"}}}); err != nil {
 		t.Fatal(err)
 	}
 	m.loadGitHubDisplay()
-	if m.githubName("other/service") != "service" || m.githubName(p.Repository) != p.Repository {
+	if m.githubName("other/glsk-service") != "service" || m.githubName(p.Repository) != "skatteetaten-ghe/service" {
 		t.Fatal("custom prefix ignored")
 	}
 }
