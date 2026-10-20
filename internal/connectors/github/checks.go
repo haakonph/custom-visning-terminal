@@ -148,10 +148,10 @@ func checkStatus(rollup *checkRollup) model.Status {
 		return model.Fail
 	case unknown || rollup.Contexts.PageInfo.HasNextPage:
 		return model.Unknown
-	case warning:
-		return model.Warning
 	case texts:
 		return model.Texts
+	case warning:
+		return model.Warning
 	case pending:
 		return model.Pending
 	case len(rollup.Contexts.Nodes) == 0:
