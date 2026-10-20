@@ -47,17 +47,26 @@ go install ./cmd/custom-visning
 
 Ved oppstart sjekker appen lokalt oppsett for GitHub, Jira og Mattermost. Hvis
 noe mangler, får du spørsmål om å fullføre oppsettet. Velg integrasjon med j/k
-eller piltastene og trykk Enter for oppsettshjelp, eller bruk `vs` for innstillinger.
+eller piltastene og trykk Enter for en veiviser som lar deg fylle ut én integrasjon
+om gangen. Eksisterende verdier er forhåndsutfylt; Enter lagrer og går videre til
+neste felt. Shift+Tab går tilbake. Etter siste felt testes tilkoblingen mot API-et.
+Feil vises i veiviseren, slik at du kan rette og prøve igjen. Etter vellykket
+validering tar appen integrasjonen i bruk uten omstart, og Enter går til neste.
+Serveradresse og brukernavn lagres i config; maskerte PAT-felt brukes bare i
+denne kjøringen og må oppgis igjen ved neste oppstart eller settes i miljøet.
+GitHub kan også bruke eksisterende gh-innlogging når tokenfeltet er tomt.
 Esc fortsetter til dashboardet (lokale oppgaver hvis ingen tjeneste er klar).
 Valgfrie integrasjoner kan hoppes over; forespørselen vises igjen ved neste
 oppstart så lenge oppsett mangler. `--copilot` starter fortsatt AI-visningen direkte.
-Sjekken gjelder lokal konfigurasjon; den bekrefter ikke tokenets tilgang på serveren.
+Oppstartssjekken gjelder lokal konfigurasjon; veiviseren bekrefter autentisering
+og grunnleggende API-tilgang, ikke alle repository-, prosjekt- eller kanalrettigheter.
 
 Appen kan startes uten GitHub-innlogging. Når du åpner en visning som mangler
 oppsett (`vg` GitHub, `vt` Jira, `va` AI eller `vc` Mattermost), får du hjelp
 med konkrete steg for innstillinger, innlogging og nødvendig oppsett utenfor
 appen. `vh` viser oppsettshjelp for aktiv side, `vs` åpner innstillingene,
-og Esc går tilbake. Lange veiledninger kan rulles med j/k eller piltaster.
+og `f` i oppsettshjelpen åpner utfylling og validering for GitHub, Jira og
+Mattermost. Esc går tilbake. Lange veiledninger kan rulles med j/k eller piltaster.
 
 | Visning/funksjon | I appen | Utenfor appen |
 | --- | --- | --- |

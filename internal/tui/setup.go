@@ -8,6 +8,7 @@ import (
 )
 
 type setupState struct {
+	wizard          *setupWizard
 	provider        string
 	problem         string
 	offset          int
@@ -191,12 +192,15 @@ func (m Model) setupBody() []string {
 }
 
 func (m Model) setupView() tea.View {
+	if m.setup.wizard != nil {
+		return m.wizardView()
+	}
 	body := m.setupBody()
 	capacity := max(1, m.height-2)
 	start := min(m.setup.offset, max(0, len(body)-capacity))
 	lines := []string{accent.Render(" OPPSETTSHJELP · " + m.setup.provider)}
 	lines = append(lines, body[start:min(len(body), start+capacity)]...)
-	lines = append(lines, "vs innstillinger · vg/vt/va/vc sider · j/k bla · Enter prøv igjen · Esc tilbake")
+	lines = append(lines, "f fyll ut og valider · vs innstillinger · vg/vt/va/vc sider · j/k bla · Enter prøv igjen · Esc tilbake")
 	if m.setup.provider == "startup" {
 		lines[0] = accent.Render(" OPPSETT VED OPPSTART")
 		lines[len(lines)-1] = "j/k velg · Enter fiks oppsett · vs innstillinger · Esc fortsett"
@@ -229,10 +233,19 @@ func (m Model) updateSetup(k string) (tea.Model, tea.Cmd) {
 			if provider == m.setup.problemProvider {
 				problem = m.setup.problem
 			}
-			return m.WithSetupProblem(provider, problem), nil
+			queue := append([]string(nil), m.setup.missing[m.setup.selected+1:]...)
+			queue = append(queue, m.setup.missing[:m.setup.selected]...)
+			next := m.startSetupWizard(provider, queue)
+			next.setup.problem = problem
+			return next, next.setup.wizard.input.Focus()
 		}
 	}
 	switch k {
+	case "f":
+		if m.setup.provider == "github" || m.setup.provider == "jira" || m.setup.provider == "mattermost" {
+			next := m.startSetupWizard(m.setup.provider, nil)
+			return next, next.setup.wizard.input.Focus()
+		}
 	case "v":
 		m.sequence = "v"
 		m.sequenceRefs = nil
