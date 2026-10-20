@@ -269,3 +269,28 @@ func TestFirstMattermostSetupPreservesPreviousProviderWithoutGitHub(t *testing.T
 		t.Fatal("could not return to tasks")
 	}
 }
+
+func TestWebhookWizardActivatesSenderAndClearsSecret(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t).WithSetup("webhook")
+	next, _ := m.updateSetup("f")
+	m = next.(Model)
+	w := m.setup.wizard
+	if w == nil || w.fields[0].kind != "secret" {
+		t.Fatal("webhook field must be masked")
+	}
+	w.input.SetValue("https://chat.example/hooks/secret")
+	next, cmd := m.updateSetupWizard(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	next, _ = m.finishSetupValidation(cmd().(setupValidated))
+	m = next.(Model)
+	if m.mattermost == nil || !w.valid {
+		t.Fatal("webhook not activated")
+	}
+	if w.values[0] != "" || w.input.Value() != "" {
+		t.Fatal("credential retained in form")
+	}
+	if strings.Contains(m.View().Content, "/hooks/secret") {
+		t.Fatal("credential visible")
+	}
+}

@@ -1089,7 +1089,13 @@ snooze-database blokkerer nye lagringer til lageret er rettet og programmet star
 
 ## Send PR-er til Mattermost
 
-Sett `MATTERMOST_WEBHOOK_URL` til en HTTPS incoming-webhook for ønsket kanal.
+Uten webhook åpner `as` oppsetthjelp. Opprett en webhook under
+**Integrasjoner → Incoming Webhooks** i Mattermost og kopier HTTPS-adressen.
+Trykk `f` i oppsetthjelpen og lim inn adressen i det maskerte feltet.
+`Enter` kontrollerer adressen lokalt og aktiverer sending uten omstart eller
+testmelding. Adressen brukes bare til appen avsluttes.
+
+For oppsett ved oppstart: Sett `MATTERMOST_WEBHOOK_URL` til en HTTPS incoming-webhook for ønsket kanal.
 Webhook-adressen er en hemmelighet; oppbevar den utenfor kildekoden.
 Installer Neovim, Vim eller vi (appen velger første tilgjengelige i den rekkefølgen).
 

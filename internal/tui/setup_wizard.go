@@ -26,10 +26,11 @@ type setupWizard struct {
 	queue           []string
 }
 type setupValidated struct {
-	wizard *setupWizard
-	github *github.Client
-	jira   *jira.Client
-	err    error
+	wizard  *setupWizard
+	github  *github.Client
+	jira    *jira.Client
+	webhook *mm.Client
+	err     error
 }
 
 func (m Model) startSetupWizard(provider string, queue []string) Model {
@@ -40,6 +41,8 @@ func (m Model) startSetupWizard(provider string, queue []string) Model {
 		w.fields = []settingField{{"GitHub · PAT (tomt bruker gh / miljø)", "GITHUB_TOKEN", "secret"}}
 	case "jira":
 		w.fields = []settingField{{"Jira · serveradresse", "jira.base_url", "url"}, {"Jira · PAT", "JIRA_TOKEN", "secret"}}
+	case "webhook":
+		w.fields = []settingField{{"Mattermost · incoming-webhook (HTTPS)", "MATTERMOST_WEBHOOK_URL", "secret"}}
 	case "mattermost":
 		w.fields = []settingField{{"Mattermost · serveradresse", "mattermost.server", "url"}, {"Mattermost · brukernavn", "mattermost.username", "string"}}
 	default:
@@ -180,6 +183,8 @@ func validateSetup(parent context.Context, w *setupWizard, provider string, v []
 		if r.err == nil {
 			_, r.err = r.jira.Search(ctx, "assignee = currentUser() AND resolution = Unresolved")
 		}
+	case "webhook":
+		r.webhook, r.err = mm.New(v[0])
 	case "mattermost":
 		_, r.err = mm.NewAPI(v[0])
 	}
@@ -194,6 +199,9 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 	if r.err != nil {
 		w.notice = "Validering feilet: " + r.err.Error() + " · Shift+Tab retter tidligere felt, Enter prøver igjen."
 		return m, nil
+	}
+	if r.webhook != nil {
+		m = m.WithMattermost(r.webhook)
 	}
 	if r.github != nil {
 		m.source = r.github
@@ -218,6 +226,9 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 	}
 	w.valid = true
 	w.notice = "Validert mot API-et."
+	if m.setup.provider == "webhook" {
+		w.notice = "HTTPS-adressen er kontrollert lokalt; ingen testmelding er sendt. Klar for as. Gjelder til appen avsluttes."
+	}
 	if m.setup.provider == "mattermost" {
 		w.loginMattermost = true
 		w.notice = "Oppsett lagret. Fortsett for å logge inn med passord og eventuell TOTP-kode."
