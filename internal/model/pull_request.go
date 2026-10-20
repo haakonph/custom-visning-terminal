@@ -45,6 +45,7 @@ type PullRequest struct {
 	Number             int            `json:"number"`
 	Body               string         `json:"body,omitempty"`
 	HeadOID            string         `json:"head_oid,omitempty"`
+	BaseRef            string         `json:"base_ref,omitempty"`
 	HeadRef            string         `json:"head_ref,omitempty"`
 	Title              string         `json:"title"`
 	URL                string         `json:"url"`

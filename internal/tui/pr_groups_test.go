@@ -196,3 +196,19 @@ func TestActivateGroupedPRUsesVisibleOrder(t *testing.T) {
 		t.Fatal("activated a different PR")
 	}
 }
+
+func TestStackLabelsSurviveFilteringAcrossViews(t *testing.T) {
+	m := ready(t)
+	m.width = 180
+	base := model.PullRequest{URL: "https://github.com/acme/api/pull/1", Repository: "acme/api", Number: 1, HeadRef: "base", Title: "Base"}
+	child := model.PullRequest{URL: "https://github.com/acme/api/pull/2", Repository: "acme/api", Number: 2, BaseRef: "base", Title: "Child"}
+	m.snapshot.Datasets[model.Drafts].PRs = []model.PullRequest{base}
+	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{child}
+	text := ansi.Strip(strings.Join(m.groupedPRLines([]model.PullRequest{child}, 10), "\n"))
+	if !strings.Contains(text, "[stack 2/2]") {
+		t.Fatal(text)
+	}
+	if m.snapshot.Datasets[model.Open].PRs[0].Title != "Child" {
+		t.Fatal("mutated cached title")
+	}
+}

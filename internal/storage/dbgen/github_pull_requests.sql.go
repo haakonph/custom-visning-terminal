@@ -19,7 +19,7 @@ func (q *Queries) ClearGithubPullRequests(ctx context.Context) error {
 }
 
 const insertGithubPullRequests = `-- name: InsertGithubPullRequests :exec
-INSERT INTO github_pull_requests (id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft, auto_merge, merge_queue, queue_position) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+INSERT INTO github_pull_requests (id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft, auto_merge, merge_queue, queue_position, base_ref) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
 `
 
 type InsertGithubPullRequestsParams struct {
@@ -42,6 +42,7 @@ type InsertGithubPullRequestsParams struct {
 	AutoMerge     string
 	MergeQueue    string
 	QueuePosition int64
+	BaseRef       string
 }
 
 func (q *Queries) InsertGithubPullRequests(ctx context.Context, arg InsertGithubPullRequestsParams) error {
@@ -65,12 +66,13 @@ func (q *Queries) InsertGithubPullRequests(ctx context.Context, arg InsertGithub
 		arg.AutoMerge,
 		arg.MergeQueue,
 		arg.QueuePosition,
+		arg.BaseRef,
 	)
 	return err
 }
 
 const listGithubPullRequests = `-- name: ListGithubPullRequests :many
-SELECT id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft, auto_merge, merge_queue, queue_position FROM github_pull_requests ORDER BY id
+SELECT id, repository_id, number, provider_id, body, head_oid, head_ref, title, url, author, created_at, updated_at, review, ci, mergeability, draft, auto_merge, merge_queue, queue_position, base_ref FROM github_pull_requests ORDER BY id
 `
 
 func (q *Queries) ListGithubPullRequests(ctx context.Context) ([]GithubPullRequest, error) {
@@ -102,6 +104,7 @@ func (q *Queries) ListGithubPullRequests(ctx context.Context) ([]GithubPullReque
 			&i.AutoMerge,
 			&i.MergeQueue,
 			&i.QueuePosition,
+			&i.BaseRef,
 		); err != nil {
 			return nil, err
 		}
