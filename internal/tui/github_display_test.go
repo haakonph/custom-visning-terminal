@@ -188,7 +188,8 @@ func TestOpenCommentsInfo(t *testing.T) {
 		status model.Status
 		want   string
 	}{
-		{0, model.Mergeable, "0 åpne"},
+		{0, model.Mergeable, ""},
+		{0, model.Conflicting, "CONFLICT"},
 		{3, model.Mergeable, "3 åpne"},
 		{12, model.Conflicting, "CONFLICT · 12 åpne"},
 	} {
@@ -199,6 +200,9 @@ func TestOpenCommentsInfo(t *testing.T) {
 		for _, width := range []int{100, 120, 140, 160, 200} {
 			m.width = width
 			row := ansi.Strip(m.row(p, false, false))
+			if tc.count == 0 && strings.Contains(row, "0 åpne") {
+				t.Fatalf("width %d: zero open comments shown: %q", width, row)
+			}
 			if !strings.Contains(row, tc.want) || ansi.StringWidth(row) > width {
 				t.Fatalf("width %d: %q", width, row)
 			}
