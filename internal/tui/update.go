@@ -16,6 +16,12 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if result, ok := msg.(notificationResult); ok {
+		if result.failed {
+			m.notice = "Kunne ikke vise skrivebordsvarsel. Kontroller varslingstillatelser og varslingsverktøy."
+		}
+		return m, nil
+	}
 	if next, cmd, handled := m.autoMessage(msg); handled {
 		return next, cmd
 	}
@@ -257,7 +263,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.clamp()
 		}
-		return m, tea.Batch(m.persist(), m.refreshLocal())
+		return m, tea.Batch(m.persist(), m.refreshLocal(), m.notifyPullRequests(msg))
 	case cacheMsg:
 		m.saving = false
 		if msg.err != nil {

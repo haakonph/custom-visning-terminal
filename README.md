@@ -1157,3 +1157,25 @@ Se [Mattermost-oppsett, tastatursnarveier og begrensninger](docs/mattermost.md).
 ### Be om ny Copilot-review
 
 Velg én eller flere PR-er og trykk `ar` (handling → review), også etter en tidligere Copilot-review. Handlingen fungerer fra PR-detaljer og GitHub-relasjoner. GitHub må tillate Copilot code review for kontoen og repositoryet. Appen viser hvor mange forespørsler som ble sendt; ved feil stoppes resten. `au` henter oppdatert review-status. På Jira beholder `ar` handlingen for å fjerne egen tilordning.
+
+### Varsler om CI og Copilot-review
+
+Appen viser skrivebordsvarsler for egne åpne PR-er når CI går fra ventende til
+PASS eller FAIL, og når Copilot leverer en ny review. En ny commit som allerede
+har fullført CI ved neste oppdatering, varsles også. Hver hendelse varsles separat.
+Varslene inneholder repository, PR-nummer og tittel. Drafts og andres PR-er varsles
+ikke. Første vellykkede innhenting setter utgangspunktet uten å varsle om gamle
+hendelser, og samme review varsles bare én gang per kjøring.
+
+Begge varseltypene er på som standard. Åpne `vs` og endre **Varsler · CI ferdig**
+eller **Varsler · Copilot-review**; endringen gjelder straks. Varslene følger
+vellykkede, komplette GitHub-oppdateringer, også i bakgrunnen mens en annen
+visning er åpen. Standardintervallene er ett minutt for aktiv GitHub-fane og
+fem minutter for bakgrunnsfaner. `au` kan også utløse varsler. Appen må kjøre;
+den oppretter ingen bakgrunnstjeneste. CI som starter og fullføres på samme
+commit mellom to oppdateringer, kan ikke alltid oppdages.
+
+macOS bruker innebygd `osascript`; tillat varsler for Script Editor/osascript i
+systeminnstillingene ved behov. Linux krever `notify-send` og en aktiv
+skrivebordsøkt med varslingstjeneste. Andre plattformer støttes ikke foreløpig.
+Ved sendefeil vises en melding i appen; hendelsen sendes ikke automatisk på nytt.

@@ -130,10 +130,11 @@ func applyCopilotReview(p *model.PullRequest, d *details) {
 			break
 		}
 	}
-	p.CopilotReview = &model.CopilotReview{Recommendation: recommendation, Comments: r.Comments.TotalCount}
+	p.CopilotReview = &model.CopilotReview{ID: r.ID, Recommendation: recommendation, Comments: r.Comments.TotalCount}
 }
 
 type copilotReview struct {
+	ID     string `json:"id"`
 	Author *struct {
 		Login string `json:"login"`
 		Type  string `json:"__typename"`
@@ -155,7 +156,7 @@ type copilotReviews struct {
 func latestCopilotReview(reviews copilotReviews) *copilotReview {
 	for i := len(reviews.Nodes) - 1; i >= 0; i-- {
 		r := reviews.Nodes[i]
-		if r == nil || r.Author == nil || r.Author.Type != "Bot" {
+		if r == nil || r.Author == nil || r.Author.Type != "Bot" || r.State == "PENDING" {
 			continue
 		}
 		login := strings.ToLower(strings.TrimSuffix(r.Author.Login, "[bot]"))
@@ -177,7 +178,7 @@ func (c *Client) completeCopilotReviews(ctx context.Context, id string, d *detai
 		}
 		seen[cursor] = true
 		req, err := c.api.NewRequest(ctx, "POST", "graphql", map[string]any{
-			"query":     `query($id:ID!,$before:String!) { node(id:$id) { ... on PullRequest { copilotReviews: reviews(last:100,before:$before) { pageInfo { hasPreviousPage startCursor } nodes { author { login __typename } body state comments { totalCount } } } } } }`,
+			"query":     `query($id:ID!,$before:String!) { node(id:$id) { ... on PullRequest { copilotReviews: reviews(last:100,before:$before) { pageInfo { hasPreviousPage startCursor } nodes { id author { login __typename } body state comments { totalCount } } } } } }`,
 			"variables": map[string]any{"id": id, "before": cursor},
 		})
 		if err != nil {

@@ -28,7 +28,7 @@ const detailsQuery = `query($ids:[ID!]!) {
   }
   copilotReviews: reviews(last:100) {
    pageInfo { hasPreviousPage startCursor }
-   nodes { author { login __typename } body state comments { totalCount } }
+   nodes { id author { login __typename } body state comments { totalCount } }
   }
   reviewThreads(first:100) { pageInfo { hasNextPage endCursor } nodes { isResolved comments(first:1) { nodes { author { __typename } } } } }
   autoMergeRequest { enabledAt }
