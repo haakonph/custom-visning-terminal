@@ -143,5 +143,9 @@ func copilotReviewLabel(p model.PullRequest) string {
 	case "Dismissed":
 		icon = "⚪"
 	}
-	return fmt.Sprintf("%s %s · %d", icon, r.Recommendation, r.Comments)
+	label := icon + " " + r.Recommendation
+	if r.Comments > 0 {
+		label += fmt.Sprintf(" · %d", r.Comments)
+	}
+	return label
 }
