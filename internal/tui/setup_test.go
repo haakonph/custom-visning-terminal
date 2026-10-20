@@ -12,6 +12,89 @@ import (
 	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 )
 
+func TestStartupSetupOffersMissingIntegrationsAndCanBeSkipped(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t)
+	m.source = nil
+	m = m.WithStartupSetup()
+	if m.setup.provider != "startup" || len(m.setup.missing) != 3 || !strings.Contains(m.View().Content, "Vil du fullføre") {
+		t.Fatalf("missing startup prompt: %+v", m.setup)
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.setup.provider != "" || !m.tasks.active || m.booting {
+		t.Fatal("skip did not open usable local tasks")
+	}
+	// Skipping lasts for this run; a later startup offers setup again.
+	m = m.WithStartupSetup()
+	if m.setup.provider != "startup" {
+		t.Fatal("missing setup suppressed on later startup")
+	}
+}
+
+func TestStartupSetupSelectsHelpAndPreservesUnderlyingView(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t)
+	m.selected = 1
+	m = m.WithStartupSetup()
+	if len(m.setup.missing) != 2 || m.setup.missing[0] != "jira" {
+		t.Fatalf("configured GitHub was offered: %+v", m.setup)
+	}
+	m, _ = update(m, key('j'))
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.setup.provider != "mattermost" || !strings.Contains(m.View().Content, "serveradresse") {
+		t.Fatal("selected setup help did not open")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.setup.provider != "" || m.selected != 1 || m.tasks.active {
+		t.Fatal("setup lost underlying GitHub selection")
+	}
+}
+
+func TestStartupSetupCompleteAndCopilotOnlyDoNotPrompt(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t)
+	m.jira = &jiraState{}
+	m.mmReader = &mattermostReader{}
+	m = m.WithStartupSetup()
+	if m.setup.provider != "" {
+		t.Fatal("complete setup prompted")
+	}
+	m = ready(t)
+	m.copilotActive = true
+	m = m.WithStartupSetup()
+	if m.setup.provider != "" {
+		t.Fatal("Copilot-only startup prompted for unrelated integrations")
+	}
+}
+
+func TestStartupSetupKeepsRequestedProviderAndProblem(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t).WithSetupProblem("mattermost", "Kunne ikke åpne lokalt datalager")
+	m = m.WithStartupSetup()
+	if m.setup.missing[m.setup.selected] != "mattermost" {
+		t.Fatal("startup lost requested provider")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.setup.provider != "mattermost" || !strings.Contains(m.setup.problem, "datalager") {
+		t.Fatal("setup lost repair problem")
+	}
+}
+
+func TestStartupSetupSelectionRemainsVisibleInSmallTerminal(t *testing.T) {
+	isolateSetup(t)
+	m := ready(t).WithStartupSetup()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 40, Height: 6})
+	m, _ = update(m, key('j'))
+	if !strings.Contains(m.View().Content, "> Mattermost") {
+		t.Fatal(m.View().Content)
+	}
+	for _, line := range strings.Split(m.View().Content, "\n") {
+		if ansi.StringWidth(line) > 40 {
+			t.Fatal("startup prompt exceeds terminal width")
+		}
+	}
+}
+
 func isolateSetup(t *testing.T) {
 	t.Helper()
 	t.Setenv("CUSTOM_VISNING_CONFIG", filepath.Join(t.TempDir(), "config.json"))

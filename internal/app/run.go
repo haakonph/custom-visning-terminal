@@ -138,6 +138,7 @@ func runDashboard(ctx context.Context, dashboard tui.Model) error {
 		dashboard = configured
 	}
 
+	dashboard = dashboard.WithStartupSetup()
 	_, err = tea.NewProgram(dashboard, tea.WithContext(ctx)).Run()
 	return err
 }
