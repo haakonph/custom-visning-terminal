@@ -94,7 +94,7 @@ func TestNotificationsIgnoreIncompleteResults(t *testing.T) {
 }
 
 func TestNotificationTextIsPassedAsData(t *testing.T) {
-	event := desktopNotification{`CI "done"`, "$(touch /tmp/unsafe)\n<script>", "https://github.com/a/b/pull/1"}
+	event := desktopNotification{`CI "done"`, "$(touch /tmp/unsafe)\n<script>", "https://github.com/a/b/pull/1", ""}
 	name, args := notificationCommand("darwin", event)
 	if name != "terminal-notifier" || !reflect.DeepEqual(args, []string{"-title", event.title, "-message", event.body, "-open", event.url}) {
 		t.Fatal(name, args)

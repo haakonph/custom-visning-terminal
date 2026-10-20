@@ -32,7 +32,7 @@ type notificationState struct {
 	seen    map[string]notificationObservation
 }
 
-type desktopNotification struct{ title, body, url string }
+type desktopNotification struct{ title, body, url, icon string }
 type notificationResult struct{ failed bool }
 
 func (m *Model) loadNotifications() {
@@ -63,10 +63,12 @@ func (s *notificationState) observe(user string, prs []model.PullRequest) []desk
 		if known && !pr.Draft {
 			if s.options.CI && (pr.CI == model.Pass || pr.CI == model.Fail) &&
 				(old.ci == model.Pending || (old.head != "" && pr.HeadOID != "" && old.head != pr.HeadOID)) {
-				events = append(events, desktopNotification{"CI ferdig · " + string(pr.CI), label, pr.URL})
+				icon, badge := notificationStyle(string(pr.CI))
+				events = append(events, desktopNotification{badge + " CI ferdig · " + string(pr.CI), label, pr.URL, icon})
 			}
 			if s.options.Copilot && next.reviewID != "" && next.reviewID != old.reviewID {
-				events = append(events, desktopNotification{"Copilot har levert review", label, pr.URL})
+				icon, badge := notificationStyle(pr.CopilotReview.Recommendation)
+				events = append(events, desktopNotification{badge + " Copilot har levert review · " + pr.CopilotReview.Recommendation, label, pr.URL, icon})
 			}
 		}
 		// Unknown data must not erase a known pending CI or completed review.
@@ -103,6 +105,12 @@ func (m *Model) notifyPullRequests(msg refreshMsg) tea.Cmd {
 type notificationRunner func(context.Context, string, ...string) ([]byte, error)
 
 func sendDesktopNotification(ctx context.Context, platform string, event desktopNotification) error {
+	// Materialize embedded icons locally; no download or installation is needed.
+	if path, err := notificationIconPath(event.icon); err == nil {
+		event.icon = path
+	} else {
+		event.icon = ""
+	}
 	return deliverNotification(ctx, platform, event, func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		return exec.CommandContext(ctx, name, args...).Output()
 	}, openBrowser)
@@ -131,9 +139,17 @@ func notificationCommand(platform string, event desktopNotification) (string, []
 	switch platform {
 	case "darwin":
 		// No shell or AppleScript interpolation. terminal-notifier handles the click.
-		return "terminal-notifier", []string{"-title", event.title, "-message", event.body, "-open", event.url}
+		args := []string{"-title", event.title, "-message", event.body, "-open", event.url}
+		if event.icon != "" {
+			args = append(args, "-appIcon", (&url.URL{Scheme: "file", Path: event.icon}).String())
+		}
+		return "terminal-notifier", args
 	case "linux":
-		return "notify-send", []string{"--app-name=custom-visning", "--action=default=Åpne PR", "--wait", "--expire-time=30000", "--", event.title, event.body}
+		args := []string{"--app-name=custom-visning", "--action=default=Åpne PR", "--wait", "--expire-time=30000"}
+		if event.icon != "" {
+			args = append(args, "--icon="+event.icon)
+		}
+		return "notify-send", append(args, "--", event.title, event.body)
 	default:
 		return "", nil
 	}
