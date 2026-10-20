@@ -64,9 +64,7 @@ type details struct {
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
-				StatusCheckRollup *struct {
-					State string `json:"state"`
-				} `json:"statusCheckRollup"`
+				StatusCheckRollup *checkRollup `json:"statusCheckRollup"`
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"commits"`
@@ -80,15 +78,14 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 		for _, p := range rows[start:end] {
 			ids = append(ids, p.ID)
 		}
-		req, err := c.api.NewRequest(ctx, "POST", "graphql", map[string]any{"query": detailsQuery, "variables": map[string]any{"ids": ids}})
+		query := strings.TrimSuffix(detailsQuery, "}") + ciFields(rows[start:end], nil) + "}"
+		req, err := c.api.NewRequest(ctx, "POST", "graphql", map[string]any{"query": query, "variables": map[string]any{"ids": ids}})
 		if err != nil {
 			return errors.New("could not create GitHub details request")
 		}
 		var response struct {
-			Data struct {
-				Nodes []*details `json:"nodes"`
-			} `json:"data"`
-			Errors []json.RawMessage `json:"errors"`
+			Data   map[string]json.RawMessage `json:"data"`
+			Errors []json.RawMessage          `json:"errors"`
 		}
 		_, err = c.api.Do(req, &response)
 		if err != nil {
@@ -98,8 +95,13 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 		if len(response.Errors) > 0 {
 			failures = append(failures, errors.New("GitHub GraphQL returned partial data; check repository and organization access"))
 		}
+		var nodes []*details
+		if err := json.Unmarshal(response.Data["nodes"], &nodes); err != nil {
+			failures = append(failures, errors.New("could not read GitHub details"))
+			continue
+		}
 		mapped := map[string]*details{}
-		for _, d := range response.Data.Nodes {
+		for _, d := range nodes {
 			if d != nil {
 				mapped[d.ID] = d
 			}
@@ -109,6 +111,23 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 			if d == nil {
 				failures = append(failures, missingNode(rows[i].ID))
 				continue
+			}
+			// The per-PR alias supplies isRequired with the correct PR ID even
+			// when several pull requests share a commit.
+			if raw := response.Data[ciAlias(i-start)]; len(raw) > 0 {
+				var checks details
+				if json.Unmarshal(raw, &checks) != nil || string(raw) == "null" {
+					rows[i].CI = model.Unknown
+					failures = append(failures, errors.New("could not read GitHub checks"))
+					d.Commits.Nodes = nil
+				} else {
+					d.Commits = checks.Commits
+					if err := c.completeChecks(ctx, rows[i], d); err != nil {
+						failures = append(failures, err)
+						rows[i].CI = model.Unknown
+						d.Commits.Nodes = nil
+					}
+				}
 			}
 			applyDetails(&rows[i], d)
 			if rows[i].ReviewSummary != nil && !rows[i].ReviewSummary.Complete {
@@ -184,14 +203,7 @@ func applyDetails(p *model.PullRequest, d *details) {
 	}
 	applyReview(p, d)
 	if len(d.Commits.Nodes) > 0 && d.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
-		switch d.Commits.Nodes[0].Commit.StatusCheckRollup.State {
-		case "SUCCESS":
-			p.CI = model.Pass
-		case "FAILURE", "ERROR":
-			p.CI = model.Fail
-		case "PENDING", "EXPECTED":
-			p.CI = model.Pending
-		}
+		p.CI = checkStatus(d.Commits.Nodes[0].Commit.StatusCheckRollup)
 	}
 }
 func contains(values []string, value string) bool {
