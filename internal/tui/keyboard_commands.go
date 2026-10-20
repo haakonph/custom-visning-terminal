@@ -63,6 +63,8 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	}
 	if op == "a" {
 		switch k {
+		case "+", "-":
+			return m.startAutoMerge(refs, k == "+")
 		case "f", "m", "r":
 			if allProvider(refs, "jira") {
 				m.sequenceRefs = refs

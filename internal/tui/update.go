@@ -195,6 +195,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	case refreshMsg:
 		m.loading[msg.view] = false
+		if msg.autoMergeVersion != m.autoMergeVersion {
+			return m, m.refresh(msg.view)
+		}
 		warnings := append([]string{}, msg.result.Warnings...)
 		if msg.err != nil {
 			warnings = append(warnings, msg.err.Error())

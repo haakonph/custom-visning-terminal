@@ -244,6 +244,19 @@ PR hentes; større lister markeres delvise. Ved GraphQL-/tilgangsfeil beholdes
 søkeresultatene med eksplisitt ukjente statuser og advarsel. Resultater sorteres
 lokalt etter sist oppdatert og dedupliseres på URL.
 
+I GitHub-visningen slår `a+` på automerge (merge when ready), og `a-` slår det
+av. Handlingen gjelder markerte PR-er, ellers aktiv PR, og virker også i
+detaljvisningen. `AUTO` viser `ON`, `OFF` eller `UNKNOWN`; statusen vises også
+under listen og i detaljene. `QUEUE` viser køstatus og plass når GitHub har
+returnert dette. Bruk `au` for å hente fersk status.
+
+GitHub håndhever tilganger, nødvendige sjekker, reviews og branch-regler.
+Aktivering krever en åpen PR som ikke er draft og at repository tillater
+automerge. Appen velger en tillatt merge-metode i rekkefølgen merge commit,
+squash, rebase. GitHub kan merge når kravene er oppfylt. Statusen fra GitHub
+oppdateres i alle lastede faner og lagres i cachen. Ved feil i flervalg stoppes
+resten; allerede oppdaterte PR-er beholdes og antallet vises i feilmeldingen.
+
 Review-status bruker GitHubs `reviewDecision` når den finnes. For PR-er uten
 samlet status, for eksempel stablede PR-er mot brancher uten review-regler,
 brukes `latestOpinionatedReviews`: siste gjeldende vurdering per reviewer.

@@ -25,10 +25,12 @@ type Model struct {
 	sequenceRefs     []model.TaskReference
 	internalKey      bool
 
-	sequence       string
-	sequenceNotice string
-	jiraAction     *jiraActionState
-	jiraChosen     map[string]jira.Issue
+	sequence         string
+	sequenceNotice   string
+	autoMergeBusy    bool
+	autoMergeVersion uint64
+	jiraAction       *jiraActionState
+	jiraChosen       map[string]jira.Issue
 
 	detail               *detailState
 	detailSequence       uint64
@@ -70,10 +72,11 @@ type bootMsg struct {
 	warning  string
 }
 type refreshMsg struct {
-	view   model.View
-	result model.Result
-	err    error
-	at     time.Time
+	autoMergeVersion uint64
+	view             model.View
+	result           model.Result
+	err              error
+	at               time.Time
 }
 type cacheMsg struct{ err error }
 type openMsg struct{ err error }
@@ -145,11 +148,12 @@ func (m *Model) refresh(view model.View) tea.Cmd {
 	}
 	m.loading[view] = true
 	source, user, parent := m.source, m.snapshot.User, m.ctx
+	version := m.autoMergeVersion
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		result, err := source.List(ctx, view, user)
-		return refreshMsg{view: view, result: result, err: err, at: time.Now()}
+		return refreshMsg{view: view, result: result, err: err, at: time.Now(), autoMergeVersion: version}
 	}
 }
 
