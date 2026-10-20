@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -25,7 +26,7 @@ func (m Model) prGroupKey(p model.PullRequest) string {
 	return ""
 }
 
-// Preserve the source order within groups and order groups by their first PR.
+// Sort PRs by repository within groups and order groups by their first PR.
 // Keep unlinked PRs together, followed by Dependabot review requests, without
 // modifying the cached dataset.
 func (m Model) groupPRs(rows []model.PullRequest) []model.PullRequest {
@@ -41,6 +42,9 @@ func (m Model) groupPRs(rows []model.PullRequest) []model.PullRequest {
 	keys = append(keys, "", dependabotGroup)
 	result := make([]model.PullRequest, 0, len(rows))
 	for _, key := range keys {
+		sort.SliceStable(groups[key], func(i, j int) bool {
+			return groups[key][i].Repository < groups[key][j].Repository
+		})
 		result = append(result, groups[key]...)
 	}
 	return result

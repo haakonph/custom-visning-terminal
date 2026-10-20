@@ -57,6 +57,41 @@ func TestPRGroupingAcrossViews(t *testing.T) {
 	}
 }
 
+func TestPRGroupsSortByRepository(t *testing.T) {
+	m := ready(t)
+	rows := []model.PullRequest{
+		{Number: 4, Repository: "acme/web", Title: "ABC-1 First web PR"},
+		{Number: 2, Repository: "acme/zeta", Title: "Unlinked"},
+		{Number: 1, Repository: "acme/api", Title: "ABC-1 API"},
+		{Number: 3, Repository: "acme/beta", Title: "XYZ-2 Other issue"},
+		{Number: 5, Repository: "acme/web", Title: "ABC-1 Second web PR"},
+		{Number: 6, Repository: "acme/docs", Title: "Also unlinked"},
+	}
+	original := append([]model.PullRequest(nil), rows...)
+	for view := model.Open; view < model.ViewCount; view++ {
+		m.active = view
+		m.snapshot.Datasets[view].PRs = rows
+		var numbers []int
+		for _, p := range m.filtered() {
+			numbers = append(numbers, p.Number)
+		}
+		if !reflect.DeepEqual(numbers, []int{1, 4, 5, 3, 6, 2}) {
+			t.Fatalf("%s: %v", view, numbers)
+		}
+		if !reflect.DeepEqual(rows, original) {
+			t.Fatal("sorting changed cached PRs")
+		}
+	}
+	m.relatedKey = "ABC-1"
+	var numbers []int
+	for _, p := range m.groupPRs([]model.PullRequest{rows[0], rows[2], rows[4]}) {
+		numbers = append(numbers, p.Number)
+	}
+	if !reflect.DeepEqual(numbers, []int{1, 4, 5}) {
+		t.Fatal("related PR order", numbers)
+	}
+}
+
 func TestPRGroupingKeySourcesAndRelatedIssue(t *testing.T) {
 	m := ready(t)
 	for _, p := range []model.PullRequest{{Title: "ABC-7 title"}, {Body: "ABC-7"}, {HeadRef: "fix/ABC-7"}} {
@@ -82,8 +117,8 @@ func TestDependabotReviewGroupIsLast(t *testing.T) {
 			rows := groupedFixture()
 			rows[0].Author = "dependabot[bot]" // Even a Jira-linked bot PR belongs at the end.
 			rows[2].Author = "DEPENDABOT"      // GraphQL login and case variants also match.
-			rows = append(rows, model.PullRequest{Number: 5, URL: "human", Author: "dependabot-helper", Title: "Unlinked human PR"})
-			rows = append(rows, model.PullRequest{Number: 6, URL: "bot", Author: "dependabot[bot]", Title: "Update dependency"})
+			rows = append(rows, model.PullRequest{Number: 5, URL: "human", Repository: "acme/docs", Author: "dependabot-helper", Title: "Unlinked human PR"})
+			rows = append(rows, model.PullRequest{Number: 6, URL: "bot", Repository: "acme/web", Author: "dependabot[bot]", Title: "Update dependency"})
 			m.snapshot.Datasets[view].PRs = rows
 			var numbers []int
 			for _, p := range m.filtered() {
