@@ -151,7 +151,12 @@ func (m Model) setupLines() []string {
 	case "webhook":
 		return []string{
 			"Mattermost · sende meldinger og PR-lenker",
-			"Utenfor appen: Opprett en incoming-webhook for ønsket kanal i Mattermost. Administrator må ha tillatt integrasjonen.",
+			"I Mattermost: Åpne Integrasjoner → Incoming Webhooks → Legg til incoming-webhook.",
+			"Velg kanal, gi webhooken et navn, lagre og kopier hele HTTPS-adressen.",
+			"Hvis menyen mangler eller oppretting er sperret, kontakt Mattermost-administrator.",
+			"I appen: Trykk f og lim inn adressen i det maskerte feltet. Enter aktiverer sending uten omstart.",
+			"Adressen brukes bare til appen avsluttes. Ingen testmelding sendes under oppsettet.",
+			"Alternativ for oppstart fra terminal:",
 			"Les inn hele HTTPS-adressen i Bash uten å vise den eller legge den i historikken:",
 			`  read -rsp 'Mattermost webhook: ' MATTERMOST_WEBHOOK_URL; echo; export MATTERMOST_WEBHOOK_URL`,
 			"Start custom-visning på nytt fra samme terminal.",
@@ -242,7 +247,7 @@ func (m Model) updateSetup(k string) (tea.Model, tea.Cmd) {
 	}
 	switch k {
 	case "f":
-		if m.setup.provider == "github" || m.setup.provider == "jira" || m.setup.provider == "mattermost" {
+		if m.setup.provider == "github" || m.setup.provider == "jira" || m.setup.provider == "mattermost" || m.setup.provider == "webhook" {
 			next := m.startSetupWizard(m.setup.provider, nil)
 			return next, next.setup.wizard.input.Focus()
 		}
