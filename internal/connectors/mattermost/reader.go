@@ -2,10 +2,8 @@ package mattermost
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -123,34 +121,19 @@ func (a *API) Channels(ctx context.Context) ([]model.MattermostChannel, error) {
 	return out, nil
 }
 func (a *API) Posts(ctx context.Context, channel string, since int64) ([]model.MattermostPost, error) {
+	var list *mm.PostList
+	var err error
 	if since == 0 {
-		list, _, err := a.sdk.GetPostsForChannel(ctx, channel, 0, 60, "", false, true)
-		// Reading deleted posts requires an extra permission on some servers.
-		if errors.Is(apiError(err), ErrAccess) {
-			list, _, err = a.sdk.GetPostsForChannel(ctx, channel, 0, 60, "", false, false)
-		}
-		if err != nil {
-			return nil, apiError(err)
-		}
-		return mapList(list), nil
-	}
-	// The SDK's GetPostsSince doesn't expose include_deleted. Use its authenticated
-	// transport with that option to retain tombstones as well as edited posts.
-	route := fmt.Sprintf("/channels/%s/posts?since=%d", url.PathEscape(channel), max(int64(0), since-1))
-	resp, err := a.sdk.DoAPIGet(ctx, route+"&include_deleted=true", "")
-	if errors.Is(apiError(err), ErrAccess) {
-		resp, err = a.sdk.DoAPIGet(ctx, route, "")
+		list, _, err = a.sdk.GetPostsForChannel(ctx, channel, 0, 60, "", false, false)
+	} else {
+		list, _, err = a.sdk.GetPostsSince(ctx, channel, max(int64(0), since-1), false)
 	}
 	if err != nil {
 		return nil, apiError(err)
 	}
-	defer resp.Body.Close()
-	var list mm.PostList
-	if err = json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&list); err != nil {
-		return nil, errors.New("Invalid Mattermost posts response")
-	}
-	return mapList(&list), nil
+	return mapList(list), nil
 }
+
 func (a *API) Thread(ctx context.Context, id string) ([]model.MattermostPost, error) {
 	list, _, err := a.sdk.GetPostThread(ctx, id, "", false)
 	if err != nil {
@@ -159,10 +142,7 @@ func (a *API) Thread(ctx context.Context, id string) ([]model.MattermostPost, er
 	return mapList(list), nil
 }
 func (a *API) History(ctx context.Context, channel, before string) ([]model.MattermostPost, error) {
-	list, _, err := a.sdk.GetPostsBefore(ctx, channel, before, 0, 60, "", false, true)
-	if errors.Is(apiError(err), ErrAccess) {
-		list, _, err = a.sdk.GetPostsBefore(ctx, channel, before, 0, 60, "", false, false)
-	}
+	list, _, err := a.sdk.GetPostsBefore(ctx, channel, before, 0, 60, "", false, false)
 	if err != nil {
 		return nil, apiError(err)
 	}

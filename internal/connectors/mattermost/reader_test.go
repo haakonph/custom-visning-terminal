@@ -199,23 +199,6 @@ func TestLoginTOTP(t *testing.T) {
 		t.Fatal(token, err)
 	}
 }
-func TestSinceIncludesDeleted(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("since") != "99" || r.URL.Query().Get("include_deleted") != "true" {
-			t.Error(r.URL.String())
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"order":["p"],"posts":{"p":{"id":"p","channel_id":"c","update_at":200,"delete_at":200}}}`))
-	}))
-	defer srv.Close()
-	a, _ := NewAPI(srv.URL)
-	a.sdk.HTTPClient = srv.Client()
-	a.SetToken("t")
-	posts, err := a.Posts(context.Background(), "c", 100)
-	if err != nil || len(posts) != 1 || posts[0].DeletedAt != 200 {
-		t.Fatal(posts, err)
-	}
-}
 func TestServerValidation(t *testing.T) {
 	for _, server := range []string{"http://chat.example", "https://user:password@chat.example", "https://chat.example?token=secret", "https://chat.example#fragment", ""} {
 		if _, err := NewAPI(server); err == nil {
@@ -298,18 +281,24 @@ func TestPartialAccessFailureKeepsSuccessfulChannels(t *testing.T) {
 	}
 }
 
-// Ordinary members may read posts while lacking permission to read deleted posts.
-func TestPostsFallbackWithoutDeletedPermission(t *testing.T) {
-	for _, operation := range []string{"initial", "since", "history"} {
+func TestPostsNeverRequestDeletedMessages(t *testing.T) {
+	for _, operation := range []string{"initial", "since", "history", "thread"} {
 		for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusUnauthorized, http.StatusInternalServerError} {
 			t.Run(operation+"/"+http.StatusText(status), func(t *testing.T) {
 				var queries []string
 				srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					queries = append(queries, r.URL.RawQuery)
-					if r.URL.Path != "/api/v4/channels/c/posts" || !strings.EqualFold(r.Header.Get("Authorization"), "Bearer test-token") {
+					wantPath := "/api/v4/channels/c/posts"
+					if operation == "thread" {
+						wantPath = "/api/v4/posts/p/thread"
+					}
+					if r.URL.Path != wantPath || !strings.EqualFold(r.Header.Get("Authorization"), "Bearer test-token") {
 						t.Error("unexpected request", r.URL, r.Header.Get("Authorization"))
 					}
 					q := r.URL.Query()
+					if q.Has("include_deleted") {
+						t.Error("request includes deleted messages", r.URL)
+					}
 					if operation == "since" && q.Get("since") != "99" {
 						t.Error("lost incremental cursor")
 					}
@@ -318,9 +307,6 @@ func TestPostsFallbackWithoutDeletedPermission(t *testing.T) {
 					}
 					w.Header().Set("Content-Type", "application/json")
 					code := status
-					if q.Get("include_deleted") == "true" && status == http.StatusOK {
-						code = http.StatusForbidden
-					}
 					if code != http.StatusOK {
 						w.WriteHeader(code)
 						_ = json.NewEncoder(w).Encode(map[string]any{"id": "test.error", "message": "sensitive upstream body", "status_code": code})
@@ -341,16 +327,11 @@ func TestPostsFallbackWithoutDeletedPermission(t *testing.T) {
 					posts, err = a.Posts(context.Background(), "c", 100)
 				case "history":
 					posts, err = a.History(context.Background(), "c", "p")
+				case "thread":
+					posts, err = a.Thread(context.Background(), "p")
 				}
-				wantCalls := 1
-				if status == http.StatusOK || status == http.StatusForbidden {
-					wantCalls = 2
-				}
-				if len(queries) != wantCalls {
-					t.Fatalf("requests = %v, want %d", queries, wantCalls)
-				}
-				if wantCalls == 2 && strings.Contains(queries[1], "include_deleted") {
-					t.Fatal("fallback still requests deleted posts")
+				if len(queries) != 1 {
+					t.Fatalf("requests = %v, want exactly one", queries)
 				}
 				switch status {
 				case http.StatusOK:
