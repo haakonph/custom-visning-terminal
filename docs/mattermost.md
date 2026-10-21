@@ -158,9 +158,15 @@ viser oppsettet en feil og lar deg prøve igjen etter at nøkkelringen er aktive
 eller låst opp. Tidligere oppsett som bare lå i minnet må legges inn én gang til.
 
 I **My Review Requests** og **Team Review Requests** viser REVIEW-kolonnen tiden
-siden siste vellykkede forespørsel sendt til Mattermost fra appen (`now`, `2h`,
+siden siste PR-lenke delt i en valgt, synkronisert Mattermost-kanal (`now`, `2h`,
 `3d`). Tiden er gul når ingen har reviewet, og grønn når andre har godkjent eller
 bedt om endringer. Din egen godkjenning vises som `APPROVED`; egne ønskede
 endringer vises som `CHANGES`. Uten registrert forespørsel er feltet tomt med
 mindre du selv har reviewet. GitHubs samlede review-status er fortsatt tilgjengelig
-i detaljvisningen. Tidspunkt og reviewer-identiteter beholdes etter omstart.
+i detaljvisningen. Meldinger fra andre brukere og klienter teller også, inkludert
+lenker i tråder. Nyeste meldings opprettelsestid brukes; redigering starter ikke
+tiden på nytt. Slettede meldinger og kanaler som ikke lenger er valgt ignoreres.
+Appens egne vellykkede sendinger teller med en gang, også uten Mattermost-leseren.
+Tidene fra kanalen er tilgjengelige fra lokal cache etter omstart. Bare synkronisert
+historikk inngår; bruk `ah` i Mattermost-visningen for eldre meldinger. Reviewer-identiteter
+beholdes også etter omstart.

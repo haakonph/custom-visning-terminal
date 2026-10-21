@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -175,10 +176,8 @@ func (m Model) reviewLabel(p model.PullRequest) string {
 		if own := m.ownReview(p); own != "" {
 			return own
 		}
-		if m.mattermost != nil {
-			if at := m.mattermost.sent[strings.ToLower(p.URL)]; !at.IsZero() {
-				return age(at)
-			}
+		if at := m.reviewRequestedAt(p.URL); !at.IsZero() {
+			return age(at)
 		}
 		return ""
 	}
@@ -220,4 +219,18 @@ func (m Model) reviewColor(p model.PullRequest) string {
 		return "108"
 	}
 	return "179"
+}
+
+func (m Model) reviewRequestedAt(url string) time.Time {
+	key := strings.ToLower(url)
+	var at time.Time
+	if m.mattermost != nil {
+		at = m.mattermost.sent[key]
+	}
+	if m.mmReader != nil {
+		if channelTime := m.mmReader.reviewRequests[key]; channelTime.After(at) {
+			at = channelTime
+		}
+	}
+	return at
 }
