@@ -193,7 +193,7 @@ func (m Model) entitySnapshotView() tea.View {
 	start := min(d.offset, max(0, len(lines)-capacity))
 	content := append([]string{}, lines[start:min(len(lines), start+capacity)]...)
 	if m.height > 1 {
-		content = append([]string{"j/k rull · Esc tilbake · a/e/r/t handling"}, content...)
+		content = append([]string{m.shortcuts()}, content...)
 	}
 	for i := range content {
 		content[i] = ansi.Truncate(content[i], max(1, m.width), "…")

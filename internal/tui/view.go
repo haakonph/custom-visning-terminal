@@ -146,35 +146,31 @@ func (m Model) View() tea.View {
 	if m.local != nil && m.local.choosing {
 		lines = append(lines, fmt.Sprintf(" Editor: %s · j/k velg · Enter åpne · Esc avbryt", []string{"IntelliJ IDEA", "VS Code", "egendefinert"}[m.local.editorChoice]))
 	}
-	if m.help {
-		lines = append(lines, strings.Split(helpText, "\n")...)
-	} else {
-		rows := m.filtered()
-		rowModel := m
-		rowModel.width = max(1, m.width-3)
-		lines = append(lines, "   "+rowModel.row(model.PullRequest{}, true, false))
-		// Reserve space for details, both warning sources, results and footer.
-		reserved := 7
-		if m.local != nil {
-			reserved += min(3, len(m.local.results))
-			if m.local.warmNotice != "" {
-				reserved++
-			}
+	rows := m.filtered()
+	rowModel := m
+	rowModel.width = max(1, m.width-3)
+	lines = append(lines, "   "+rowModel.row(model.PullRequest{}, true, false))
+	// Reserve space for details, both warning sources, results and footer.
+	reserved := 7
+	if m.local != nil {
+		reserved += min(3, len(m.local.results))
+		if m.local.warmNotice != "" {
+			reserved++
 		}
-		capacity := max(1, m.height-len(lines)-reserved)
-		lines = append(lines, m.groupedPRLines(rows, capacity)...)
-		if len(rows) == 0 {
-			lines = append(lines, muted.Render(" No pull requests in this view."))
-		}
-		if len(rows) > 0 {
-			p := rows[m.selected]
-			lines = append(lines, muted.Render(clean(" "+reviewSummaryLabel(p))))
-			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
-			detail := fmt.Sprintf(" %d/%d · automerge: %s (a+ på / a- av) · queue: %s · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), autoMergeLabel(p), queueLabel(p), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
-			lines = append(lines, muted.Render(clean(detail)))
-			if m.mmReader != nil {
-				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · v vis referanser · M kanaler", m.mmMentionCount(p.URL)))
-			}
+	}
+	capacity := max(1, m.height-len(lines)-reserved)
+	lines = append(lines, m.groupedPRLines(rows, capacity)...)
+	if len(rows) == 0 {
+		lines = append(lines, muted.Render(" No pull requests in this view."))
+	}
+	if len(rows) > 0 {
+		p := rows[m.selected]
+		lines = append(lines, muted.Render(clean(" "+reviewSummaryLabel(p))))
+		lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · rt relaterte saker")
+		detail := fmt.Sprintf(" %d/%d · automerge: %s (a+ på / a- av) · queue: %s · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), autoMergeLabel(p), queueLabel(p), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
+		lines = append(lines, muted.Render(clean(detail)))
+		if m.mmReader != nil {
+			lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · rc vis referanser · vc chat", m.mmMentionCount(p.URL)))
 		}
 	}
 	if m.local != nil && m.local.warmNotice != "" {
@@ -190,7 +186,7 @@ func (m Model) View() tea.View {
 			lines = append(lines, warning.Render(clean(message)))
 		}
 	}
-	lines = append(lines, muted.Render(shortcuts))
+	lines = append(lines, muted.Render(m.shortcuts()))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}
@@ -285,7 +281,7 @@ func age(at time.Time) string {
 }
 
 func (m Model) helpView() tea.View {
-	rows := strings.Split(helpText, "\n")
+	rows := strings.Split(m.helpText(), "\n")
 	version := m.version
 	if version == "" {
 		version = "dev"

@@ -276,12 +276,15 @@ func sortedRefs(values map[string]model.TaskReference) []model.TaskReference {
 }
 func (m *Model) currentReferences() []model.TaskReference {
 	kind := m.visibleProvider()
-	if kind == "github" && m.detail != nil && len(m.chosen) == 0 {
+	if kind == "github" && m.detail != nil {
 		return []model.TaskReference{prRef(m.detail.pr)}
 	}
-	if kind == "jira" && m.jira.detail != nil && len(m.jiraChosen) == 0 {
+	if kind == "jira" && m.jira.detail != nil {
 		r := m.jira.detail
 		return []model.TaskReference{{Provider: "jira", URL: r.URL, Key: r.Key, Title: r.Title}}
+	}
+	if kind == "copilot" && m.copilot.detail != nil {
+		return []model.TaskReference{copilotRef(m.copilot.detail.Session)}
 	}
 	if kind == "github" {
 		var refs []model.TaskReference
@@ -313,9 +316,6 @@ func (m *Model) currentReferences() []model.TaskReference {
 	}
 	if len(selected) > 0 {
 		return sortedRefs(selected)
-	}
-	if kind == "copilot" && m.copilot.detail != nil {
-		return []model.TaskReference{copilotRef(m.copilot.detail.Session)}
 	}
 	refs := m.visibleReferences()
 	i := m.cursor()
@@ -545,8 +545,8 @@ func (m *Model) relatedReferenceKinds(origins []model.TaskReference, kinds ...st
 			}
 		}
 	}
-	// Each typed thing traverses one relation. Never expand an action to an
-	// entire connected component through unrelated tasks.
+	// Related navigation follows one relation, avoiding unrelated tasks reached
+	// through an entire connected component.
 	result := map[string]model.TaskReference{}
 	for _, origin := range origins {
 		id := refID(origin)

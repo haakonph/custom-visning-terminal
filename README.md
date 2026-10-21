@@ -169,20 +169,21 @@ PR-bygg bruker GitHubs test-merge-commit.
 
 ## Visninger og hurtigtaster
 
-Alle snarveier følger nå ett mønster. Se [fullstendig tastaturoversikt](docs/keyboard.md),
-inkludert tastene som ikke var definert i den opprinnelige listen.
+Handlinger og hjelp gjelder aktiv visning. Se [fullstendig tastaturoversikt](docs/keyboard.md).
 
 - `j/k` eller ↑/↓ velger rad; `h/l` eller ←/→ bytter fane.
 - `d` viser detaljer, `/` søker, `?` viser hjelpen.
 - Space og Shift+↑/↓ velger flere; `x` fjerner alle markeringer.
 - `r` relatert, `v` visning, `t` koble, `e` åpne, `a` handling.
-- `o/g/t/a/c` velger oppgaver/GitHub/Jira/AI/chat under en starttast.
-- `atfq` flytter tilhørende Jira-saker til QA direkte fra GitHub.
+- `vo/vg/vt/va/vc` bytter til oppgaver/GitHub/Jira/AI/chat.
+- `af` flytter valgte saker i Jira. Åpne først en relatert sak med `rt` fra GitHub.
 - `au` oppdaterer, `vs` åpner innstillinger og Ctrl+C avslutter.
 
 Gamle enkelttaster, talltaster for faner og Tab-snarveier er fjernet. Enter brukes
 bare til å bekrefte dialoger/tekstfelt. AI og chat har også flervalg, koblinger,
-relasjoner, snooze og lokalt arkiv. Typene kan inngå i kjedede handlinger.
+relasjoner, snooze og lokalt arkiv. Handlinger kan ikke kjedes gjennom andre typer.
+Menyer og `?` viser bare handlingene for aktiv visning. `an` lager oppgaver fra
+oppgavesiden; koble referanser til etterpå med `t`.
 
 GitHub-fanene er egne åpne PR-er uten drafts, egne drafts, direkte reviewforespørsler
 og teamforespørsler. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
@@ -713,21 +714,21 @@ JSONL-poster er begrenset til 2 MiB, workspace til 1 MiB og OTLP-forespørsler t
 ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhold.
 
 - **/** søker på sesjon, repository, prosjekt, Jira, klient, modell og status.
-- **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
-- **eee** åpner den valgte sesjonens arbeidsmappe i IntelliJ fra listen eller detaljene.
-- **eew** åpner sesjonens Git-/worktreerot i IntelliJ.
+- **d** viser metadata, samtale, verktøyargumenter/resultater og feil.
+- **ee** åpner den valgte sesjonens arbeidsmappe i IntelliJ fra listen eller detaljene.
+- **ew** åpner sesjonens Git-/worktreerot i IntelliJ.
 - **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
 - **vi** viser diagnostikk; **Esc** går tilbake og fjerner søket.
 - **au** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
-- **g** og **J** bytter til GitHub/Jira når de er konfigurert.
+- **vg** og **vt** bytter til GitHub/Jira når de er konfigurert.
 
 ### Åpne IntelliJ fra en sesjon
 
-Trykk **eee** i Copilot-visningen for chattens arbeidsmappe (`cwd`), eller **eew**
-for Git-/worktreeroten (`gitRoot`). **ee** venter på tredje tast; **Esc** avbryter.
+Trykk **ee** i Copilot-visningen for chattens arbeidsmappe (`cwd`), eller **ew**
+for Git-/worktreeroten (`gitRoot`). Begge handlingene avsluttes med to taster.
 Hvis den foretrukne mappen mangler eller ikke finnes lokalt, brukes prosjektroten
 og deretter den andre mappen. Hvis chatten jobber i worktreeroten, åpner begge
-samme mappe. I andre visninger og relasjonskjeder beholdes editorhandlingen som før.
+samme mappe. Editorhandlinger gjelder valget i aktiv visning og følger ingen relasjoner.
 IntelliJ åpner prosjektet eller
 aktiverer det hvis det allerede er åpent. Dette åpner prosjektet; den konkrete
 Copilot-chatten gjenåpnes ikke automatisk, siden sesjonsdataene ikke gir en støttet
@@ -1156,7 +1157,7 @@ Se [Mattermost-oppsett, tastatursnarveier og begrensninger](docs/mattermost.md).
 
 ### Be om ny Copilot-review
 
-Velg én eller flere PR-er og trykk `ar` (handling → review), også etter en tidligere Copilot-review. Handlingen fungerer fra PR-detaljer og GitHub-relasjoner. GitHub må tillate Copilot code review for kontoen og repositoryet. Appen viser hvor mange forespørsler som ble sendt; ved feil stoppes resten. `au` henter oppdatert review-status. På Jira beholder `ar` handlingen for å fjerne egen tilordning.
+Velg én eller flere PR-er og trykk `ar` (handling → review), også etter en tidligere Copilot-review. Handlingen fungerer i GitHub-listen og PR-detaljer. Åpne først en relatert PR i GitHub. GitHub må tillate Copilot code review for kontoen og repositoryet. Appen viser hvor mange forespørsler som ble sendt; ved feil stoppes resten. `au` henter oppdatert review-status. På Jira beholder `ar` handlingen for å fjerne egen tilordning.
 
 ### Varsler om CI og Copilot-review
 

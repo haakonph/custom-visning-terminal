@@ -15,7 +15,7 @@ func (m Model) keyboardView() tea.View {
 	view := m.View()
 	lines := []string{}
 	if sequence != "" {
-		lines = append(lines, "Tastsekvens: "+sequence+" · "+sequenceHint(sequence)+" · Esc avbryt")
+		lines = append(lines, "Tastsekvens: "+sequence+" · "+m.sequenceHint(sequence)+" · Esc avbryt")
 	}
 	if notice != "" {
 		lines = append(lines, notice)

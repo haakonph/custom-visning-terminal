@@ -112,11 +112,11 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 	m.copilot.selected = 1
 	var opened string
 	m.copilot.openIDE = func(ctx context.Context, s copilot.Session) error { opened = s.ID; return nil }
-	m, cmd := sequence(m, "eee")
+	m, cmd := sequence(m, "ee")
 	if cmd == nil || !m.copilot.openingIDE {
 		t.Fatal("IDE action not scheduled")
 	}
-	_, duplicate := sequence(m, "eee")
+	_, duplicate := sequence(m, "ee")
 	if duplicate != nil {
 		t.Fatal("duplicate launch while pending")
 	}
@@ -125,7 +125,7 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 		t.Fatal("wrong selection or missing feedback")
 	}
 	m.copilot.detail = &copilot.Detail{Session: copilot.Session{ID: "detail", ProjectRoot: project}}
-	m, cmd = sequence(m, "eee")
+	m, cmd = sequence(m, "ee")
 	m, _ = update(m, cmd())
 	if opened != "detail" {
 		t.Fatal("opened list row instead of detail")
@@ -134,6 +134,7 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 	if m.copilot.ideNotice != "launcher unavailable" {
 		t.Fatal("launch failure not shown")
 	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	m, _ = update(m, key('/'))
 	m, _ = update(m, key('i'))
 	if m.copilot.openingIDE || m.copilot.input.Value() != "i" {
@@ -142,7 +143,7 @@ func TestCopilotOpenIDEUsesSelectedOrDetailedSession(t *testing.T) {
 	m.copilot.filtering = false
 	m.copilot.detail = nil
 	m.copilot.sessions = nil
-	_, cmd = sequence(m, "eee")
+	_, cmd = sequence(m, "ee")
 	if cmd != nil {
 		t.Fatal("launched IDE without session")
 	}
@@ -162,14 +163,14 @@ func TestAIEditorShortcutsChooseDirectoryAndKeepOriginalTargets(t *testing.T) {
 				opened = append(opened, s)
 				return nil
 			}
-			m, cmd := sequence(m, "ee")
-			if cmd != nil || m.sequence != "ee" || m.copilot.openingIDE || !strings.Contains(m.View().Content, "w worktree") {
-				t.Fatal("ee must wait and show the two targets")
+			m, cmd := sequence(m, "e")
+			if cmd != nil || m.sequence != "e" || m.copilot.openingIDE || !strings.Contains(m.View().Content, "w åpne worktree") {
+				t.Fatal("e must show the two targets")
 			}
 			m.copilot.selected = 1 // Background/cursor changes must not retarget the sequence.
 			m, cmd = sequence(m, target)
 			if cmd == nil || m.sequence != "" || len(m.sequenceRefs) != 0 {
-				t.Fatal("third key did not complete the sequence")
+				t.Fatal("action key did not complete the command")
 			}
 			m, _ = update(m, cmd())
 			want := chat
@@ -187,7 +188,7 @@ func TestAIEditorPrefixCancelInvalidAndMissingPaths(t *testing.T) {
 	for _, finish := range []tea.KeyPressMsg{{Code: tea.KeyEscape}, key('x')} {
 		m := ready(t).WithCopilot(testCopilot(t), true)
 		m.copilot.sessions = []copilot.Session{{ID: "first"}}
-		m, _ = sequence(m, "ee")
+		m, _ = sequence(m, "e")
 		m, cmd := update(m, finish)
 		if cmd != nil || m.sequence != "" || len(m.sequenceRefs) != 0 || m.copilot.openingIDE {
 			t.Fatal("canceled/invalid sequence launched an editor or retained targets")
@@ -199,7 +200,7 @@ func TestAIEditorPrefixCancelInvalidAndMissingPaths(t *testing.T) {
 		t.Fatal("launched IDE without an available local directory")
 		return nil
 	}
-	m, cmd := sequence(m, "eew")
+	m, cmd := sequence(m, "ew")
 	if cmd == nil {
 		t.Fatal("missing path validation command")
 	}
@@ -246,7 +247,7 @@ func TestAIEditorWorktreeShortcutUsesSelectionAndDetails(t *testing.T) {
 			opened = append(opened, s.ProjectRoot)
 			return nil
 		}
-		m, cmd := sequence(m, "eew")
+		m, cmd := sequence(m, "ew")
 		if cmd == nil {
 			t.Fatal("worktree launch not scheduled")
 		}
@@ -257,9 +258,10 @@ func TestAIEditorWorktreeShortcutUsesSelectionAndDetails(t *testing.T) {
 	}
 }
 
-func TestRelatedAIEditorActionsInOtherViewsRemainImmediate(t *testing.T) {
+func TestRelatedAIEditorActionsRequireOpeningAIView(t *testing.T) {
 	for _, page := range []string{"g", "t", "c", "o"} {
 		m := unifiedModel(t)
+		m.copilot.sessions[0].Cwd = t.TempDir()
 		m, _ = sequence(m, "v"+page)
 		m.entities.data.Links = append(m.entities.data.Links, model.EntityLink{
 			Left: m.currentReferences()[0], Right: copilotRef(m.copilot.sessions[0]),
@@ -269,9 +271,9 @@ func TestRelatedAIEditorActionsInOtherViewsRemainImmediate(t *testing.T) {
 			opened = append(opened, s.ID)
 			return nil
 		}
-		m, cmd := sequence(m, "eae")
+		m, cmd := sequence(m, "raee")
 		if cmd == nil || m.sequence != "" {
-			t.Fatalf("%s: related AI editor action now requires a third editor key", page)
+			t.Fatalf("%s: related AI view did not open before editor action", page)
 		}
 		m, _ = update(m, cmd())
 		if !reflect.DeepEqual(opened, []string{"ai1"}) {

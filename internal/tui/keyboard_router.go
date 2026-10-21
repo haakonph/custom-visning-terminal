@@ -80,9 +80,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.sequence = ""
 		next, cmd := m.executeSequence(prefix, k)
 		result := next.(Model)
-		if result.sequence == "" {
-			result.sequenceRefs = nil
-		}
+		result.sequenceRefs = nil
 		return result, cmd, true
 	}
 	if m.setup.provider != "" && !m.settings.active && !m.help {
@@ -94,7 +92,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		case "?", "esc":
 			m.help = false
 		case "j", "down":
-			m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(helpText, "\n"))-max(1, m.height-1)))
+			m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(m.helpText(), "\n"))-max(1, m.height-1)))
 		case "k", "up":
 			m.helpOffset = max(0, m.helpOffset-1)
 		}
@@ -138,6 +136,9 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	}
 	switch k {
 	case "r", "v", "t", "e", "a":
+		if m.sequenceHint(k) == "" {
+			return m, nil, true
+		}
 		m.sequence = k
 		m.sequenceRefs = m.currentReferences()
 		return m, nil, true
@@ -146,9 +147,15 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.helpOffset = 0
 		return m, nil, true
 	case "x":
+		if m.detailsOpen() {
+			return m, nil, true
+		}
 		m.clearChosen()
 		return m, nil, true
 	case "space", " ":
+		if m.detailsOpen() {
+			return m, nil, true
+		}
 		refs := m.visibleReferences()
 		i := m.cursor()
 		if i < len(refs) && i >= 0 {
@@ -156,6 +163,9 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	case "shift+up", "shift+down":
+		if m.detailsOpen() {
+			return m, nil, true
+		}
 		refs := m.visibleReferences()
 		i := m.cursor()
 		if i >= 0 && i < len(refs) {
@@ -195,6 +205,9 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.setCursor(m.cursor() + delta)
 		return m, nil, true
 	case "h", "l", "left", "right":
+		if m.detailsOpen() || m.dialog != nil {
+			return m, nil, true
+		}
 		delta := 1
 		if k == "h" || k == "left" {
 			delta = -1
@@ -202,9 +215,15 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		next, cmd := m.changeTab(delta)
 		return next, cmd, true
 	case "d":
+		if !m.canShowDetails() {
+			return m, nil, true
+		}
 		next, cmd := m.showDetails()
 		return next, cmd, true
 	case "/":
+		if m.detailsOpen() {
+			return m, nil, true
+		}
 		if m.visibleProvider() == "deferred" {
 			rows := m.visibleReferences()
 			next, _ := m.showEntities("Søk i utsatte", "deferred", rows, nil)
@@ -259,6 +278,9 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		next, cmd := m.dispatchKey("esc")
 		return next, cmd, true
 	case "z":
+		if m.dialog != nil || (m.visibleProvider() == "copilot" && m.copilot.diagnosticsOpen) {
+			return m, nil, true
+		}
 		next, cmd := m.beginSnooze()
 		return next, cmd, true
 	case "enter":
@@ -393,22 +415,4 @@ func (m Model) unavailable() (tea.Model, tea.Cmd) {
 	m.sequenceRefs = nil
 	m.sequenceNotice = "Ingen tilgjengelige mål eller handlinger for dette valget."
 	return m, nil
-}
-func sequenceHint(prefix string) string {
-	if prefix == "ee" {
-		return "e chattens arbeidsmappe · w worktree"
-	}
-	switch prefix[0] {
-	case 'r':
-		return "o oppgaver · g GitHub · t Jira · a AI · c chat"
-	case 't':
-		return "o oppgaver · g GitHub · t Jira · a AI · c chat (velg koblingsmål)"
-	case 'v':
-		return "o/g/t/a/c visning · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler · h oppsett"
-	case 'e':
-		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
-	case 'a':
-		return "+ automerge på · - automerge av · r ny Copilot-review (GitHub) · s melding · k arkiver · d slett · w slett worktree (GitHub) · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
-	}
-	return fmt.Sprint(prefix)
 }
