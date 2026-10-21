@@ -3,10 +3,13 @@ package tui
 import (
 	"context"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type messageSender interface {
@@ -18,14 +21,25 @@ type mattermostState struct {
 	text, notice    string
 	offset          int
 	messages        []string
+	sent            map[string]time.Time
 }
 type mattermostSent struct {
-	err  error
-	sent int
+	err        error
+	sent       int
+	timestamps map[string]time.Time
+	saveErr    error
 }
 
 func (m Model) WithMattermost(sender messageSender) Model {
-	m.mattermost = &mattermostState{sender: sender}
+	m.mattermost = &mattermostState{sender: sender, sent: map[string]time.Time{}}
+	if m.entities != nil {
+		sent, err := storage.LoadReviewMessages(m.entities.path)
+		if err != nil {
+			m.notice = "Kunne ikke lese sendetider for Mattermost: " + err.Error()
+		} else {
+			m.mattermost.sent = sent
+		}
+	}
 	return m
 }
 func markdownLink(title, link string) string {
@@ -49,14 +63,29 @@ func (m *Model) sendMattermost(messages []string) tea.Cmd {
 	s.offset = 0
 	s.notice = "Sender…"
 	sender, ctx := s.sender, m.ctx
+	path := ""
+	if m.entities != nil {
+		path = m.entities.path
+	}
 	return func() tea.Msg {
-		result := mattermostSent{}
+		result := mattermostSent{timestamps: map[string]time.Time{}}
 		for _, text := range messages {
 			if err := sender.Send(ctx, text); err != nil {
 				result.err = err
 				break
 			}
 			result.sent++
+			at := time.Now()
+			var links []string
+			for _, link := range mm.PRLinks(text) {
+				links = append(links, link.URL)
+				result.timestamps[link.URL] = at
+			}
+			if len(links) > 0 {
+				if err := storage.SaveReviewMessages(path, links, at); err != nil {
+					result.saveErr = err
+				}
+			}
 		}
 		return result
 	}
@@ -84,6 +113,9 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 	switch msg := msg.(type) {
 	case mattermostSent:
 		s.sending = false
+		for link, at := range msg.timestamps {
+			s.sent[link] = at
+		}
 		if msg.err != nil {
 			s.messages = s.messages[min(msg.sent, len(s.messages)):]
 			s.text = strings.Join(s.messages, "\n")
@@ -92,6 +124,14 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.active = false
 			s.messages = nil
 			m.notice = "Meldingene er sendt til Mattermost"
+		}
+		if msg.saveErr != nil {
+			notice := "; kunne ikke lagre sendetid: " + msg.saveErr.Error()
+			if msg.err != nil {
+				s.notice += notice
+			} else {
+				m.notice += notice
+			}
 		}
 		return true, nil
 	case tea.KeyPressMsg:

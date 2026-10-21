@@ -224,15 +224,15 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	jira := strings.Join(p.JiraKeys(m.jiraPattern), ", ")
 	repository := m.githubName(p.Repository)
 	if m.width >= 100 {
-		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"INFO", prInfoLabel(p), 22, p.Mergeability == model.Conflicting}}
+		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", m.reviewLabel(p), 9, true}, {"CI", string(p.CI), 7, true}, {"AUTO", autoMergeLabel(p), 7, false}, {"INFO", prInfoLabel(p), 22, p.Mergeability == model.Conflicting}}
 		if m.width >= 120 {
-			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 19, false})
+			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 7, false})
 		}
 		if m.width >= 160 {
 			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})
 		}
 	} else if m.width >= 60 {
-		columns = []column{{"REPOSITORY", repository, 14, false}, {"PR", number, 6, false}, {"JIRA", jira, 12, false}, {"TITLE", title, 1, false}, {"REVIEW", string(p.Review), 9, true}}
+		columns = []column{{"REPOSITORY", repository, 14, false}, {"PR", number, 6, false}, {"JIRA", jira, 12, false}, {"TITLE", title, 1, false}, {"REVIEW", m.reviewLabel(p), 9, true}}
 	} else {
 		columns = []column{{"PR", number, 6, false}, {"JIRA", jira, min(12, max(0, m.width/4)), false}, {"TITLE", title, 1, false}}
 	}

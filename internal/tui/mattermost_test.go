@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -146,5 +147,69 @@ func TestComposeReferencesSendsUncachedPRsSeparately(t *testing.T) {
 		if sender.messages[i] != want {
 			t.Fatalf("got %q, want %q", sender.messages[i], want)
 		}
+	}
+}
+
+func TestReviewAgeTracksOnlySuccessfullySentLinksAndSurvivesRestart(t *testing.T) {
+	m := ready(t).WithMattermost(&fakeMessageSender{err: errors.New("offline")})
+	p := m.snapshot.Datasets[0].PRs[0]
+	p.Review = model.Pending
+	if got := m.reviewLabel(p); got != string(model.Pending) {
+		t.Fatal(got)
+	}
+	m.mattermost.active = true
+	m.mattermost.text = "[PR](" + p.URL + ")"
+	m, cmd := sequence(m, "as")
+	m, _ = update(m, cmd())
+	if len(m.mattermost.sent) != 0 {
+		t.Fatal("failed send recorded")
+	}
+	m.mattermost.sender = &fakeMessageSender{}
+	m, cmd = sequence(m, "as")
+	m, _ = update(m, cmd())
+	if got := m.reviewLabel(p); got != "now" {
+		t.Fatal(got)
+	}
+	m = m.WithMattermost(&fakeMessageSender{})
+	if got := m.reviewLabel(p); got != "now" {
+		t.Fatal("restart lost send time", got)
+	}
+	m.mattermost.sent[p.URL] = time.Now().Add(-2 * time.Hour)
+	for _, width := range []int{60, 100, 120, 160} {
+		m.width = width
+		if row := m.row(p, false, true); !strings.Contains(row, "2h") || strings.Contains(row, "PENDING") {
+			t.Fatal(row)
+		}
+	}
+	other := p
+	other.URL += "0"
+	if got := m.reviewLabel(other); got != string(model.Pending) {
+		t.Fatal("unmentioned PR changed", got)
+	}
+	p.Review = model.Status("APPROVED")
+	if got := m.reviewLabel(p); got != "APPROVED" {
+		t.Fatal(got)
+	}
+}
+
+func TestReviewAgePartialSendPersistsOnlySuccessfulMessages(t *testing.T) {
+	sender := &fakeMessageSender{failAt: 2}
+	m := ready(t).WithMattermost(sender)
+	first, second := m.snapshot.Datasets[0].PRs[0], m.snapshot.Datasets[0].PRs[1]
+	cmd := m.sendMattermost([]string{m.mattermostPRText(first), m.mattermostPRText(second)})
+	m, _ = update(m, cmd())
+	if m.mattermost.sent[first.URL].IsZero() || !m.mattermost.sent[second.URL].IsZero() {
+		t.Fatal("partial send timestamps incorrect")
+	}
+	at := m.mattermost.sent[first.URL]
+	m = m.WithMattermost(sender)
+	if !m.mattermost.sent[first.URL].Equal(at) || !m.mattermost.sent[second.URL].IsZero() {
+		t.Fatal("partial send timestamps not persisted")
+	}
+	sender.failAt = 0
+	cmd = m.sendMattermost([]string{m.mattermostPRText(second)})
+	m, _ = update(m, cmd())
+	if !m.mattermost.sent[first.URL].Equal(at) || m.mattermost.sent[second.URL].IsZero() {
+		t.Fatal("retry changed successful send timestamp")
 	}
 }

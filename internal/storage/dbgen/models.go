@@ -269,6 +269,11 @@ type OverviewItem struct {
 	Status       string
 }
 
+type ReviewMessage struct {
+	PullRequestUrl string
+	SentAt         string
+}
+
 type SchemaMigration struct {
 	Version int64
 }
