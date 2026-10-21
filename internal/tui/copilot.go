@@ -302,7 +302,7 @@ func (m Model) copilotView() tea.View {
 			body = append(body, line)
 		}
 		if len(rows) == 0 {
-			body = append(body, "Ingen Copilot-sesjoner. vh viser oppsett; vi viser diagnostikk.", "Start en Copilot CLI-sesjon. Historikk leses fra ~/.copilot/session-state.", "vs lar deg endre sesjonsmappe og innsamling; au skanner på nytt.")
+			body = append(body, m.keyText("Ingen Copilot-sesjoner. `vh` viser oppsett; `vi` viser diagnostikk."), "Start en Copilot CLI-sesjon. Historikk leses fra ~/.copilot/session-state.", m.keyText("`vs` lar deg endre sesjonsmappe og innsamling; `au` skanner på nytt."))
 		}
 	}
 	if c.detail != nil || c.diagnosticsOpen {
@@ -324,7 +324,7 @@ func (m Model) copilotView() tea.View {
 	if c.notice != "" {
 		lines = append(lines, warning.Render(clean(c.notice)))
 	}
-	lines = append(lines, muted.Render("vs innstillinger · eee chatmappe · eew worktree (IntelliJ) · d detaljer · j/k ↑/↓ · / søk · vi diagnostikk · au oppdater · Esc tilbake · Ctrl+C avslutt"))
+	lines = append(lines, muted.Render("F2 "+m.keyboardLabel()+" · "+m.keyHints("vs innstillinger · eee chatmappe · eew worktree (IntelliJ) · d detaljer · j/k ↑/↓ · / søk · vi diagnostikk · au oppdater · Esc tilbake · Ctrl+C avslutt")))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

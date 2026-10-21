@@ -96,7 +96,7 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 	refs := m.taskReferences()
 	if len(refs) == 0 {
 		t.active = true
-		t.notice = "Velg en Jira-sak eller PR først, eller trykk n for en tom oppgave"
+		t.notice = m.keyText("Velg en Jira-sak eller PR først, eller trykk `an` for en tom oppgave")
 		return m, nil
 	}
 	if create || len(t.items) == 0 {
@@ -324,9 +324,9 @@ func (t *taskState) moveTask(delta int, wrap bool) {
 
 func (m Model) tasksView() tea.View {
 	t := m.tasks
-	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "vg GitHub · vt Jira · / søk · h/l oppgave · d detaljer · ae endre tittel · ak arkiver · vb vis arkiv"}
+	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), m.keyHints("vg GitHub · vt Jira · / søk · h/l oppgave · d detaljer · ae endre tittel · ak arkiver · vb vis arkiv")}
 	if t.archived {
-		lines = append(lines, " Arkiverte oppgaver · ak gjenopprett · vo aktive")
+		lines = append(lines, " Arkiverte oppgaver · "+m.keyHints("ak gjenopprett · vo aktive"))
 	}
 	lines = append(lines, m.snoozeLines()...)
 	if t.searching || t.editing {
@@ -363,7 +363,7 @@ func (m Model) tasksView() tea.View {
 	var details []string
 	if len(indices) > 0 {
 		task := t.items[t.selected]
-		details = append(details, accent.Render(clean(task.Title)), "vg/vt: finn referanser, to legger til her")
+		details = append(details, accent.Render(clean(task.Title)), m.keyText("`vg`/`vt`: finn referanser, `to` legger til her"))
 		refsCapacity := max(1, capacity-2)
 		refStart := max(0, t.row-refsCapacity+1)
 		for i := refStart; i < min(len(task.References), refStart+refsCapacity); i++ {
@@ -422,7 +422,7 @@ func (m Model) tasksView() tea.View {
 	if t.notice != "" {
 		lines = append(lines, warning.Render(clean(t.notice)))
 	}
-	lines = append(lines, footer)
+	lines = append(lines, "F2 "+m.keyboardLabel()+" · "+m.keyHints(footer))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

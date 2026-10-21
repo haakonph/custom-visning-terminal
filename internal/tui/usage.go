@@ -18,6 +18,18 @@ func (m Model) WithUsage(recorder *usage.Recorder, notice string) Model {
 // Update observes only real key messages. Internal compatibility dispatch and
 // background refreshes must never count as user activity.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Decode once, before usage classification and compatibility dispatch.
+	// Read the source before each key so automatic switching does not have a
+	// polling window with the previous keyboard's shortcuts.
+	if _, ok := msg.(tea.KeyPressMsg); ok && !m.internalKey && m.keyboard.options.Profile == "auto" && m.keyboard.currentSource != nil {
+		m.applyInputSource(m.keyboard.currentSource())
+	}
+	if next, cmd, handled := m.keyboardMessage(msg); handled {
+		return next, cmd
+	}
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		msg = m.profileKey(key)
+	}
 	key, isKey := msg.(tea.KeyPressMsg)
 	if m.usage == nil || !isKey || m.internalKey {
 		return m.update(msg)
@@ -190,7 +202,7 @@ func (m Model) usageCommand(k string) (category, name, target string) {
 func (m Model) usageStatsLines() []string {
 	periods := []int{7, 30, 0}
 	labels := []string{"7 dager", "30 dager", "hele perioden"}
-	lines := []string{accent.Render(" BRUKSSTATISTIKK · " + labels[m.usagePeriod]), "h/l periode · j/k rull · Esc tilbake", "Lokale tellere. Kommandoer teller forespørsler, også ved avbrudd eller feil.", ""}
+	lines := []string{accent.Render(" BRUKSSTATISTIKK · " + labels[m.usagePeriod]), m.keyHints("h/l periode · j/k rull · Esc tilbake"), "Lokale tellere. Kommandoer teller forespørsler, også ved avbrudd eller feil.", ""}
 	if m.usage == nil {
 		lines = append(lines, "Innsamling er ikke tilgjengelig. "+m.usageNotice)
 	} else {

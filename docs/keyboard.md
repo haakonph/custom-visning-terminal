@@ -5,6 +5,70 @@ read-only detaljer. Tekstfelt og dialoger eier inntastingen sin. Enter bekrefter
 et valg eller et tekstfelt; den åpner ikke lenger elementer fra hovedlisten.
 Gamle enkelttaster og tall-/Tab-snarveier er fjernet.
 
+## Profiler for hviletastene
+
+`F2` bytter mellom QWERTY og eksternt tastatur. Profilen og tastene vises i
+appen, og `?` viser snarveiene for valgt profil. Hviletastene er:
+
+- Laptop: `asdf␣ | jklø` — ni taster, inkludert mellomrom.
+- Splittastatur: `ciae␣ | rhtns` — ti taster, inkludert begge tomlene.
+
+`␣` betyr mellomrom. De åtte fingerposisjonene har samme funksjon på begge
+tastaturene. Splittastaturets ekstra tommeltast brukes til relasjoner.
+
+| Handling | QWERTY | Eksternt |
+| --- | --- | --- |
+| Handling, start en sekvens | `a` | `c` |
+| Bytt visning, start en sekvens | `s` | `i` |
+| Detaljer | `d` | `a` |
+| Åpne, start en sekvens | `f` | `e` |
+| Marker/fjern markering | Mellomrom | Mellomrom |
+| Relaterte elementer, start en sekvens | `r` (utenfor hviletastene) | `r` (høyre tommel) |
+| Neste rad | `j` | `h` |
+| Forrige rad | `k` | `t` |
+| Forrige fane/oppgave | `l` | `n` |
+| Neste fane/oppgave | `ø` | `s` |
+
+Hele tastsekvensen følger profilen. For eksempel åpner `sv` innstillingene på
+QWERTY og `il` på splittastaturet; editor åpnes med henholdsvis `ff` og `ee`.
+Andre bokstaver flyttes ved behov, slik at ingen snarveier kolliderer.
+Pilene, Esc, Ctrl-snarveier, tekstfelt og innlimt tekst følger vanlig inndata.
+I tidsfeltet brukes alltid `h/d/m/D`; worktree-sletting bekreftes med `y`.
+
+På **macOS** er profilvalg som standard `auto`. Velg inndatakilden for laptopen,
+og trykk `F2` til appen viser `qwerty`. Bytt til inndatakilden du bruker med
+splittastaturet, og trykk `F2` til appen viser `workman`. Appen lagrer koblingene
+til systemets faktiske kilde-ID-er. Senere bytter profilen automatisk når du
+bytter inndatakilde, også når selve tastaturoppsettet ligger i firmware.
+Det kreves ikke at en inndatakilde heter «UTF8» eller «Workman».
+
+Appen leser inndatakilden ved oppstart, hvert sekund og rett før tastetrykk
+tolkes. Ved profilbytte avbrytes påbegynte sekvenser og ventende Jira-valg.
+Påbegynte eksterne operasjoner fortsetter. En ukjent kilde bruker standardprofilen
+til du har valgt en profil med `F2`. Over SSH leses kilden på maskinen appen kjører
+på; appen kan ikke lese klientens kilde. Velg en fast profil der.
+
+Profil, hviletaster og kildekoblinger kan også endres i innstillingene. Eksempel
+på `keyboard`-delen i den felles `config.json`:
+
+```json
+{
+  "keyboard": {
+    "profile": "auto",
+    "qwerty_home": "asdf jklø",
+    "workman_home": "ciae rhtns",
+    "source_profiles": {}
+  }
+}
+```
+
+Mellomrommet i de to tastestrengene er en tast. Du kan bruke ni eller ti unike
+hviletaster; plass fem er mellomrom, og med ti taster er plass seks høyre tommel.
+`F2` fyller ut `source_profiles` i automatisk modus. Faste profiler er `qwerty`,
+`workman` og `standard`. På andre operativsystemer bytter `F2` mellom de to faste
+profilene. `standard` beholder snarveiene i resten av denne oversikten; aktive
+profiler viser de oversatte tastene i appen.
+
 ## Tastene fra spesifikasjonen
 
 | Tast | Handling |

@@ -227,7 +227,7 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 	w.valid = true
 	w.notice = "Validert mot API-et."
 	if m.setup.provider == "webhook" {
-		w.notice = "HTTPS-adressen er kontrollert lokalt; ingen testmelding er sendt. Klar for as. Gjelder til appen avsluttes."
+		w.notice = m.keyText("HTTPS-adressen er kontrollert lokalt; ingen testmelding er sendt. Klar for `as`. Gjelder til appen avsluttes.")
 	}
 	if m.setup.provider == "mattermost" {
 		w.loginMattermost = true

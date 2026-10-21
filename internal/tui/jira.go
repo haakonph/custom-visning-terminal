@@ -358,7 +358,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m Model) jiraView() tea.View {
 	j := m.jira
-	lines := []string{accent.Render(" CUSTOM VISNING · JIRA") + muted.Render("  vg GitHub · [vt Jira] · va Copilot")}
+	lines := []string{accent.Render(" CUSTOM VISNING · JIRA") + muted.Render(m.keyText("  `vg` GitHub · [`vt` Jira] · `va` Copilot"))}
 	var tabs []string
 	for i, t := range j.tabs {
 		label := t.Name
@@ -437,7 +437,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, shortcuts)
+	lines = append(lines, m.shortcutFooter())
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}

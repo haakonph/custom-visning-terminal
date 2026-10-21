@@ -106,39 +106,39 @@ func (m Model) setupLines() []string {
 			"Alternativ: Sett GITHUB_TOKEN til et PAT med tilgang til repositoryene dine.",
 			"GITHUB_TOKEN overstyrer gh-innlogging. Fjern en gammel verdi med unset GITHUB_TOKEN.",
 			"Start custom-visning på nytt fra samme terminal etter innlogging eller tokenendring.",
-			"I appen: vg åpner GitHub, au henter data på nytt. Ved tilgangsfeil: kontroller token, SSO og repository-tilgang.",
+			m.keyText("I appen: `vg` åpner GitHub, `au` henter data på nytt. Ved tilgangsfeil: kontroller token, SSO og repository-tilgang."),
 		}
 	case "jira":
 		return []string{
 			"Jira · server og personlig tilgangstoken",
-			"I appen: vs åpner innstillinger. Fyll ut Jira · serveradresse, f.eks. https://jira.example.no/jira.",
+			m.keyText("I appen: `vs` åpner innstillinger. Fyll ut Jira · serveradresse, f.eks. https://jira.example.no/jira."),
 			"Utenfor appen: Opprett et personlig tilgangstoken (PAT) i Jira-profilen. Administrator må ha tillatt PAT.",
 			"Integrasjonen bruker Jira Data Center / Server med Bearer-token og REST API v2.",
 			"Les inn token i Bash uten å vise det eller legge det i historikken:",
 			`  read -rsp 'Jira PAT: ' JIRA_TOKEN; echo; export JIRA_TOKEN`,
 			"Start custom-visning på nytt fra samme terminal. Miljøvariabler fra andre terminaler følger ikke med.",
-			"I appen: vt åpner Jira, au henter data på nytt. Ved tilgangsfeil: sjekk token og prosjekttilgang.",
+			m.keyText("I appen: `vt` åpner Jira, `au` henter data på nytt. Ved tilgangsfeil: sjekk token og prosjekttilgang."),
 		}
 	case "mattermost":
 		return []string{
 			"Mattermost · lese kanaler og logge inn",
-			"I appen: vs åpner innstillinger. Fyll ut Mattermost · serveradresse (HTTPS) og Mattermost · brukernavn.",
+			m.keyText("I appen: `vs` åpner innstillinger. Fyll ut Mattermost · serveradresse (HTTPS) og Mattermost · brukernavn."),
 			"Bruk Mattermost-brukernavnet, ikke e-postadressen. Serveradressen kan inneholde en context path.",
-			"Ved første oppsett: Trykk Esc fra innstillingene, deretter Enter eller vc for å ta det i bruk uten omstart.",
+			m.keyText("Ved første oppsett: Trykk Esc fra innstillingene, deretter Enter eller `vc` for å ta det i bruk uten omstart."),
 			"Endring av en allerede tilkoblet konto krever omstart.",
-			"I chatten: al åpner innlogging med passord og eventuell TOTP-kode. ap åpner et maskert PAT-felt.",
+			m.keyText("I chatten: `al` åpner innlogging med passord og eventuell TOTP-kode. `ap` åpner et maskert PAT-felt."),
 			"Utenfor appen, hvis du bruker PAT: Opprett token i Mattermost-profilen; administrator må ha tillatt dette.",
-			"vk velger kanaler når du er innlogget. En lagret sesjon gjenbrukes fra operativsystemets nøkkelring.",
+			m.keyText("`vk` velger kanaler når du er innlogget. En lagret sesjon gjenbrukes fra operativsystemets nøkkelring."),
 			"Linux: Nøkkelring krever tilgjengelig, opplåst Secret Service og D-Bus. Uten nøkkelring må du logge inn etter omstart.",
 			"MATTERMOST_SERVER og MATTERMOST_USERNAME overstyrer innstillingene; fjern gamle verdier i startterminalen ved behov.",
-			"Ingen webhook kreves for lesing. Sending av PR-lenker bruker et separat webhook-oppsett (as viser hjelp hvis det mangler).",
+			m.keyText("Ingen webhook kreves for lesing. Sending av PR-lenker bruker et separat webhook-oppsett (`as` viser hjelp hvis det mangler)."),
 		}
 	case "copilot":
 		return []string{
 			"AI / Copilot · lokal historikk og valgfri telemetri",
 			"Utenfor appen: Installer Copilot CLI, logg inn der og start en sesjon. Historikk leses fra ~/.copilot/session-state.",
-			"I appen: vs lar deg endre sesjonsmappe og innsamling. Start appen på nytt etter endringer.",
-			"va åpner AI, au skanner på nytt, vi viser diagnostikk. Ingen GitHub-token kreves for lokal historikk.",
+			m.keyText("I appen: `vs` lar deg endre sesjonsmappe og innsamling. Start appen på nytt etter endringer."),
+			m.keyText("`va` åpner AI, `au` skanner på nytt, `vi` viser diagnostikk. Ingen GitHub-token kreves for lokal historikk."),
 			"Valgfri telemetri: Sett følgende i terminalen som starter Copilot eller IDE-en:",
 			"  export COPILOT_OTEL_ENABLED=true",
 			"  export COPILOT_OTEL_CAPTURE_CONTENT=true",
@@ -154,13 +154,13 @@ func (m Model) setupLines() []string {
 			"I Mattermost: Åpne Integrasjoner → Incoming Webhooks → Legg til incoming-webhook.",
 			"Velg kanal, gi webhooken et navn, lagre og kopier hele HTTPS-adressen.",
 			"Hvis menyen mangler eller oppretting er sperret, kontakt Mattermost-administrator.",
-			"I appen: Trykk f og lim inn adressen i det maskerte feltet. Enter aktiverer sending uten omstart.",
+			m.keyText("I appen: Trykk `f` og lim inn adressen i det maskerte feltet. Enter aktiverer sending uten omstart."),
 			"Adressen brukes bare til appen avsluttes. Ingen testmelding sendes under oppsettet.",
 			"Alternativ for oppstart fra terminal:",
 			"Les inn hele HTTPS-adressen i Bash uten å vise den eller legge den i historikken:",
 			`  read -rsp 'Mattermost webhook: ' MATTERMOST_WEBHOOK_URL; echo; export MATTERMOST_WEBHOOK_URL`,
 			"Start custom-visning på nytt fra samme terminal.",
-			"I appen: Marker elementene du vil dele og bruk as. Gjennomgå meldingen før du sender med as fra utkastet.",
+			m.keyText("I appen: Marker elementene du vil dele og bruk `as`. Gjennomgå meldingen før du sender med `as` fra utkastet."),
 			"Webhook-adressen er en hemmelighet og skal ikke legges i config.json. Chat-innlogging aktiverer ikke denne webhooken.",
 		}
 	case "editor":
@@ -205,10 +205,10 @@ func (m Model) setupView() tea.View {
 	start := min(m.setup.offset, max(0, len(body)-capacity))
 	lines := []string{accent.Render(" OPPSETTSHJELP · " + m.setup.provider)}
 	lines = append(lines, body[start:min(len(body), start+capacity)]...)
-	lines = append(lines, "f fyll ut og valider · vs innstillinger · vg/vt/va/vc sider · j/k bla · Enter prøv igjen · Esc tilbake")
+	lines = append(lines, m.keyHints("f fyll ut og valider · vs innstillinger · vg/vt/va/vc sider · j/k bla · Enter prøv igjen · Esc tilbake"))
 	if m.setup.provider == "startup" {
 		lines[0] = accent.Render(" OPPSETT VED OPPSTART")
-		lines[len(lines)-1] = "j/k velg · Enter fiks oppsett · vs innstillinger · Esc fortsett"
+		lines[len(lines)-1] = m.keyHints("j/k velg · Enter fiks oppsett · vs innstillinger · Esc fortsett")
 	}
 	if len(lines) > m.height {
 		lines = lines[:max(1, m.height)]

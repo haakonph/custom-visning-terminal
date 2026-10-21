@@ -86,7 +86,7 @@ func (m Model) removeLocalView() tea.View {
 	if shown < len(m.local.removePending) {
 		lines = append(lines, fmt.Sprintf("  … og %d flere valgte PR-er", len(m.local.removePending)-shown))
 	}
-	lines = append(lines, "", "Worktree-mappene, inkludert ignorerte filer, fjernes.", "Lokale endringer og usporede filer stopper sletting. Grener og commits beholdes.", "Bruk ee etter sletting for å opprette et nytt worktree.", "", "y slett · n/Esc avbryt")
+	lines = append(lines, "", "Worktree-mappene, inkludert ignorerte filer, fjernes.", "Lokale endringer og usporede filer stopper sletting. Grener og commits beholdes.", m.keyText("Bruk `ee` etter sletting for å opprette et nytt worktree."), "", "y slett · n/Esc avbryt")
 	view := tea.NewView(strings.Join(lines, "\n"))
 	view.AltScreen = true
 	return view

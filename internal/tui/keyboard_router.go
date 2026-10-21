@@ -41,7 +41,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	}
 	if result, ok := msg.(copilotReviewRequested); ok {
 		m.reviewRequestBusy = false
-		m.sequenceNotice = fmt.Sprintf("Ny Copilot-review forespurt for %d PR-er; au henter status", result.count)
+		m.sequenceNotice = fmt.Sprintf(m.keyText("Ny Copilot-review forespurt for %d PR-er; `au` henter status"), result.count)
 		if result.err != nil {
 			m.sequenceNotice = result.err.Error()
 		}
@@ -111,7 +111,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		case "?", "esc":
 			m.help = false
 		case "j", "down":
-			m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(helpText, "\n"))-max(1, m.height-1)))
+			m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(m.keyboardHelp(), "\n"))-max(1, m.height-1)))
 		case "k", "up":
 			m.helpOffset = max(0, m.helpOffset-1)
 		}

@@ -172,6 +172,12 @@ PR-bygg bruker GitHubs test-merge-commit.
 Alle snarveier følger nå ett mønster. Se [fullstendig tastaturoversikt](docs/keyboard.md),
 inkludert tastene som ikke var definert i den opprinnelige listen.
 
+`F2` velger en profil for hviletastene: laptop `asdf␣ | jklø` (ni taster)
+eller splittastatur `ciae␣ | rhtns` (ti taster). På macOS husker automatisk modus
+profilen for hver inndatakilde etter at du har valgt med `F2`. Hjelp og hint i
+appen følger profilen. Se [oppsett og tastene for profilene](docs/keyboard.md#profiler-for-hviletastene).
+Snarveiene nedenfor er standardprofilen.
+
 - `j/k` eller ↑/↓ velger rad; `h/l` eller ←/→ bytter fane.
 - `d` viser detaljer, `/` søker, `?` viser hjelpen.
 - Space og Shift+↑/↓ velger flere; `x` fjerner alle markeringer.

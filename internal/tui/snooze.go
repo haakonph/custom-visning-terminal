@@ -89,7 +89,7 @@ func snoozeTimer() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.initProviders(), refreshTimer(), snoozeTimer(), m.mmStart(), mmTimer())
+	return tea.Batch(m.initProviders(), refreshTimer(), snoozeTimer(), m.mmStart(), mmTimer(), readInputSource())
 }
 
 func (m Model) snoozeLines() []string {
@@ -97,7 +97,7 @@ func (m Model) snoozeLines() []string {
 	if s == nil {
 		return nil
 	}
-	line := fmt.Sprintf(" %d utsatte · z snooze · zz hele sammenhengen · vz vis", len(s.rows()))
+	line := fmt.Sprintf(" %d utsatte · ", len(s.rows())) + m.keyHints("z snooze · zz hele sammenhengen · vz vis")
 	if s.input {
 		line = " Snooze: " + s.digits + "▏  h timer · d dager · m dager kl. 06 · Esc avbryt"
 	}
@@ -423,7 +423,7 @@ func (m Model) snoozeView() tea.View {
 	if len(rows) == 0 {
 		lines = append(lines, " Ingen utsatte elementer.")
 	}
-	lines = append(lines, "j/k velg · z endre tidspunkt · az hent tilbake · Esc tilbake")
+	lines = append(lines, m.keyHints("j/k velg · z endre tidspunkt · az hent tilbake · Esc tilbake"))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}
