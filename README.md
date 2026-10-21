@@ -1144,31 +1144,16 @@ testmelding. Adressen brukes bare til appen avsluttes.
 
 For oppsett ved oppstart: Sett `MATTERMOST_WEBHOOK_URL` til en HTTPS incoming-webhook for ønsket kanal.
 Webhook-adressen er en hemmelighet; oppbevar den utenfor kildekoden.
-Installer Neovim, Vim eller vi (appen velger første tilgjengelige i den rekkefølgen).
-
 1. Marker én eller flere PR-er med `Space`, også på tvers av faner og filtre.
    Uten markering brukes PR-en under markøren.
-2. Trykk `as`. Meldingen åpnes ferdig utfylt som Markdown i Vim/Neovim.
-3. Trykk `i` for å redigere. Bruk `Esc` og `:wq` for å lagre og gå tilbake.
-   `:cq` avbryter redigeringen og beholder forrige utkast.
-4. Se gjennom Markdown-teksten i terminalappen (`j/k` ruller), trykk `ee` for
-   å redigere videre, `as` for å sende, eller `Esc` for å avbryte sendingen.
+2. Trykk `as` for å sende med en gang. Hver PR sendes som en egen melding.
 
-Alle valgte PR-er sendes i **én melding**, med én lenke per linje:
+Lenketeksten begynner med repoets visningsnavn, for eksempel **[saksbehandling] PR-tittel**.
+Jira-lenker legges ikke til som egne linjer. Sending åpner ingen editor.
 
-```markdown
-[PR-tittel](https://github.com/owner/repo/pull/123)
-[En annen PR-tittel](https://github.com/owner/repo/pull/124)
-[JIRA-123](https://jira.example.com/browse/JIRA-123)
-```
-
-Jira-lenken legges til én gang nederst når Jira er konfigurert med
-`JIRA_BASE_URL` og `JIRA_TOKEN`, og alle PR-ene har nøyaktig én og samme
-Jira-nøkkel i tittel, beskrivelse eller branchnavn. Ved ulike, manglende eller
-flere Jira-nøkler brukes bare PR-lenkene.
-
-Ved sendefeil beholdes utkastet. Appen forsøker ikke automatisk på nytt;
-ved nettverksfeil bør du sjekke kanalen før du sender igjen.
+Ved sendefeil stopper sendingen, og bare meldingene som ikke ble sendt beholdes.
+Trykk `as` for å prøve disse igjen, eller `Esc` for å avbryte. Ved nettverksfeil
+bør du sjekke kanalen før du sender igjen.
 
 ### GitHub-detaljer
 

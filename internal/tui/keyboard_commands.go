@@ -14,9 +14,6 @@ import (
 func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	refs := m.sequenceRefs
 	if m.mattermost != nil && m.mattermost.active {
-		if prefix == "e" && k == "e" {
-			return m, m.editMattermost()
-		}
 		if prefix == "a" && k == "s" {
 			_, cmd := m.mattermostMessage(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 			return m, cmd
@@ -408,47 +405,43 @@ func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 	if len(refs) == 0 {
 		return m.unavailable()
 	}
-	var lines []string
+	if m.mattermost.sending {
+		return m, nil
+	}
+	var messages []string
+	seen := map[string]bool{}
 	for _, r := range refs {
+		if seen[r.URL] && r.URL != "" {
+			continue
+		}
+		seen[r.URL] = true
+		text := clean(r.Title) + " (" + r.Key + ")"
 		if strings.HasPrefix(r.URL, "https://") {
-			lines = append(lines, markdownLink(r.Title, r.URL))
-		} else {
-			lines = append(lines, clean(r.Title)+" ("+r.Key+")")
+			text = markdownLink(r.Title, r.URL)
 		}
-	}
-	m.mattermost.text = strings.Join(lines, "\n")
-	allPR := true
-	for _, r := range refs {
-		if r.Provider != "github" {
-			allPR = false
-		}
-	}
-	if allPR {
-		var rows []model.PullRequest
-		for _, r := range refs {
+		if r.Provider == "github" {
+			repository, _, _ := strings.Cut(r.Key, "#")
+			p := model.PullRequest{Repository: repository, Title: r.Title, URL: r.URL}
 			found := false
 			for _, d := range m.snapshot.Datasets {
-				for _, p := range d.PRs {
-					if p.URL == r.URL && !found {
-						rows = append(rows, p)
+				for _, candidate := range d.PRs {
+					if candidate.URL == r.URL {
+						p = candidate
 						found = true
+						break
 					}
 				}
+				if found {
+					break
+				}
 			}
+			text = m.mattermostPRText(p)
 		}
-		var issueURL func(string) string
-		if m.jira != nil && m.jira.client != nil {
-			issueURL = m.jira.client.IssueURL
-		}
-		if len(rows) == len(refs) {
-			m.mattermost.text = mattermostText(rows, issueURL, m.jiraPattern)
-		}
+		messages = append(messages, text)
 	}
-	m.mattermost.active = true
-	m.mattermost.offset = 0
-	m.mattermost.notice = ""
 	m.dialog = nil
-	return m, m.editMattermost()
+	cmd := m.sendMattermost(messages)
+	return m, cmd
 }
 func (m Model) openReferences(refs []model.TaskReference, editor bool) (tea.Model, tea.Cmd) {
 	return m.openReferencesWithTarget(refs, editor, "")
