@@ -15,7 +15,7 @@ func (m Model) keyboardView() tea.View {
 	view := m.View()
 	lines := []string{}
 	if sequence != "" {
-		lines = append(lines, "Tastsekvens: "+sequence+" · "+sequenceHint(sequence)+" · Esc avbryt")
+		lines = append(lines, "Tastsekvens: "+m.shortcut(sequence)+" · "+m.keyHints(sequenceHint(sequence))+" · Esc avbryt")
 	}
 	if notice != "" {
 		lines = append(lines, notice)
@@ -24,9 +24,9 @@ func (m Model) keyboardView() tea.View {
 		if action.running {
 			lines = append(lines, "Jira: utfører handling…")
 		} else if action.loading {
-			lines = append(lines, "Jira: henter tilgjengelige overganger… · q QA · u under arbeid · a avklaring · f ferdig · Esc avbryt")
+			lines = append(lines, "Jira: henter tilgjengelige overganger… · "+m.keyHints("q QA · u under arbeid · a avklaring · f ferdig · Esc avbryt"))
 		} else {
-			lines = append(lines, "Jira: velg overgang · j/k · Enter · q QA · u under arbeid · a avklaring · f ferdig · Esc avbryt")
+			lines = append(lines, "Jira: velg overgang · "+m.keyHints("j/k bla · Enter velg · q QA · u under arbeid · a avklaring · f ferdig · Esc avbryt"))
 			start := max(0, action.selected-max(1, m.height-2)+1)
 			for i := start; i < min(len(action.choices), start+max(1, m.height-2)); i++ {
 				choice := action.choices[i]
@@ -68,7 +68,7 @@ func (m Model) jiraDetailView() tea.View {
 	end := min(len(lines), start+max(1, m.height-1))
 	content := append([]string{}, lines[start:end]...)
 	if m.height > 1 {
-		content = append([]string{"Esc tilbake · j/k ↑/↓ bla"}, content...)
+		content = append([]string{m.keyHints("Esc tilbake · j/k ↑/↓ bla")}, content...)
 	}
 	for i := range content {
 		content[i] = ansi.Truncate(content[i], max(1, m.width), "…")

@@ -3,11 +3,13 @@ package tui
 import (
 	"context"
 	"regexp"
+	"runtime"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/inputsource"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -16,6 +18,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	keyboard         keyboardState
 	notifications    notificationState
 	auto             refreshState
 	setup            setupState
@@ -98,6 +101,10 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	m.loadNotifications()
 	m.loadJiraPattern()
 	m.loadGitHubDisplay()
+	m.loadKeyboard()
+	if runtime.GOOS == "darwin" {
+		m.keyboard.currentSource = inputsource.Current
+	}
 	return m
 }
 func (m Model) initProviders() tea.Cmd {

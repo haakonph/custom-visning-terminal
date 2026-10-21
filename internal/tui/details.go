@@ -55,7 +55,7 @@ func (m *Model) loadDetails() tea.Cmd {
 func (m Model) detailLines() []string {
 	d := m.detail
 	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(d.pr.Repository), d.pr.Number, d.pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", "Oppdatert: " + syncAge(d.synced), ""}
-	lines = append(lines, "Jira: "+strings.Join(d.pr.JiraKeys(m.jiraPattern), ", "), "Automerge: "+autoMergeLabel(d.pr)+" · Queue: "+queueLabel(d.pr), "a+ automerge på (merge when ready) · a- av")
+	lines = append(lines, "Jira: "+strings.Join(d.pr.JiraKeys(m.jiraPattern), ", "), "Automerge: "+autoMergeLabel(d.pr)+" · Queue: "+queueLabel(d.pr), m.keyHints("a+ automerge på (merge when ready) · a- av"))
 	if d.pr.Mergeability == model.Conflicting {
 		lines = append(lines, "CONFLICT: PR-en har mergekonflikter som må løses før den kan merges.")
 	}

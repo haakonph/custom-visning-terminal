@@ -14,7 +14,7 @@ func (m Model) entityView() tea.View {
 		return m.entitySnapshotView()
 	}
 	rows := d.filtered()
-	lines := []string{d.title, "j/k velg · Space marker · Shift+↑/↓ utvid · / søk · Enter velg · Esc avbryt"}
+	lines := []string{d.title, m.keyHints("j/k velg · Space marker · Shift+↑/↓ utvid · / søk · Enter velg · Esc avbryt")}
 	if d.searching {
 		lines = append(lines, "/ "+clean(d.query)+"▏")
 	} else if d.query != "" {
@@ -193,7 +193,7 @@ func (m Model) entitySnapshotView() tea.View {
 	start := min(d.offset, max(0, len(lines)-capacity))
 	content := append([]string{}, lines[start:min(len(lines), start+capacity)]...)
 	if m.height > 1 {
-		content = append([]string{"j/k rull · Esc tilbake · a/e/r/t handling"}, content...)
+		content = append([]string{m.keyHints("j/k rull · Esc tilbake · a/e/r/t handling")}, content...)
 	}
 	for i := range content {
 		content[i] = ansi.Truncate(content[i], max(1, m.width), "…")

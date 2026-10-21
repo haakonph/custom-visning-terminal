@@ -59,6 +59,10 @@ var settingFields = []settingField{
 	{"Oppdatering · lokal bakgrunn", "refresh.local_background", "duration"},
 	{"Varsler · CI ferdig", "notifications.ci", "bool"},
 	{"Varsler · Copilot-review", "notifications.copilot", "bool"},
+	{"Tastatur · profil (auto/standard/qwerty/workman)", "keyboard.profile", "keyboard-profile"},
+	{"Tastatur · QWERTY-hviletaster", "keyboard.qwerty_home", "home-keys"},
+	{"Tastatur · eksterne hviletaster", "keyboard.workman_home", "home-keys"},
+	{"Tastatur · profiler per inndatakilde (JSON)", "keyboard.source_profiles", "keyboard-sources"},
 }
 
 type settingsState struct {
@@ -90,7 +94,7 @@ func settingsDocument() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "refresh": defaultRefreshOptions(), "notifications": defaultNotificationOptions(), "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}}
+	defaults := map[string]any{"editors": local.Defaults().Editors, "workspace": local.Defaults().Workspace, "repository_paths": []string{}, "jira": jira.Config{}, "copilot": cp, "refresh": defaultRefreshOptions(), "notifications": defaultNotificationOptions(), "github": map[string]any{"hidden_prefixes": defaultGitHubPrefixes}, "keyboard": defaultKeyboardOptions()}
 	b, _ := json.Marshal(defaults)
 	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
@@ -166,6 +170,25 @@ func (m Model) openSettings() (tea.Model, tea.Cmd) {
 func parseSetting(field settingField, text string) (any, error) {
 	value := strings.TrimSpace(text)
 	switch field.kind {
+	case "keyboard-profile":
+		if value != "auto" && value != "standard" && value != "qwerty" && value != "workman" {
+			return nil, fmt.Errorf("velg auto, standard, qwerty eller workman")
+		}
+	case "home-keys":
+		if _, err := homeKeyMap(value); err != nil {
+			return nil, err
+		}
+	case "keyboard-sources":
+		var profiles map[string]string
+		if err := json.Unmarshal([]byte(value), &profiles); err != nil || profiles == nil {
+			return nil, fmt.Errorf("bruk et JSON-objekt med inndatakilde-ID og profil")
+		}
+		for id, profile := range profiles {
+			if id == "" || (profile != "qwerty" && profile != "workman" && profile != "standard") {
+				return nil, fmt.Errorf("hver inndatakilde må ha en ID og profilen qwerty, workman eller standard")
+			}
+		}
+		return profiles, nil
 	case "regex":
 		if value != "" {
 			if _, err := regexp.Compile(value); err != nil {
@@ -270,7 +293,7 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "?":
 				s.help = false
 			case "j", "down":
-				lines := strings.Split(ansi.Wrap(strings.Join(settingsTokenHelp, "\n"), max(1, m.width), ""), "\n")
+				lines := strings.Split(ansi.Wrap(m.settingsHelp(), max(1, m.width), ""), "\n")
 				s.helpOffset = min(s.helpOffset+1, max(0, len(lines)-max(1, m.height-4)))
 			case "k", "up":
 				s.helpOffset = max(0, s.helpOffset-1)
@@ -317,7 +340,7 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s.input.Blur()
 			s.notice = "Lagret. Øvrige innstillinger tas i bruk etter omstart."
 			if strings.HasPrefix(field.path, "mattermost.") && m.mmReader == nil {
-				s.notice = "Lagret. Esc tilbake og vc tar førstegangsoppsettet i bruk uten omstart."
+				s.notice = m.keyText("Lagret. Esc tilbake og `vc` tar førstegangsoppsettet i bruk uten omstart.")
 			}
 			if err := s.loadValues(); err != nil {
 				s.notice = err.Error()
@@ -325,6 +348,10 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(field.path, "notifications.") {
 				m.loadNotifications()
 				s.notice = "Varslingsinnstillinger tatt i bruk."
+			}
+			if strings.HasPrefix(field.path, "keyboard.") {
+				m.loadKeyboard()
+				s.notice = "Tastaturinnstillinger tatt i bruk."
 			}
 			if strings.HasPrefix(field.path, "refresh.") {
 				m.loadRefresh()
@@ -387,8 +414,8 @@ var settingsTokenHelp = []string{
 	"Samme Bash-kommando kan brukes med GITHUB_TOKEN i stedet for JIRA_TOKEN.",
 	"",
 	"Mattermost-lesing: Sett serveradresse og brukernavn i innstillingene.",
-	"Åpne chat med vc; al logger inn med passord/TOTP, ap bruker PAT.",
-	"Første oppsett kan tas i bruk med vc uten omstart; kontobytte krever omstart.",
+	"Åpne chat med `vc`; `al` logger inn med passord/TOTP, `ap` bruker PAT.",
+	"Første oppsett kan tas i bruk med `vc` uten omstart; kontobytte krever omstart.",
 	"",
 	"Mattermost-sending: Opprett en incoming-webhook for ønsket kanal.",
 	"Sett MATTERMOST_WEBHOOK_URL til hele HTTPS-adressen via samme metode.",
@@ -398,16 +425,24 @@ var settingsTokenHelp = []string{
 	"Ikke legg token i config.json eller kildekoden. Hjelpen viser aldri tokenverdier.",
 }
 
+func (m Model) settingsHelp() string {
+	lines := make([]string, len(settingsTokenHelp))
+	for i, line := range settingsTokenHelp {
+		lines[i] = m.keyText(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (m Model) settingsView() tea.View {
 	s := m.settings
 	lines := []string{accent.Render(" INNSTILLINGER"), "Felles konfigurasjon: " + clean(appconfig.Path()), ""}
 	if s.help {
 		lines = []string{accent.Render(" TOKENHJELP"), ""}
-		wrapped := strings.Split(ansi.Wrap(strings.Join(settingsTokenHelp, "\n"), max(1, m.width), ""), "\n")
+		wrapped := strings.Split(ansi.Wrap(m.settingsHelp(), max(1, m.width), ""), "\n")
 		capacity := max(1, m.height-4)
 		start := min(s.helpOffset, max(0, len(wrapped)-capacity))
 		lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
-		lines = append(lines, "", "↑/↓ eller j/k rull · ?/Esc tilbake")
+		lines = append(lines, "", m.keyHints("j/k ↑/↓ rull · ?/Esc tilbake"))
 		view := tea.NewView(strings.Join(lines, "\n"))
 		view.AltScreen = true
 		view.WindowTitle = "custom-visning · Tokenhjelp"
@@ -435,7 +470,14 @@ func (m Model) settingsView() tea.View {
 	if s.selected == 0 {
 		lines = append(lines, "Eksempel: KAKE-[0-9]{3,5} · tom verdi bruker standardmønsteret")
 	}
-	lines = append(lines, warning.Render(clean(s.notice)), "Miljøvariabler overstyrer filen ved oppstart. Token settes i miljøet.", "? tokenhjelp · ↑/↓ eller j/k velg · Enter rediger/lagre · Esc tilbake")
+	if strings.HasPrefix(settingFields[s.selected].path, "keyboard.") {
+		lines = append(lines, "Aktiv inndatakilde: "+clean(m.keyboard.source.Name)+" · "+clean(m.keyboard.source.ID))
+		if m.keyboard.sourceError != "" {
+			lines = append(lines, clean(m.keyboard.sourceError))
+		}
+		lines = append(lines, "F2 velger profil og husker den for aktiv inndatakilde i auto.")
+	}
+	lines = append(lines, warning.Render(clean(s.notice)), "Miljøvariabler overstyrer filen ved oppstart. Token settes i miljøet.", m.keyHints("? tokenhjelp · j/k ↑/↓ velg · Enter rediger/lagre · Esc tilbake"))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, max(1, m.width), "…")
 	}

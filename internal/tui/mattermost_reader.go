@@ -681,11 +681,11 @@ func (m Model) mmReaderView() tea.View {
 			}
 			lines = append(lines, line)
 		}
-		lines = append(lines, "j/k ↑↓ velg · / søk · Enter overvåk/avslutt overvåking · Esc tilbake")
+		lines = append(lines, m.keyHints("j/k ↑↓ velg · / søk · Enter overvåk/avslutt overvåking · Esc tilbake"))
 	} else {
 		ps := s.posts()
 		if len(ps) == 0 {
-			lines = append(lines, "No cached messages. vk velger kanaler; al logger inn; ap bruker PAT.")
+			lines = append(lines, m.keyText("No cached messages. `vk` velger kanaler; `al` logger inn; `ap` bruker PAT."))
 		} else {
 			var body []string
 			selectedLine := 0
@@ -774,9 +774,9 @@ func (m Model) mmReaderView() tea.View {
 	}
 	lines = append(lines, warning.Render(clean(notice)))
 	if s.mentions {
-		lines = append(lines, muted.Render("d åpner tråden; rc/rg følger relasjoner"))
+		lines = append(lines, muted.Render(m.shortcut("d")+" åpner tråden; "+m.shortcut("rc/rg")+" følger relasjoner"))
 	}
-	lines = append(lines, muted.Render("j/k meldinger · h/l kanaler · vk overvåk · d tråd · ah eldre · a↓/a↑ rull · en åpne · el lenker · rg PR · av lest · au synk · ab tøm · Esc tilbake"))
+	lines = append(lines, muted.Render("F2 "+m.keyboardLabel()+" · "+m.keyHints("j/k meldinger · h/l kanaler · vk overvåk · d tråd · ah eldre · a↓/a↑ rull · en åpne · el lenker · rg PR · av lest · au synk · ab tøm · Esc tilbake")))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], max(1, m.width), "…")
 	}

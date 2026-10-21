@@ -96,7 +96,7 @@ func (m Model) View() tea.View {
 	if user == "" {
 		user = "authenticating…"
 	}
-	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [vg GitHub] · vt Jira"))
+	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+m.keyText("  [`vg` GitHub] · `vt` Jira")))
 	tabs := []string{}
 	for v := model.Open; v < model.ViewCount; v++ {
 		label := v.String()
@@ -144,10 +144,10 @@ func (m Model) View() tea.View {
 		lines = append(lines, m.input.View())
 	}
 	if m.local != nil && m.local.choosing {
-		lines = append(lines, fmt.Sprintf(" Editor: %s · j/k velg · Enter åpne · Esc avbryt", []string{"IntelliJ IDEA", "VS Code", "egendefinert"}[m.local.editorChoice]))
+		lines = append(lines, " Editor: "+[]string{"IntelliJ IDEA", "VS Code", "egendefinert"}[m.local.editorChoice]+" · "+m.keyHints("j/k velg · Enter åpne · Esc avbryt"))
 	}
 	if m.help {
-		lines = append(lines, strings.Split(helpText, "\n")...)
+		lines = append(lines, strings.Split(m.keyboardHelp(), "\n")...)
 	} else {
 		rows := m.filtered()
 		rowModel := m
@@ -169,11 +169,11 @@ func (m Model) View() tea.View {
 		if len(rows) > 0 {
 			p := rows[m.selected]
 			lines = append(lines, muted.Render(clean(" "+reviewSummaryLabel(p))))
-			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
-			detail := fmt.Sprintf(" %d/%d · automerge: %s (a+ på / a- av) · queue: %s · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), autoMergeLabel(p), queueLabel(p), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
+			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+m.keyText(" · `rt` relaterte saker"))
+			detail := fmt.Sprintf(" %d/%d · automerge: %s (%s) · queue: %s · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), autoMergeLabel(p), m.keyText("`a+` på / `a-` av"), queueLabel(p), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 			if m.mmReader != nil {
-				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · v vis referanser · M kanaler", m.mmMentionCount(p.URL)))
+				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · %s", m.mmMentionCount(p.URL), m.keyText("`rc` vis referanser · `vk` kanaler")))
 			}
 		}
 	}
@@ -190,7 +190,7 @@ func (m Model) View() tea.View {
 			lines = append(lines, warning.Render(clean(message)))
 		}
 	}
-	lines = append(lines, muted.Render(shortcuts))
+	lines = append(lines, muted.Render(m.shortcutFooter()))
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}
@@ -285,7 +285,7 @@ func age(at time.Time) string {
 }
 
 func (m Model) helpView() tea.View {
-	rows := strings.Split(helpText, "\n")
+	rows := strings.Split(m.keyboardHelp(), "\n")
 	version := m.version
 	if version == "" {
 		version = "dev"
@@ -295,7 +295,7 @@ func (m Model) helpView() tea.View {
 	start := max(0, min(m.helpOffset, len(rows)-capacity))
 	lines := append([]string{}, rows[start:min(len(rows), start+capacity)]...)
 	if m.height > 1 {
-		lines = append(lines, "j/k ↑/↓ scroll · ? / Esc close")
+		lines = append(lines, m.keyHints("j/k ↑/↓ scroll · ? / Esc close"))
 	}
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")

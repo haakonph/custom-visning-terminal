@@ -7,6 +7,7 @@ require (
 	charm.land/bubbletea/v2 v2.1.0
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/ebitengine/purego v0.11.2
 	github.com/google/go-github/v93 v93.0.0
 	github.com/mattermost/mattermost/server/public v0.1.10
 	github.com/zalando/go-keyring v0.2.6
