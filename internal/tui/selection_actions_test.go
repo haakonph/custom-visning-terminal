@@ -189,28 +189,19 @@ func TestSpaceSelectionActions(t *testing.T) {
 	}
 	actions = append(actions, selectionAction{
 		"Mattermost m", func(t *testing.T, m Model, want []model.PullRequest) {
-			t.Setenv("PATH", t.TempDir()) // No interactive Vim process in tests.
 			sender := &fakeMessageSender{}
 			m = m.WithMattermost(sender)
-			m, _ = sequence(m, "as")
-			if !m.mattermost.active {
-				t.Fatal("Mattermost draft not opened")
-			}
-			expected := make([]string, len(want))
-			for i, p := range want {
-				expected[i] = fmt.Sprintf("[%s](%s)", p.Title, p.URL)
-			}
-			if m.mattermost.text != strings.Join(expected, "\n") {
-				t.Fatalf("draft = %q, want %v", m.mattermost.text, expected)
-			}
-			draft := m.mattermost.text
 			m, cmd := sequence(m, "as")
-			if cmd == nil {
+			if cmd == nil || !m.mattermost.sending {
 				t.Fatal("send command missing")
 			}
 			m, _ = update(m, cmd())
-			if sender.calls != 1 || sender.text != draft || m.mattermost.active {
-				t.Fatal("selected PR draft not sent")
+			expected := make([]string, len(want))
+			for i, p := range want {
+				expected[i] = m.mattermostPRText(p)
+			}
+			if sender.calls != len(want) || strings.Join(sender.messages, "\n") != strings.Join(expected, "\n") || m.mattermost.active {
+				t.Fatalf("messages = %v, want %v", sender.messages, expected)
 			}
 		},
 	}, selectionAction{

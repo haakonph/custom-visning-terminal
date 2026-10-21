@@ -62,17 +62,18 @@ utvides aldri til et helt nettverk av indirekte sammenkoblede oppgaver.
 
 | Handling | Tast etter `a` |
 | --- | --- |
-| Rediger og send melding til konfigurert Mattermost-webhook | `s` |
+| Send meldinger til konfigurert Mattermost-webhook | `s` |
 | Arkiver valgte elementer lokalt / gjenopprett fra arkivvisningen | `k` |
 | Slett intern oppgave eller valgte referanser i oppgavedetaljer | `d` |
 | Flytt Jira-saker: hent og velg faktisk overgang | `f` |
 | Tilordne Jira til meg | `m` |
 | Fjern min Jira-tilordning, uten å fjerne andre ansvarlige | `r` |
 
-`as` lager et redigerbart Markdown-utkast fra valgte elementer uansett type.
-Inne i utkastet betyr `ee` rediger igjen og `as` send. Teksten må bekreftes ved
-å sende; åpning av utkastet sender ingen melding. Mottakeren er den konfigurerte
-webhook-kanalen, ikke automatisk kanalen til en markert chatmelding.
+`as` sender valgte elementer direkte, med én melding per PR og repoets
+visningsnavn først i lenketeksten. Ingen editor åpnes, og Jira-lenker legges ikke
+til som egne linjer. Ved feil beholdes usendte meldinger; `as` prøver disse igjen.
+Mottakeren er den konfigurerte webhook-kanalen, ikke automatisk kanalen til en
+markert chatmelding.
 
 `ak` skjuler elementene fra vanlige lister uten å endre eksterne systemer.
 `vb` viser det lokale arkivet, der `ak` gjenoppretter valgte elementer.
