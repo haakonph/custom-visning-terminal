@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -69,8 +70,12 @@ func writeGitHub(ctx context.Context, q *dbgen.Queries, s model.Snapshot) error 
 			}
 		}
 		if summary := p.ReviewSummary; summary != nil {
+			reviewers, err := json.Marshal(summary.Reviewers)
+			if err != nil {
+				return err
+			}
 			if err := q.InsertGithubReviewSummaries(ctx, dbgen.InsertGithubReviewSummariesParams{
-				PullRequestID: key, Approved: int64(summary.Approved), Changes: int64(summary.Changes), Pending: int64(summary.Pending), PendingTeams: int64(summary.PendingTeams), Complete: boolInt(summary.Complete), Fallback: boolInt(summary.Fallback),
+				Reviewers: string(reviewers), PullRequestID: key, Approved: int64(summary.Approved), Changes: int64(summary.Changes), Pending: int64(summary.Pending), PendingTeams: int64(summary.PendingTeams), Complete: boolInt(summary.Complete), Fallback: boolInt(summary.Fallback),
 			}); err != nil {
 				return err
 			}
@@ -168,6 +173,9 @@ func readGitHub(ctx context.Context, q *dbgen.Queries) (model.Snapshot, error) {
 			return out, errors.New("missing GitHub pull request")
 		}
 		p.ReviewSummary = &model.ReviewSummary{Approved: int(summary.Approved), Changes: int(summary.Changes), Pending: int(summary.Pending), PendingTeams: int(summary.PendingTeams), Complete: summary.Complete != 0, Fallback: summary.Fallback != 0}
+		if err := json.Unmarshal([]byte(summary.Reviewers), &p.ReviewSummary.Reviewers); err != nil {
+			return out, err
+		}
 	}
 	copilotReviews, err := q.ListGithubCopilotReviews(ctx)
 	if err != nil {

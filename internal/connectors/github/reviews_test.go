@@ -134,3 +134,15 @@ func TestReviewFallbackEnrichment(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewAuthorsRetainedForViewerIdentity(t *testing.T) {
+	var d details
+	if err := json.Unmarshal([]byte(`{"latestOpinionatedReviews":{"nodes":[{"state":"APPROVED","author":{"login":"Alice"}},{"state":"CHANGES_REQUESTED","author":{"login":"Bob"}},{"state":"DISMISSED","author":{"login":"Charlie"}}],"pageInfo":{"hasNextPage":false}},"reviewRequests":{"nodes":[],"pageInfo":{"hasNextPage":false}}}`), &d); err != nil {
+		t.Fatal(err)
+	}
+	var p model.PullRequest
+	applyReview(&p, &d)
+	if p.ReviewSummary.Reviewers["alice"] != "APPROVED" || p.ReviewSummary.Reviewers["bob"] != "CHANGES_REQUESTED" || len(p.ReviewSummary.Reviewers) != 2 {
+		t.Fatal(p.ReviewSummary)
+	}
+}

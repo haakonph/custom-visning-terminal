@@ -10,7 +10,7 @@ import (
 )
 
 const insertGithubReviewSummaries = `-- name: InsertGithubReviewSummaries :exec
-INSERT INTO github_review_summaries (pull_request_id, approved, changes, pending, pending_teams, complete, fallback) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+INSERT INTO github_review_summaries (pull_request_id, approved, changes, pending, pending_teams, complete, fallback, reviewers) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
 `
 
 type InsertGithubReviewSummariesParams struct {
@@ -21,6 +21,7 @@ type InsertGithubReviewSummariesParams struct {
 	PendingTeams  int64
 	Complete      int64
 	Fallback      int64
+	Reviewers     string
 }
 
 func (q *Queries) InsertGithubReviewSummaries(ctx context.Context, arg InsertGithubReviewSummariesParams) error {
@@ -32,12 +33,13 @@ func (q *Queries) InsertGithubReviewSummaries(ctx context.Context, arg InsertGit
 		arg.PendingTeams,
 		arg.Complete,
 		arg.Fallback,
+		arg.Reviewers,
 	)
 	return err
 }
 
 const listGithubReviewSummaries = `-- name: ListGithubReviewSummaries :many
-SELECT pull_request_id, approved, changes, pending, pending_teams, complete, fallback FROM github_review_summaries ORDER BY pull_request_id
+SELECT pull_request_id, approved, changes, pending, pending_teams, complete, fallback, reviewers FROM github_review_summaries ORDER BY pull_request_id
 `
 
 func (q *Queries) ListGithubReviewSummaries(ctx context.Context) ([]GithubReviewSummary, error) {
@@ -57,6 +59,7 @@ func (q *Queries) ListGithubReviewSummaries(ctx context.Context) ([]GithubReview
 			&i.PendingTeams,
 			&i.Complete,
 			&i.Fallback,
+			&i.Reviewers,
 		); err != nil {
 			return nil, err
 		}

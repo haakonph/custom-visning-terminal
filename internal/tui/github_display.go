@@ -171,10 +171,53 @@ func copilotReviewLabel(p model.PullRequest) string {
 }
 
 func (m Model) reviewLabel(p model.PullRequest) string {
+	if m.active == model.Reviews || m.active == model.TeamReviews {
+		if own := m.ownReview(p); own != "" {
+			return own
+		}
+		if m.mattermost != nil {
+			if at := m.mattermost.sent[strings.ToLower(p.URL)]; !at.IsZero() {
+				return age(at)
+			}
+		}
+		return ""
+	}
+
 	if p.Review == model.Pending && m.mattermost != nil {
 		if at := m.mattermost.sent[p.URL]; !at.IsZero() {
 			return age(at)
 		}
 	}
 	return string(p.Review)
+}
+
+// Current opinions identify the viewer independently of the branch protection decision.
+func (m Model) ownReview(p model.PullRequest) string {
+	if p.ReviewSummary == nil || m.snapshot.User == "" {
+		return ""
+	}
+	for login, state := range p.ReviewSummary.Reviewers {
+		if strings.EqualFold(login, m.snapshot.User) {
+			switch state {
+			case "APPROVED":
+				return string(model.Approved)
+			case "CHANGES_REQUESTED":
+				return string(model.ChangesRequested)
+			}
+		}
+	}
+	return ""
+}
+
+func (m Model) reviewColor(p model.PullRequest) string {
+	switch m.ownReview(p) {
+	case string(model.Approved):
+		return "108"
+	case string(model.ChangesRequested):
+		return "174"
+	}
+	if p.ReviewSummary != nil && p.ReviewSummary.Approved+p.ReviewSummary.Changes > 0 {
+		return "108"
+	}
+	return "179"
 }

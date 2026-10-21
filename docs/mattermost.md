@@ -156,3 +156,11 @@ Den lastes ved oppstart og beholdes gjennom omstart og appoppdateringer.
 Adressen skrives ikke til `config.json`. Hvis nøkkelringen ikke er tilgjengelig,
 viser oppsettet en feil og lar deg prøve igjen etter at nøkkelringen er aktivert
 eller låst opp. Tidligere oppsett som bare lå i minnet må legges inn én gang til.
+
+I **My Review Requests** og **Team Review Requests** viser REVIEW-kolonnen tiden
+siden siste vellykkede forespørsel sendt til Mattermost fra appen (`now`, `2h`,
+`3d`). Tiden er gul når ingen har reviewet, og grønn når andre har godkjent eller
+bedt om endringer. Din egen godkjenning vises som `APPROVED`; egne ønskede
+endringer vises som `CHANGES`. Uten registrert forespørsel er feltet tomt med
+mindre du selv har reviewet. GitHubs samlede review-status er fortsatt tilgjengelig
+i detaljvisningen. Tidspunkt og reviewer-identiteter beholdes etter omstart.

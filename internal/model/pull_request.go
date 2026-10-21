@@ -75,12 +75,13 @@ type CopilotReview struct {
 // ReviewSummary counts current opinions per reviewer, with outstanding requests
 // counted separately (a reviewer can be asked to review again).
 type ReviewSummary struct {
-	Approved     int  `json:"approved"`
-	Changes      int  `json:"changes"`
-	Pending      int  `json:"pending"`
-	PendingTeams int  `json:"pending_teams"`
-	Complete     bool `json:"complete"`
-	Fallback     bool `json:"fallback"`
+	Reviewers    map[string]string `json:"reviewers,omitempty"`
+	Approved     int               `json:"approved"`
+	Changes      int               `json:"changes"`
+	Pending      int               `json:"pending"`
+	PendingTeams int               `json:"pending_teams"`
+	Complete     bool              `json:"complete"`
+	Fallback     bool              `json:"fallback"`
 }
 
 func (p PullRequest) Key() string { return p.URL }

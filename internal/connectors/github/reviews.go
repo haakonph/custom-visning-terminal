@@ -50,6 +50,7 @@ func applyReview(p *model.PullRequest, d *details) {
 				summary.Complete = false
 			}
 		}
+		summary.Reviewers = opinions
 		for _, state := range opinions {
 			if state == "APPROVED" {
 				summary.Approved++
