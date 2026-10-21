@@ -183,6 +183,11 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
+	if k == "m" {
+		m.usageView = true
+		m.usageOffset = 0
+		return m, nil
+	}
 	if k == "h" {
 		kind := m.visibleProvider()
 		if m.setup.provider != "" {

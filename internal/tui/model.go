@@ -11,6 +11,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/inputsource"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/usage"
 )
 
 type Cache interface {
@@ -19,6 +20,11 @@ type Cache interface {
 }
 type Model struct {
 	keyboard         keyboardState
+	usage            *usage.Recorder
+	usageView        bool
+	usageOffset      int
+	usagePeriod      int
+	usageNotice      string
 	notifications    notificationState
 	auto             refreshState
 	setup            setupState

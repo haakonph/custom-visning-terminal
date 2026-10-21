@@ -15,18 +15,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Check before decoding a key too, so switching input source does not leave
-	// a one-second polling window with the previous keyboard's shortcuts.
-	if _, ok := msg.(tea.KeyPressMsg); ok && !m.internalKey && m.keyboard.options.Profile == "auto" && m.keyboard.currentSource != nil {
-		m.applyInputSource(m.keyboard.currentSource())
-	}
-	if next, cmd, handled := m.keyboardMessage(msg); handled {
-		return next, cmd
-	}
-	if key, ok := msg.(tea.KeyPressMsg); ok {
-		msg = m.profileKey(key)
-	}
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if result, ok := msg.(notificationResult); ok {
 		if result.failed {
 			m.notice = "Kunne ikke vise eller åpne skrivebordsvarsel. Kontroller varslingstillatelser og varslingsverktøy."

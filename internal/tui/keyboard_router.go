@@ -63,6 +63,23 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cancel()
 		return m, tea.Quit, true
 	}
+	if m.usageView {
+		switch k {
+		case "esc":
+			m.usageView = false
+		case "j", "down":
+			m.usageOffset = min(m.usageOffset+1, m.usageMaxOffset())
+		case "k", "up":
+			m.usageOffset = max(0, m.usageOffset-1)
+		case "h", "left":
+			m.usagePeriod = (m.usagePeriod + 2) % 3
+			m.usageOffset = 0
+		case "l", "right":
+			m.usagePeriod = (m.usagePeriod + 1) % 3
+			m.usageOffset = 0
+		}
+		return m, nil, true
+	}
 	if m.local != nil && len(m.local.removePending) > 0 {
 		return m.removeLocalKey(k)
 	}
@@ -404,7 +421,7 @@ func sequenceHint(prefix string) string {
 	case 't':
 		return "o oppgaver · g GitHub · t Jira · a AI · c chat (velg koblingsmål)"
 	case 'v':
-		return "o/g/t/a/c visning · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler · h oppsett"
+		return "o/g/t/a/c visning · m bruksstatistikk · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler · h oppsett"
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':

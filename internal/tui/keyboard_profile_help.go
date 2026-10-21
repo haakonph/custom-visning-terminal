@@ -52,6 +52,7 @@ func (m Model) keyboardHelp() string {
 		"aq/ax Lagre Jira-søk / nullstill hurtigfiltre",
 		"vs Innstillinger",
 		"vi Copilot-diagnostikk",
+		"vm Lokal bruksstatistikk",
 		"vr Forrige visning",
 		"vh Oppsettshjelp",
 		"vf/vj Jira-hurtigfiltre / JQL-redigering",

@@ -195,6 +195,38 @@ og teamforespørsler. Filteret beholdes ved fanebytte, og oppdatering skjer asyn
 Delvise resultater beholder cache og tidspunkt for siste fulle synk. UNKNOWN betyr
 at GitHub ikke har gitt en kjent status; det er ikke bevis på at sjekker har bestått.
 
+## Lokal bruksstatistikk
+
+`vm` viser hvilke kommandoer og navigasjoner du bruker. `h/l` eller venstre/høyre
+velger siste 7 dager, siste 30 dager eller hele perioden; `j/k` ruller og Esc
+går tilbake til visningen du kom fra.
+
+- **Kommandoer** teller forespørsler, inkludert utilgjengelige handlinger og
+  handlinger som senere avbrytes eller feiler. Tastsekvenser telles når de er
+  ferdige; mellomliggende relasjonssteg telles ikke som egne handlinger.
+- **Faktisk navigasjon** teller endringer mellom sider, detaljer og dialoger,
+  fane- og oppgavebytter og radflytting. En tast som treffer listegrensen teller ikke som
+  radflytting. Pil- og bokstavsnarveier samles under samme kommandonavn.
+- **Oppstarter** teller appøkter. Statistikksidens egen rulling og periodevalg
+  teller ikke som bruk av arbeidsvisningene.
+
+Dataene er daglige tellere med faste navn på funksjoner og visninger. Søketekst,
+meldinger, titler, lenker, repositorynavn, kanalnavn, bruker-ID-er, passord og
+token inngår ikke. Automatisk oppdatering og interne tastekall telles ikke.
+Statistikken sendes ikke til noen ekstern tjeneste.
+
+Databasen er `usage.sqlite` under `os.UserConfigDir()/custom-visning/`, med
+private mappe-/filrettigheter (`0700`/`0600`). `CUSTOM_VISNING_METRICS` overstyrer
+filplasseringen. Sett `CUSTOM_VISNING_METRICS_DISABLED=1` for å slå av innsamling.
+For å nullstille statistikken: avslutt alle appinstanser og slett denne filen.
+
+Tellere lagres hvert femte sekund og ved vanlig avslutning. Ved krasj kan siste
+intervall gå tapt. Samtidige appinstanser summeres atomisk i databasen; den åpne
+statistikkvisningen viser tidligere lagrede tall pluss egen økt, og leser andre
+instansers nye tall etter omstart. Datoer følger maskinens lokale tidssone.
+Lagringsfeil stopper ikke dashboardet; statistikkvisningen varsler hvis nye
+tellere foreløpig bare finnes i minnet.
+
 ## GitHub-rettigheter
 
 For et klassisk PAT / GitHub CLI OAuth-token:

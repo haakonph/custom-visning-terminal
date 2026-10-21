@@ -196,6 +196,9 @@ func (m Model) keyboardCommandMode() bool {
 	if m.settings.active {
 		return !m.settings.editing
 	}
+	if m.usageView {
+		return true
+	}
 	if m.local != nil && m.local.choosing {
 		return true
 	}

@@ -246,3 +246,30 @@ func TestProfilePreservesTimeInputAndDeleteConfirmation(t *testing.T) {
 		t.Fatal("literal n did not cancel worktree deletion")
 	}
 }
+
+func TestUsageObservesLogicalProfileCommands(t *testing.T) {
+	m, recorder := measuredModel(t)
+	m = withKeyboard(m, "workman")
+	m, _ = sequence(m, m.shortcut("jd"))
+	if metricCount(t, recorder, "navigation", "row") != 1 || metricCount(t, recorder, "command", "details") != 1 {
+		t.Fatal("physical keys were classified as different commands")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m, _ = sequence(m, m.shortcut("vm"))
+	if !m.usageView || !strings.Contains(m.View().Content, "n/s periode · h/t rull") {
+		t.Fatal("metrics view did not follow keyboard profile")
+	}
+	m, _ = sequence(m, m.shortcut("l"))
+	if m.usagePeriod != 1 {
+		t.Fatal("metrics period did not use the same right-hand position")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m, _ = sequence(m, "/")
+	before, _ := recorder.Snapshot(0)
+	m, _ = sequence(m, "ciae rhtns private text")
+	m, _ = update(m, tea.PasteMsg{Content: "æøå"})
+	after, _ := recorder.Snapshot(0)
+	if !sameUsage(before, after) {
+		t.Fatal("profile caused typed text to count as commands")
+	}
+}

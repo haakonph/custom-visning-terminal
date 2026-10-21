@@ -195,6 +195,7 @@ Følgende utvider mønsteret for funksjoner som allerede fantes:
 | `ae` | Endre aktiv oppgaves tittel; `aoe` kan først finne en tilhørende oppgave |
 | `aq` / `ax` | Lagre aktivt Jira-søk / nullstill Jira-hurtigfiltre og egen JQL |
 | `vs` / `vr` | Innstillinger / forrige hovedvisning |
+| `vm` | Lokal bruksstatistikk; h/l velger siste 7 dager, siste 30 dager eller alt |
 | `vi` | Copilot-diagnostikk |
 | `vf` / `vj` | Jira-hurtigfiltre / egen JQL |
 | `vz` / `az` | Vis utsatte / gjenopprett valgte utsatte elementer |
