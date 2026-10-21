@@ -2,11 +2,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,12 +17,12 @@ type mattermostState struct {
 	active, sending bool
 	text, notice    string
 	offset          int
+	messages        []string
 }
-type mattermostEdited struct {
-	text string
+type mattermostSent struct {
 	err  error
+	sent int
 }
-type mattermostSent struct{ err error }
 
 func (m Model) WithMattermost(sender messageSender) Model {
 	m.mattermost = &mattermostState{sender: sender}
@@ -38,25 +33,33 @@ func markdownLink(title, link string) string {
 	link = strings.NewReplacer("(", "%28", ")", "%29", " ", "%20").Replace(link)
 	return "[" + title + "](" + link + ")"
 }
-func mattermostText(rows []model.PullRequest, issueURL func(string) string, patterns ...*regexp.Regexp) string {
-	var lines []string
-	common := ""
-	for i, p := range rows {
-		lines = append(lines, markdownLink(p.Title, p.URL))
-		keys := p.JiraKeys(patterns...)
-		if len(keys) != 1 {
-			common = ""
-			issueURL = nil
-		} else if i == 0 {
-			common = keys[0]
-		} else if common != keys[0] {
-			issueURL = nil
+func (m Model) mattermostPRText(p model.PullRequest) string {
+	return markdownLink("["+m.githubName(p.Repository)+"] "+p.Title, p.URL)
+}
+
+func (m *Model) sendMattermost(messages []string) tea.Cmd {
+	s := m.mattermost
+	if s.sending {
+		return nil
+	}
+	s.messages = append([]string(nil), messages...)
+	s.text = strings.Join(messages, "\n")
+	s.active = true
+	s.sending = true
+	s.offset = 0
+	s.notice = "Sender…"
+	sender, ctx := s.sender, m.ctx
+	return func() tea.Msg {
+		result := mattermostSent{}
+		for _, text := range messages {
+			if err := sender.Send(ctx, text); err != nil {
+				result.err = err
+				break
+			}
+			result.sent++
 		}
+		return result
 	}
-	if common != "" && issueURL != nil {
-		lines = append(lines, markdownLink(common, issueURL(common)))
-	}
-	return strings.Join(lines, "\n")
 }
 func (m *Model) composeMattermost() tea.Cmd {
 	if m.mattermost == nil {
@@ -67,50 +70,11 @@ func (m *Model) composeMattermost() tea.Cmd {
 	if len(rows) == 0 {
 		return nil
 	}
-	var issueURL func(string) string
-	if m.jira != nil {
-		issueURL = m.jira.client.IssueURL
+	messages := make([]string, len(rows))
+	for i, p := range rows {
+		messages[i] = m.mattermostPRText(p)
 	}
-	s := m.mattermost
-	s.text = mattermostText(rows, issueURL, m.jiraPattern)
-	s.active = true
-	s.offset = 0
-	s.notice = ""
-	return m.editMattermost()
-}
-func (m *Model) editMattermost() tea.Cmd {
-	s := m.mattermost
-	binary := ""
-	for _, name := range []string{"nvim", "vim", "vi"} {
-		if path, err := exec.LookPath(name); err == nil {
-			binary = path
-			break
-		}
-	}
-	if binary == "" {
-		s.notice = "Installer nvim, vim eller vi for å redigere Markdown-meldingen"
-		return nil
-	}
-	dir, err := os.MkdirTemp("", "custom-visning-message-*")
-	if err != nil {
-		s.notice = "Kunne ikke opprette meldingsfil"
-		return nil
-	}
-	path := filepath.Join(dir, "message.md")
-	if err := os.WriteFile(path, []byte(s.text), 0600); err != nil {
-		os.RemoveAll(dir)
-		s.notice = "Kunne ikke skrive meldingsfil"
-		return nil
-	}
-	command := exec.Command(binary, "-c", "set filetype=markdown", "-c", "set noswapfile nobackup nowritebackup noundofile", "--", path)
-	return tea.ExecProcess(command, func(err error) tea.Msg {
-		defer os.RemoveAll(dir)
-		if err != nil {
-			return mattermostEdited{err: fmt.Errorf("Vim ble avsluttet uten å fullføre redigeringen")}
-		}
-		b, err := os.ReadFile(path)
-		return mattermostEdited{text: string(b), err: err}
-	})
+	return m.sendMattermost(messages)
 }
 func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 	s := m.mattermost
@@ -118,22 +82,16 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 		return false, nil
 	}
 	switch msg := msg.(type) {
-	case mattermostEdited:
-		if msg.err != nil {
-			s.notice = "Kunne ikke lese redigert melding; utkastet er beholdt"
-		} else {
-			s.text = msg.text
-			s.notice = ""
-			s.offset = 0
-		}
-		return true, nil
 	case mattermostSent:
 		s.sending = false
 		if msg.err != nil {
+			s.messages = s.messages[min(msg.sent, len(s.messages)):]
+			s.text = strings.Join(s.messages, "\n")
 			s.notice = msg.err.Error()
 		} else {
 			s.active = false
-			m.notice = "Meldingen er sendt til Mattermost"
+			s.messages = nil
+			m.notice = "Meldingene er sendt til Mattermost"
 		}
 		return true, nil
 	case tea.KeyPressMsg:
@@ -150,8 +108,6 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 		switch msg.String() {
 		case "esc":
 			s.active = false
-		case "e":
-			return true, m.editMattermost()
 		case "j", "down":
 			s.offset = min(s.offset+1, max(0, len(strings.Split(s.text, "\n"))-1))
 		case "k", "up":
@@ -161,10 +117,11 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 				s.notice = "Meldingen er tom"
 				return true, nil
 			}
-			s.sending = true
-			s.notice = "Sender…"
-			sender, text, ctx := s.sender, s.text, m.ctx
-			return true, func() tea.Msg { return mattermostSent{sender.Send(ctx, text)} }
+			messages := s.messages
+			if len(messages) == 0 {
+				messages = []string{s.text}
+			}
+			return true, m.sendMattermost(messages)
 		}
 		return true, nil
 	}
@@ -172,7 +129,7 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 }
 func (m Model) mattermostView() tea.View {
 	s := m.mattermost
-	lines := []string{accent.Render(" MATTERMOST · Markdown"), " ee rediger i Vim · :wq lagre i Vim · as send · Esc avbryt · j/k rull", ""}
+	lines := []string{accent.Render(" MATTERMOST · Markdown"), " as prøv usendte meldinger igjen · Esc lukk · j/k rull", ""}
 	content := strings.Split(s.text, "\n")
 	start := min(s.offset, max(0, len(content)-1))
 	for _, line := range content[start:min(len(content), start+max(1, m.height-5))] {

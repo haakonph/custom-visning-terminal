@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -11,65 +10,29 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
-func TestMattermostDefaultText(t *testing.T) {
-	issueURL := func(key string) string { return "https://jira.example/context/browse/" + key }
-	cases := []struct {
-		name     string
-		titles   []string
-		jira     bool
-		wantJira bool
-	}{
-		{"single", []string{"ABC-1 fix"}, true, true},
-		{"same", []string{"ABC-1 fix", "ABC-1 tests"}, true, true},
-		{"different", []string{"ABC-1 fix", "ABC-2 tests"}, true, false},
-		{"missing", []string{"ABC-1 fix", "tests"}, true, false},
-		{"ambiguous", []string{"ABC-1 ABC-2 fix", "ABC-1 tests"}, true, false},
-		{"unconfigured", []string{"ABC-1 fix"}, false, false},
+func TestMattermostPRText(t *testing.T) {
+	m := ready(t)
+	p := model.PullRequest{Repository: "skatteetaten-ghe/glsk-saksbehandling", Title: "ABC-123 fix [a]", URL: "https://example.com/(pr)"}
+	want := `[\[saksbehandling\] ABC-123 fix \[a\]](https://example.com/%28pr%29)`
+	if got := m.mattermostPRText(p); got != want {
+		t.Fatalf("got %q, want %q", got, want)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var rows []model.PullRequest
-			for _, title := range tc.titles {
-				rows = append(rows, model.PullRequest{Title: title, URL: "https://github.com/a/b/pull/1"})
-			}
-			var link func(string) string
-			if tc.jira {
-				link = issueURL
-			}
-			text := mattermostText(rows, link)
-			if strings.Contains(text, "https://jira.example") != tc.wantJira {
-				t.Fatal(text)
-			}
-			if !strings.HasPrefix(text, "["+tc.titles[0]+"](https://github.com/a/b/pull/1)") {
-				t.Fatal(text)
-			}
-			if strings.Count(text, "\n") != len(rows)-1+btoi(tc.wantJira) {
-				t.Fatal(text)
-			}
-		})
-	}
-	if got := mattermostText([]model.PullRequest{{Title: "fix [a]", URL: "https://example.com/(pr)"}}, nil); got != `[fix \[a\]](https://example.com/%28pr%29)` {
-		t.Fatal(got)
-	}
-	if got := mattermostText(nil, issueURL); got != "" {
-		t.Fatal(got)
-	}
-}
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 type fakeMessageSender struct {
-	calls int
-	text  string
-	err   error
+	calls    int
+	messages []string
+	failAt   int
+	text     string
+	err      error
 }
 
 func (f *fakeMessageSender) Send(_ context.Context, text string) error {
 	f.calls++
+	if f.calls == f.failAt {
+		return errors.New("failed")
+	}
+	f.messages = append(f.messages, text)
 	f.text = text
 	return f.err
 }
@@ -123,38 +86,65 @@ func TestMattermostNavigationAndEmptyDraft(t *testing.T) {
 }
 
 func TestComposeMattermostUsesSelectionAndFreshData(t *testing.T) {
-	t.Setenv("PATH", t.TempDir()) // Keep this unit test out of the interactive editor.
-	m := ready(t).WithMattermost(&fakeMessageSender{})
+	sender := &fakeMessageSender{}
+	m := ready(t).WithMattermost(sender)
 	m, _ = update(m, key(' '))
 	m, _ = update(m, key('j'))
 	m, _ = update(m, key(' '))
 	m.snapshot.Datasets[0].PRs[0].Title = "Fresh title"
 	m.input.SetValue("no visible matches")
-	m.composeMattermost()
-	if !m.mattermost.active || !strings.HasPrefix(m.mattermost.text, "[Fresh title]") || !strings.Contains(m.mattermost.text, "[Add endpoint]") {
-		t.Fatal(m.mattermost.text)
+	cmd := m.composeMattermost()
+	if cmd == nil || !m.mattermost.sending {
+		t.Fatal("send not started immediately")
 	}
-	if !strings.Contains(m.mattermost.notice, "Installer") {
-		t.Fatal("missing editor not explained")
+	if duplicate := m.composeMattermost(); duplicate != nil {
+		t.Fatal("duplicate send")
 	}
-	m.chosen = map[string]model.PullRequest{}
-	m.input.SetValue("")
-	m.selected = 1
-	m.composeMattermost()
-	if m.mattermost.text != "[Add endpoint](https://github.com/acme/api/pull/2)" {
-		t.Fatal(m.mattermost.text)
+	m, _ = update(m, cmd())
+	if sender.calls != 2 || m.mattermost.active {
+		t.Fatal("expected one message per selected PR")
+	}
+	if !strings.Contains(sender.messages[0], "Fresh title") || !strings.Contains(sender.messages[1], "Add endpoint") {
+		t.Fatal(sender.messages)
 	}
 }
 
-func TestMattermostRespectsConfiguredJiraPattern(t *testing.T) {
-	rows := []model.PullRequest{{Title: "ABC-1 fix", URL: "https://github.com/a/b/pull/1"}}
-	text := mattermostText(rows, func(key string) string { return "https://jira.example/browse/" + key }, regexp.MustCompile(`ABC-[0-9]{3,5}`))
-	if strings.Contains(text, "jira.example") {
-		t.Fatal("ignored configured Jira pattern: " + text)
+func TestMattermostPartialFailureRetriesOnlyRemaining(t *testing.T) {
+	sender := &fakeMessageSender{failAt: 2}
+	m := ready(t).WithMattermost(sender)
+	cmd := m.sendMattermost([]string{"first", "second", "third"})
+	m, _ = update(m, cmd())
+	if !m.mattermost.active || m.mattermost.sending || strings.Join(m.mattermost.messages, ",") != "second,third" {
+		t.Fatal("remaining messages lost")
 	}
-	rows[0].Title = "ABC-123 fix"
-	text = mattermostText(rows, func(key string) string { return "https://jira.example/browse/" + key }, regexp.MustCompile(`ABC-[0-9]{3,5}`))
-	if !strings.Contains(text, "[ABC-123](https://jira.example/browse/ABC-123)") {
-		t.Fatal(text)
+	sender.failAt = 0
+	m, cmd = sequence(m, "as")
+	m, _ = update(m, cmd())
+	if m.mattermost.active || strings.Join(sender.messages, ",") != "first,second,third" {
+		t.Fatal(sender.messages)
+	}
+}
+
+func TestComposeReferencesSendsUncachedPRsSeparately(t *testing.T) {
+	sender := &fakeMessageSender{}
+	m := ready(t).WithMattermost(sender)
+	refs := []model.TaskReference{
+		{Provider: "github", Key: "skatteetaten-ghe/glsk-saksbehandling#3", Title: "ABC-123 fix", URL: "https://github.com/other/repo/pull/3"},
+		{Provider: "github", Key: "skatteetaten-ghe/glsk-saksbehandling", Title: "ABC-123 tests", URL: "https://github.com/other/repo/pull/4"},
+	}
+	next, cmd := m.composeReferences(append(refs, refs[0]))
+	m = next.(Model)
+	if cmd == nil || !m.mattermost.sending {
+		t.Fatal("send not started")
+	}
+	m, _ = update(m, cmd())
+	if sender.calls != 2 || m.mattermost.active {
+		t.Fatal("expected one message per distinct PR")
+	}
+	for i, ref := range refs {
+		want := markdownLink("[saksbehandling] "+ref.Title, ref.URL)
+		if sender.messages[i] != want {
+			t.Fatalf("got %q, want %q", sender.messages[i], want)
+		}
 	}
 }
