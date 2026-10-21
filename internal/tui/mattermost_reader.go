@@ -32,6 +32,7 @@ type mattermostReader struct {
 	api                                                           *mm.API
 	keychain                                                      mm.TokenStore
 	account, apiToken                                             string
+	reviewRequests                                                map[string]time.Time
 	data                                                          model.MattermostData
 	active, busy, authenticated, choosing, mentions, confirmClear bool
 	tab, row, channelRow, link, scroll                            int
@@ -51,7 +52,8 @@ func mmTimer() tea.Cmd { return tea.Tick(30*time.Second, func(time.Time) tea.Msg
 func (m Model) WithMattermostReader(service *mm.Service, api *mm.API, keychain mm.TokenStore, account, token string) Model {
 	input := textinput.New()
 	input.CharLimit = 512
-	m.mmReader = &mattermostReader{entities: m.entities, snoozes: m.snoozes, open: openMattermostBrowser, service: service, api: api, keychain: keychain, account: account, apiToken: token, data: service.Snapshot(), input: input}
+	data := service.Snapshot()
+	m.mmReader = &mattermostReader{reviewRequests: mattermostReviewTimes(data), entities: m.entities, snoozes: m.snoozes, open: openMattermostBrowser, service: service, api: api, keychain: keychain, account: account, apiToken: token, data: data, input: input}
 	if m.source == nil {
 		if !m.jiraActive && !m.copilotActive {
 			m.mmReader.active = true
@@ -249,6 +251,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		s.busy = false
 		s.authenticated = msg.authenticated
 		s.data = msg.data
+		s.reviewRequests = mattermostReviewTimes(msg.data)
 		s.notice = msg.notice
 		if msg.err != nil {
 			s.notice = msg.err.Error()
@@ -865,4 +868,26 @@ func (m Model) withMattermostSettings(c mm.Config, token string) (Model, error) 
 		return m, err
 	}
 	return m.WithMattermostReader(service, api, mm.Keychain{Server: c.Server, Account: c.Username}, c.Username, token), nil
+}
+
+// Channel PR shares count regardless of who posted them or which client they used.
+// Derive this index from each snapshot so edits, deletions and deselection remove stale entries.
+func mattermostReviewTimes(data model.MattermostData) map[string]time.Time {
+	selected := map[string]bool{}
+	for _, channel := range data.Channels {
+		selected[channel.ID] = channel.Selected
+	}
+	times := map[string]time.Time{}
+	for _, post := range data.Posts {
+		if !selected[post.ChannelID] || post.DeletedAt != 0 || post.CreatedAt <= 0 {
+			continue
+		}
+		at := time.UnixMilli(post.CreatedAt)
+		for _, link := range mm.PRLinks(post.Message) {
+			if at.After(times[link.URL]) {
+				times[link.URL] = at
+			}
+		}
+	}
+	return times
 }
