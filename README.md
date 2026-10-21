@@ -1163,7 +1163,12 @@ Velg én eller flere PR-er og trykk `ar` (handling → review), også etter en t
 Appen viser skrivebordsvarsler for egne åpne PR-er når CI går fra ventende til
 PASS eller FAIL, og når Copilot leverer en ny review. En ny commit som allerede
 har fullført CI ved neste oppdatering, varsles også. Hver hendelse varsles separat.
-Varslene inneholder repository, PR-nummer og tittel. Drafts og andres PR-er varsles
+Varslene inneholder repository, PR-nummer og tittel. Status vises med farget ikon
+og symbol i tittelen: grønn hake for PASS/anbefalt godkjenning, rødt kryss for
+FAIL/anbefalte endringer, gul advarsel for videre review eller avvist review,
+og blå informasjon for kommentarer/annen anbefaling. Ikonene følger med binæren
+og lagres i lokal cache. macOS og enkelte skrivebordsmiljøer kan beholde sitt
+eget appikon; symbolet i tittelen viser fortsatt status. Drafts og andres PR-er varsles
 ikke. Første vellykkede innhenting setter utgangspunktet uten å varsle om gamle
 hendelser, og samme review varsles bare én gang per kjøring.
 
