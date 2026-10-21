@@ -76,8 +76,8 @@ func (s *Service) handler() http.Handler {
 				s.diagnostics.ContentReceived = true
 			}
 		}
-		if s.saveLocked() != nil {
-			s.addErrorLocked("Kunne ikke lagre OTLP-data; data er tilgjengelig i minnet")
+		if err := s.saveLocked(); err != nil {
+			s.reportSaveErrorLocked("OTLP", err)
 			http.Error(w, "Local persistence failed", 503)
 			return
 		}

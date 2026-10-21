@@ -189,8 +189,8 @@ func (s *Service) Scan(ctx context.Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.diagnostics.Discovered = count
-	if s.saveLocked() != nil {
-		s.addErrorLocked("Kunne ikke lagre Copilot-data; data er tilgjengelig i minnet")
+	if err := s.saveLocked(); err != nil {
+		s.reportSaveErrorLocked("Copilot", err)
 	}
 }
 func (s *Service) importWorkspace(ctx context.Context, id, path string) {
