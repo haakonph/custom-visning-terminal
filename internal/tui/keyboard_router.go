@@ -102,6 +102,10 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		return result, cmd, true
 	}
+	if (m.folders.active || m.folders.picking) && !m.settings.active && !m.help && k != "?" && (k != "v" || m.folders.searching || m.folders.picking) && ((k != "a" && k != "e") || m.folders.searching || m.folders.picking) {
+		next, cmd := m.folderKey(key)
+		return next, cmd, true
+	}
 	if m.setup.provider != "" && !m.settings.active && !m.help {
 		next, cmd := m.updateSetup(k)
 		return next, cmd, true
@@ -425,7 +429,7 @@ func sequenceHint(prefix string) string {
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':
-		return "+ automerge på · - automerge av · r ny Copilot-review (GitHub) · s melding · k arkiver · d slett · w slett worktree (GitHub) · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
+		return "+ automerge på · - automerge av · r ny Copilot-review (GitHub) · s melding · k arkiver · d slett · w worktree (GitHub/Jira) · f favoritt (mapper) · h skjul/vis (mapper) · f flytt Jira · m meg · r fjern meg · u oppdater · n ny · e tittel"
 	}
 	return fmt.Sprint(prefix)
 }

@@ -171,3 +171,22 @@ j/k, piltaster eller PageUp/PageDown ruller veiledningen. Ctrl+C avslutter.
 Mattermost-server og brukernavn kan lagres i innstillingene og tas i bruk med
 Enter eller `vc` ved første oppsett. GitHub/Jira-token og webhook krever omstart
 fra terminalen der innloggingen eller miljøvariablene ble satt.
+
+## Lokale mapper
+
+| Tast | Handling |
+| --- | --- |
+| `vl` | Vis lokale mapper som appen kjenner |
+| `h/l` | Alle / Favoritter / Skjulte |
+| `/` | Søk i mapper eller i repositoryvalget |
+| `af` | Slå favoritt av/på for valgt mappe |
+| `ah` | Skjul / vis valgt mappe igjen |
+| `ee` | Åpne valgt mappe i standardeditor |
+| `au` | Oppdater mappeoversikten |
+| `aw` eller `ee` på én Jira-sak | Velg repo med skrivetilgang og opprett eget worktree |
+| `Enter` i repositoryvalget | Opprett mappe fra valgt Jira-sak og repo |
+| `Esc` | Lukk mappevisningen eller avbryt repositoryvalget |
+
+Skjulte mapper vises i fanen Skjulte, der `ah` henter dem tilbake. Valg og
+Jira-koblinger lagres lokalt. Opprettelsen kontrollerer skrivetilgangen på nytt
+og bruker en egen branch fra `workspace.main_branch`.

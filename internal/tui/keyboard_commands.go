@@ -13,6 +13,9 @@ import (
 
 func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	refs := m.sequenceRefs
+	if (m.folders.active || m.folders.picking) && prefix != "v" {
+		return m.folderAction(prefix, k)
+	}
 	if m.mattermost != nil && m.mattermost.active {
 		if prefix == "a" && k == "s" {
 			_, cmd := m.mattermostMessage(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
@@ -117,6 +120,9 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 				return m, m.mmRead()
 			}
 		case "w":
+			if allProvider(refs, "jira") {
+				return m, m.startIssueFolder(refs)
+			}
 			if m.visibleProvider() == "github" {
 				return m.beginRemoveLocal(refs)
 			}
@@ -180,6 +186,18 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
+	if k == "l" {
+		if m.local == nil {
+			return m.WithSetup("editor"), nil
+		}
+		m.folders.active = true
+		m.folders.selected = 0
+		m.setup = setupState{}
+		m.detail = nil
+		m.dialog = nil
+		return m, m.loadFolders()
+	}
+	m.folders.active = false
 	if k == "m" {
 		m.usageView = true
 		m.usageOffset = 0
@@ -452,6 +470,9 @@ func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool,
 		return m.unavailable()
 	}
 	if editor {
+		if allProvider(refs, "jira") {
+			return m, m.startIssueFolder(refs)
+		}
 		allPR, allAI := true, true
 		for _, r := range refs {
 			allPR = allPR && r.Provider == "github"

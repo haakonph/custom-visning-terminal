@@ -16,6 +16,9 @@ import (
 )
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.folderMessage(msg) {
+		return m, nil
+	}
 	if result, ok := msg.(notificationResult); ok {
 		if result.failed {
 			m.notice = "Kunne ikke vise eller åpne skrivebordsvarsel. Kontroller varslingstillatelser og varslingsverktøy."

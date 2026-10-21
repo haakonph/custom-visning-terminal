@@ -63,6 +63,10 @@ func (m Model) usageScreen() string {
 		return "snooze"
 	case m.mattermost != nil && m.mattermost.active:
 		return "mattermost.compose"
+	case m.folders.picking:
+		return "folders.repository.choose"
+	case m.folders.active:
+		return "folders.list"
 	case m.dialog != nil:
 		return "dialog." + m.dialog.mode
 	case m.snoozes != nil && m.snoozes.active:
@@ -95,6 +99,9 @@ func (m Model) usageScreen() string {
 }
 
 func (m Model) usageTab() string {
+	if m.folders.active {
+		return fmt.Sprint(m.folders.tab)
+	}
 	switch m.baseProvider() {
 	case "github":
 		return m.active.String()
@@ -114,6 +121,9 @@ func (m Model) usageTab() string {
 // Labels come from this allowlist; key text and entity metadata are never saved.
 // Commands count requests, including unavailable or subsequently failed actions.
 func (m Model) usageCommand(k string) (category, name, target string) {
+	if m.folders.searching {
+		return "", "", ""
+	}
 	if m.usageView || m.help || m.settings.active || m.setup.provider != "" || m.setup.wizard != nil {
 		return "", "", ""
 	}
@@ -129,7 +139,7 @@ func (m Model) usageCommand(k string) (category, name, target string) {
 		}
 		op := m.sequence[:1]
 		if op == "v" {
-			target = map[string]string{"o": "task", "g": "github", "t": "jira", "a": "copilot", "c": "mattermost", "s": "settings", "z": "deferred", "b": "archive", "i": "diagnostics", "f": "jira.filters", "j": "jira.jql", "k": "mattermost.channels", "h": "setup", "m": "metrics", "r": "previous"}[k]
+			target = map[string]string{"o": "task", "g": "github", "t": "jira", "a": "copilot", "c": "mattermost", "s": "settings", "z": "deferred", "b": "archive", "i": "diagnostics", "f": "jira.filters", "j": "jira.jql", "k": "mattermost.channels", "h": "setup", "m": "metrics", "l": "folders", "r": "previous"}[k]
 			if target != "" {
 				return "command", "view", target
 			}
@@ -153,6 +163,17 @@ func (m Model) usageCommand(k string) (category, name, target string) {
 			name = map[string]string{"+": "automerge.enable", "-": "automerge.disable", "f": "jira.transition.choose", "m": "jira.assign", "r": "jira.unassign", "s": "message", "k": "archive", "d": "delete.local", "u": "refresh", "n": "task.new", "e": "task.rename", "x": "jira.filters.clear", "q": "jira.query.save", "l": "mattermost.login.password", "p": "mattermost.login.token", "h": "mattermost.older", "v": "mattermost.read", "w": "worktree.remove", "b": "mattermost.clear", "down": "scroll.page.down", "up": "scroll.page.up", "z": "snooze.restore"}[k]
 			if k == "r" && allProvider(m.sequenceRefs, "github") {
 				name = "review.request"
+			}
+			if k == "w" && allProvider(m.sequenceRefs, "jira") {
+				name = "folder.create"
+			}
+			if m.folders.active {
+				if k == "f" {
+					name = "folder.favorite"
+				}
+				if k == "h" {
+					name = "folder.hidden"
+				}
 			}
 			if k == "w" && m.visibleProvider() == "mattermost" {
 				name = "mattermost.channel.remove"

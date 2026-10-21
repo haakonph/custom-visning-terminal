@@ -18,6 +18,9 @@ z / zz      Utsett valgte elementer / hele sammenhengen
 
 Ting: o oppgaver · g GitHub · t Jira · a AI/Copilot · c chat/Mattermost
 vo/vg/vt/va/vc  Visningsside
+vl              Lokale mapper: Alle / Favoritter / Skjulte
+                af favoritt · ah skjul/vis · ee editor · au oppdater
+aw / ee         Jira: opprett mappe fra én sak; velg repo med skrivetilgang
 ro/rg/rt/ra/rc  Relaterte elementer av valgt type
                 Flere treff vises i en søkbar valgliste
                 Velg og fortsett med r/e/a/t, eller Enter for å gå dit
