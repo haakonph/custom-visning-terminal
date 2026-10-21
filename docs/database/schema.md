@@ -271,6 +271,14 @@ erDiagram
         TEXT title
         INTEGER archived
     }
+    usage_metrics {
+        TEXT day PK
+        TEXT category PK
+        TEXT name PK
+        TEXT source PK
+        TEXT target PK
+        INTEGER count
+    }
     copilot_sessions |o..o{ copilot_events : fk_0
     copilot_sessions |o..o{ copilot_traces : fk_0
     copilot_events |o..o{ copilot_usage : fk_0
