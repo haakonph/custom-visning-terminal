@@ -256,7 +256,9 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 			value = c.name
 		}
 		value = cell(value, c.width)
-		if c.isStatus && !header && !selected {
+		if c.name == "REVIEW" && !header && (m.active == model.Reviews || m.active == model.TeamReviews) {
+			value = lipgloss.NewStyle().Foreground(lipgloss.Color(m.reviewColor(p))).Render(value)
+		} else if c.isStatus && !header && !selected {
 			value = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(value)
 			if model.Status(c.value) != model.Unknown {
 				value = strings.Replace(value, c.value, status(model.Status(c.value)), 1)

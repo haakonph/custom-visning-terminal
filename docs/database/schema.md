@@ -148,6 +148,7 @@ erDiagram
         INTEGER pending_teams
         INTEGER complete
         INTEGER fallback
+        TEXT reviewers
     }
     github_view_memberships {
         INTEGER view_id PK,FK

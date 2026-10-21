@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
@@ -231,5 +232,63 @@ func TestCopilotReviewPendingLabel(t *testing.T) {
 	}
 	if got := copilotReviewLabel(model.PullRequest{RequestedReviewers: []string{"alice"}}); got != "—" {
 		t.Fatal(got)
+	}
+}
+
+func TestReviewRequestAgeAndReviewerColors(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	m.snapshot.User = "Alice"
+	m.mattermost = &mattermostState{sent: map[string]time.Time{}}
+	p := model.PullRequest{URL: "https://github.com/acme/repo/pull/1", Review: model.Approved}
+	for _, view := range []model.View{model.Reviews, model.TeamReviews} {
+		m.active = view
+		for _, tc := range []struct {
+			name        string
+			sent        bool
+			reviewers   map[string]string
+			want, color string
+		}{
+			{"not requested even if aggregate approved", false, nil, "", "179"},
+			{"waiting for first review", true, nil, "2h", "179"},
+			{"other approval", true, map[string]string{"bob": "APPROVED"}, "2h", "108"},
+			{"other changes requested", true, map[string]string{"bob": "CHANGES_REQUESTED"}, "2h", "108"},
+			{"own approval", true, map[string]string{"alice": "APPROVED"}, "APPROVED", "108"},
+			{"own approval without channel request", false, map[string]string{"alice": "APPROVED"}, "APPROVED", "108"},
+			{"own changes", true, map[string]string{"alice": "CHANGES_REQUESTED"}, "CHANGES", "174"},
+		} {
+			t.Run(view.String()+"/"+tc.name, func(t *testing.T) {
+				delete(m.mattermost.sent, p.URL)
+				if tc.sent {
+					m.mattermost.sent[p.URL] = time.Now().Add(-2 * time.Hour)
+				}
+				p.ReviewSummary = &model.ReviewSummary{Reviewers: tc.reviewers}
+				for _, state := range tc.reviewers {
+					if state == "APPROVED" {
+						p.ReviewSummary.Approved++
+					} else {
+						p.ReviewSummary.Changes++
+					}
+				}
+				if got := m.reviewLabel(p); got != tc.want {
+					t.Fatalf("label %q, want %q", got, tc.want)
+				}
+				if got := m.reviewColor(p); got != tc.color {
+					t.Fatalf("color %q, want %q", got, tc.color)
+				}
+				for _, width := range []int{60, 100, 160} {
+					m.width = width
+					for _, selected := range []bool{false, true} {
+						row := ansi.Strip(m.row(p, false, selected))
+						if tc.want != "" && !strings.Contains(row, tc.want) {
+							t.Fatal(row)
+						}
+						if ansi.StringWidth(row) > width {
+							t.Fatal(row)
+						}
+					}
+				}
+			})
+		}
 	}
 }

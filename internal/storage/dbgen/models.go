@@ -164,6 +164,7 @@ type GithubReviewSummary struct {
 	PendingTeams  int64
 	Complete      int64
 	Fallback      int64
+	Reviewers     string
 }
 
 type GithubViewMembership struct {

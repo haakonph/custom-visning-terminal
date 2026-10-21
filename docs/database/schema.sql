@@ -156,7 +156,7 @@ CREATE TABLE github_review_summaries (
     pending_teams INTEGER NOT NULL,
     complete INTEGER NOT NULL CHECK (complete IN (0, 1)),
     fallback INTEGER NOT NULL CHECK (fallback IN (0, 1))
-);
+, reviewers TEXT NOT NULL DEFAULT 'null');
 
 CREATE TABLE github_view_memberships (
     view_id INTEGER NOT NULL REFERENCES sync_state(view_id) ON DELETE CASCADE,
