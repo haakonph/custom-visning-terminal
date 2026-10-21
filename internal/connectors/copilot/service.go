@@ -249,6 +249,10 @@ func (s *Service) Close() error {
 	s.diagnostics.ReceiverRunning = false
 	return s.saveLocked()
 }
+func (s *Service) reportSaveErrorLocked(source string, err error) {
+	s.addErrorLocked(fmt.Sprintf("Kunne ikke lagre %s-data i %q: %v. Ulagrede data er fortsatt tilgjengelige i appen, men kan gå tapt når appen avsluttes. Sjekk skrivetilgang og ledig diskplass. Lukk andre instanser av appen hvis databasen er låst. Lagring forsøkes på nytt ved neste innsamling.", source, storage.Path(s.options.StorePath), err))
+}
+
 func (s *Service) addErrorLocked(message string) {
 	for _, v := range s.diagnostics.Errors {
 		if v == message {
