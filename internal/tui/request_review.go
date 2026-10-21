@@ -10,6 +10,7 @@ import (
 
 type copilotReviewRequested struct {
 	count int
+	urls  []string
 	err   error
 }
 
@@ -54,6 +55,7 @@ func (m Model) startCopilotReview(refs []model.TaskReference) (tea.Model, tea.Cm
 				break
 			}
 			result.count++
+			result.urls = append(result.urls, p.URL)
 		}
 		return result
 	}

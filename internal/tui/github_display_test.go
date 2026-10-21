@@ -169,7 +169,7 @@ func TestReviewSummaryRendering(t *testing.T) {
 
 func TestCopilotReviewLabel(t *testing.T) {
 	for _, tc := range []struct{ recommendation, want string }{
-		{"Approval", "🟢 0"}, {"Changes", "🔴 0"}, {"Review", "🟡 0"}, {"Comments", "💬 0"}, {"Dismissed", "⚪ 0"},
+		{"Approval", "🟢"}, {"Changes", "🔴"}, {"Review", "🟡"}, {"Comments", "💬"}, {"Dismissed", "⚪"},
 	} {
 		if got := copilotReviewLabel(model.PullRequest{CopilotReview: &model.CopilotReview{Recommendation: tc.recommendation}}); got != tc.want {
 			t.Fatalf("got %q, want %q", got, tc.want)
@@ -214,5 +214,22 @@ func TestOpenCommentsInfo(t *testing.T) {
 				t.Fatalf("width %d: %q", width, row)
 			}
 		}
+	}
+}
+
+func TestCopilotReviewPendingLabel(t *testing.T) {
+	for _, login := range []string{"Copilot", "copilot-pull-request-reviewer", "copilot-pull-request-reviewer[bot]"} {
+		for _, review := range []*model.CopilotReview{nil, {Recommendation: "Approval", Comments: 3}} {
+			p := model.PullRequest{RequestedReviewers: []string{login}, CopilotReview: review}
+			if got := copilotReviewLabel(p); got != "⏳" {
+				t.Fatalf("%s: got %q", login, got)
+			}
+			if got := reviewSummaryLabel(p); !strings.Contains(got, "Copilot: ⏳") {
+				t.Fatal(got)
+			}
+		}
+	}
+	if got := copilotReviewLabel(model.PullRequest{RequestedReviewers: []string{"alice"}}); got != "—" {
+		t.Fatal(got)
 	}
 }
