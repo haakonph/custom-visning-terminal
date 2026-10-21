@@ -81,6 +81,9 @@ func (w *setupWizard) loadField() {
 func (m Model) wizardView() tea.View {
 	w := m.setup.wizard
 	lines := []string{accent.Render(" OPPSETT · " + m.setup.provider), fmt.Sprintf("Felt %d av %d · %s", w.index+1, len(w.fields), w.fields[w.index].label), w.input.View(), "Token brukes bare i denne kjøringen; offentlige felter lagres i config.", clean(w.notice), "Enter neste / valider · Shift+Tab forrige · Esc tilbake"}
+	if m.setup.provider == "webhook" {
+		lines[3] = "Webhooken lagres i operativsystemets nøkkelring og beholdes ved omstart og oppdatering."
+	}
 	if w.busy {
 		lines[2] = "Validerer tilkobling …"
 	}
@@ -185,6 +188,9 @@ func validateSetup(parent context.Context, w *setupWizard, provider string, v []
 		}
 	case "webhook":
 		r.webhook, r.err = mm.New(v[0])
+		if r.err == nil {
+			r.err = mm.SaveWebhook(ctx, v[0])
+		}
 	case "mattermost":
 		_, r.err = mm.NewAPI(v[0])
 	}
@@ -227,7 +233,7 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 	w.valid = true
 	w.notice = "Validert mot API-et."
 	if m.setup.provider == "webhook" {
-		w.notice = "HTTPS-adressen er kontrollert lokalt; ingen testmelding er sendt. Klar for as. Gjelder til appen avsluttes."
+		w.notice = "HTTPS-adressen er kontrollert lokalt; ingen testmelding er sendt. Lagret i operativsystemets nøkkelring. Klar for as."
 	}
 	if m.setup.provider == "mattermost" {
 		w.loginMattermost = true
