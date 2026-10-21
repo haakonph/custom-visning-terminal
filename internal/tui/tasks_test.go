@@ -19,6 +19,25 @@ func taskKey(m Model, key string) Model {
 	return next.(Model)
 }
 
+// Task creation and linking are two explicit operations, each with its own target.
+func createTaskWithReferences(t *testing.T, m Model, refs []model.TaskReference) Model {
+	t.Helper()
+	m, _ = sequence(m, "voan")
+	if !m.tasks.editing {
+		t.Fatal("new task editor missing")
+	}
+	if len(refs) > 0 {
+		m.tasks.input.SetValue(refs[0].Title)
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	next, _ := m.linkReferences(refs, []model.TaskReference{taskRef(m.tasks.items[m.tasks.selected])})
+	m = next.(Model)
+	if m.sequenceNotice != "Koblinger lagret lokalt" {
+		t.Fatal(m.sequenceNotice)
+	}
+	return m
+}
+
 func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_LINKS", filepath.Join(t.TempDir(), "links.sqlite"))
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
@@ -26,7 +45,8 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	defer m.cancel()
 	m.active = model.Reviews
 	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Repository: "org/repo", Number: 1, Title: "Review this"}}
-	m, _ = sequence(m, "an")
+	refs := m.currentReferences()
+	m = createTaskWithReferences(t, m, refs)
 	if !m.tasks.active || len(m.tasks.items) != 1 || m.tasks.items[0].References[0].Role != "review" {
 		t.Fatal("review PR should create a task")
 	}
@@ -100,11 +120,13 @@ func TestTasksTitleEditingDoesNotTriggerGlobalShortcuts(t *testing.T) {
 }
 
 func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
+	t.Setenv("CUSTOM_VISNING_LINKS", filepath.Join(t.TempDir(), "links.sqlite"))
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
 	m := New(context.Background(), &fakeSource{}, nil)
 	defer m.cancel()
 	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "Old title"}}
-	m, _ = sequence(m, "an")
+	refs := m.currentReferences()
+	m = createTaskWithReferences(t, m, refs)
 	m, _ = update(m, refreshMsg{view: model.Open, result: model.Result{Complete: true, PRs: []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "New title", Review: model.Approved}}}})
 	if !m.tasks.active || !strings.Contains(m.tasksView().Content, "New title") {
 		t.Fatal("background refresh should update task references without leaving the page")
@@ -129,7 +151,7 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	m.tasks.details = false
 	m, _ = sequence(m, "ad")
 	if len(m.tasks.items) != 0 {
-		t.Fatal("D should delete the local task")
+		t.Fatalf("ad should delete the local task: view=%s, setup=%s, dialog=%v, notice=%s", m.visibleProvider(), m.setup.provider, m.dialog, m.sequenceNotice)
 	}
 	m = taskKey(m, "j")
 	m = taskKey(m, "d")

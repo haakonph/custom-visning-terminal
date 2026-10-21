@@ -89,18 +89,18 @@ func TestAllFiveLinkTargetsPersistAndAreNavigable(t *testing.T) {
 		})
 	}
 }
-func TestActionTraversalDoesNotIncludeUnrelatedTaskIssue(t *testing.T) {
-	m := unifiedModel(t)
-	m, _ = sequence(m, "at")
-	if len(m.sequenceRefs) != 1 || m.sequenceRefs[0].Key != "APP-1" {
-		t.Fatalf("action traversed unrelated task issue: %v", m.sequenceRefs)
-	}
-	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	m, _ = sequence(m, "aot")
-	if len(m.sequenceRefs) != 1 || m.sequenceRefs[0].Key != "APP-2" {
-		t.Fatalf("explicit task path not followed: %v", m.sequenceRefs)
+func TestActionAndEditorCommandsCannotFollowRelations(t *testing.T) {
+	for _, command := range []string{"at", "ao", "aa", "ac", "et", "ea", "eo"} {
+		t.Run(command, func(t *testing.T) {
+			m := unifiedModel(t)
+			m, cmd := sequence(m, command)
+			if cmd != nil || m.sequence != "" || len(m.sequenceRefs) != 0 || m.visibleProvider() != "github" || m.jiraAction != nil || m.tasks.editing {
+				t.Fatalf("command followed a relation: %s", command)
+			}
+		})
 	}
 }
+
 func TestAllProvidersSupportSelectionAndSnooze(t *testing.T) {
 	for _, page := range []string{"g", "t", "a", "c", "o"} {
 		t.Run(page, func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestLinkCancelAndWriteFailureNeverCreateEdges(t *testing.T) {
 func TestAIActionTargetAndGenericMessage(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	m := unifiedModel(t).WithMattermost(&fakeMessageSender{})
-	m, _ = sequence(m, "aas")
+	m, _ = sequence(m, "vaas")
 	if !m.mattermost.active || !strings.Contains(m.mattermost.text, "Session") {
 		t.Fatal("AI action target unavailable")
 	}
@@ -207,13 +207,14 @@ func TestEntityStorageRoundTrip(t *testing.T) {
 }
 func TestContextSnapshotSurvivesBackgroundRefresh(t *testing.T) {
 	m := unifiedModel(t)
-	m, _ = sequence(m, "at")
-	m.snapshot.Datasets[0].PRs[0].Title = "APP-99 changed"
+	m, _ = sequence(m, "vta")
+	m.jira.rows[0].Key = "APP-99"
 	keys := m.actionJiraKeys()
 	if len(keys) != 1 || keys[0] != "APP-1" {
 		t.Fatal("pending command changed targets")
 	}
 }
+
 func TestBrowserPreflightsUnsupportedTargets(t *testing.T) {
 	m := unifiedModel(t)
 	calls := 0
@@ -249,17 +250,18 @@ func TestStaleEditorTargetNeverFallsBackToHighlightedPR(t *testing.T) {
 		t.Fatal("missing target fell back to active row")
 	}
 }
-func TestRenameAndDeleteUseExplicitRelatedTask(t *testing.T) {
+func TestRenameAndDeleteRequireOpeningRelatedTask(t *testing.T) {
 	m := unifiedModel(t)
-	m, _ = sequence(m, "aoe")
+	m, _ = sequence(m, "ro")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m, _ = sequence(m, "ae")
 	if !m.tasks.editing || m.tasks.items[m.tasks.selected].ID != "task1" {
-		t.Fatal("could not rename related task")
+		t.Fatal("could not rename after opening related task")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	m, _ = sequence(m, "vg")
-	m, _ = sequence(m, "aod")
+	m, _ = sequence(m, "ad")
 	if len(m.tasks.items) != 0 {
-		t.Fatal("could not delete related task")
+		t.Fatal("could not delete visible task")
 	}
 }
 
@@ -272,33 +274,25 @@ func TestSelectionsInOtherProvidersDoNotBecomeTaskReferenceSelections(t *testing
 	}
 }
 
-func TestSubViewsReplaceDeferredViewAndOwnInput(t *testing.T) {
-	for _, command := range []string{"vs", "vi", "vf", "vj", "vk"} {
+func TestProviderSubViewsAreUnavailableFromDeferredView(t *testing.T) {
+	for _, command := range []string{"vi", "vf", "vj", "vk"} {
 		t.Run(command, func(t *testing.T) {
 			m := unifiedModel(t)
 			m.snoozes.active = true
-			m, _ = sequence(m, command)
-			switch command {
-			case "vs":
-				if !m.settings.active {
-					t.Fatal("settings not opened")
-				}
-			case "vi":
-				if m.visibleProvider() != "copilot" || !m.copilot.diagnosticsOpen {
-					t.Fatal("diagnostics hidden")
-				}
-			case "vf", "vj":
-				if m.visibleProvider() != "jira" || m.jira.mode == "" {
-					t.Fatal("Jira editor hidden")
-				}
-			case "vk":
-				if m.visibleProvider() != "mattermost" || !m.mmReader.choosing {
-					t.Fatal("channel picker hidden")
-				}
+			m, cmd := sequence(m, command)
+			if cmd != nil || m.visibleProvider() != "deferred" || m.copilot.diagnosticsOpen || m.jira.mode != "" || m.mmReader.choosing {
+				t.Fatal("provider command escaped the active view")
 			}
 		})
 	}
+	m := unifiedModel(t)
+	m.snoozes.active = true
+	m, _ = sequence(m, "vs")
+	if !m.settings.active {
+		t.Fatal("global settings unavailable")
+	}
 }
+
 func TestNaturalAIRelationWorksWithoutJiraConnection(t *testing.T) {
 	m := unifiedModel(t)
 	m.jira = nil
@@ -365,36 +359,43 @@ func TestArchivedDetailsDoNotSelectAnotherVisibleRow(t *testing.T) {
 	}
 }
 
-func TestCreateTaskFromEveryProviderSwitchesAndKeepsEditorInput(t *testing.T) {
-	for _, thing := range []string{"g", "t", "a", "c", "o"} {
-		t.Run(thing, func(t *testing.T) {
-			m := unifiedModel(t)
-			m, _ = sequence(m, "v"+thing+"an")
-			if m.visibleProvider() != "task" {
-				t.Fatal("new task hidden behind source provider")
-			}
-			if !m.tasks.editing {
-				m, _ = sequence(m, "ae")
-			}
-			m.tasks.input.SetValue("")
-			m, _ = sequence(m, "atfqgc")
-			if !m.tasks.editing || m.tasks.input.Value() != "atfqgc" || m.sequence != "" {
-				t.Fatal("source provider stole task editor input")
-			}
-		})
+func TestNewTaskRequiresTaskViewAndKeepsEditorInput(t *testing.T) {
+	for _, page := range []string{"g", "t", "a", "c"} {
+		m := unifiedModel(t)
+		m, cmd := sequence(m, "v"+page+"an")
+		if cmd != nil || m.tasks.editing || len(m.tasks.items) != 1 || m.visibleProvider() != provider(page) {
+			t.Fatalf("created a task from %s", page)
+		}
+	}
+	m := unifiedModel(t)
+	m, _ = sequence(m, "voan")
+	m.tasks.input.SetValue("")
+	m, _ = sequence(m, "atfqgc")
+	if !m.tasks.editing || m.tasks.input.Value() != "atfqgc" || m.sequence != "" {
+		t.Fatal("shortcut stole task editor input")
 	}
 }
-func TestSpecialViewCommandsRememberSourcePage(t *testing.T) {
-	for _, command := range []string{"vi", "vf", "vj"} {
-		m := unifiedModel(t)
-		m, _ = sequence(m, command)
-		if m.jira != nil {
-			m.jira.mode = ""
-		}
-		m, _ = sequence(m, "vr")
-		if m.visibleProvider() != "github" {
-			t.Fatalf("%s lost previous page", command)
-		}
+
+func TestProviderSubViewsOpenWithinTheirOwnPage(t *testing.T) {
+	for _, command := range []string{"vavi", "vtvf", "vtvj", "vcvk"} {
+		t.Run(command, func(t *testing.T) {
+			m := unifiedModel(t)
+			m, _ = sequence(m, command)
+			switch command {
+			case "vavi":
+				if !m.copilot.diagnosticsOpen {
+					t.Fatal("diagnostics unavailable")
+				}
+			case "vtvf", "vtvj":
+				if m.jira.mode == "" {
+					t.Fatal("Jira editor unavailable")
+				}
+			case "vcvk":
+				if !m.mmReader.choosing {
+					t.Fatal("channel picker unavailable")
+				}
+			}
+		})
 	}
 }
 
@@ -418,24 +419,21 @@ func TestOpenDetailsKeepActionTargetWhenListChanges(t *testing.T) {
 	}
 }
 
-func TestAIAndChatAreUnambiguousActionTargets(t *testing.T) {
-	for _, thing := range []string{"a", "c"} {
+func TestAIAndChatActionsUseTheirVisiblePage(t *testing.T) {
+	for _, page := range []string{"a", "c"} {
 		for _, action := range []string{"s", "k"} {
-			t.Run(thing+action, func(t *testing.T) {
+			t.Run(page+action, func(t *testing.T) {
 				t.Setenv("PATH", t.TempDir())
 				m := unifiedModel(t).WithMattermost(&fakeMessageSender{})
-				m, cmd := sequence(m, "a"+thing)
-				if cmd != nil || m.sequence != "a"+thing || len(m.sequenceRefs) == 0 || !allProvider(m.sequenceRefs, provider(thing)) || m.mattermost.active || len(m.entities.data.Archived) != 0 {
-					t.Fatal("entity key executed an action instead of following its relation")
-				}
-				targets := append([]model.TaskReference(nil), m.sequenceRefs...)
-				m, _ = sequence(m, action)
+				m, _ = sequence(m, "v"+page)
+				targets := m.currentReferences()
+				m, _ = sequence(m, "a"+action)
 				if action == "s" {
 					if !m.mattermost.active || !strings.Contains(m.mattermost.text, targets[0].Title) {
-						t.Fatal("message did not use related targets")
+						t.Fatal("message did not use visible targets")
 					}
 				} else if !reflect.DeepEqual(m.entities.data.Archived, targets) {
-					t.Fatal("archive did not use related targets")
+					t.Fatal("archive did not use visible targets")
 				}
 			})
 		}

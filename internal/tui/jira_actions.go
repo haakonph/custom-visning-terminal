@@ -33,7 +33,9 @@ func (m Model) actionJiraKeys() []string {
 	if refs == nil {
 		refs = m.currentReferences()
 	}
-	refs = m.relatedReferences(refs, "jira")
+	if m.visibleProvider() != "jira" || !allProvider(refs, "jira") {
+		return nil
+	}
 	keys := []string{}
 	seen := map[string]bool{}
 	for _, r := range refs {

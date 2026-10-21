@@ -12,173 +12,117 @@ import (
 )
 
 func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
+	if !m.commandAllowed(prefix, k) {
+		return m.unavailable()
+	}
 	refs := m.sequenceRefs
 	if m.mattermost != nil && m.mattermost.active {
-		if prefix == "e" && k == "e" {
+		if prefix == "e" {
 			return m, m.editMattermost()
 		}
-		if prefix == "a" && k == "s" {
-			_, cmd := m.mattermostMessage(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
-			return m, cmd
-		}
-		return m.unavailable()
+		_, cmd := m.mattermostMessage(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+		return m, cmd
 	}
-	if prefix == "ee" {
-		switch k {
-		case "e", "w":
-			return m.openReferencesWithTarget(refs, true, k)
-		}
-		return m.unavailable()
-	}
-	op := prefix[:1]
-	if op == "v" {
+	switch prefix {
+	case "v":
 		return m.viewProvider(k)
-	}
-	if op == "r" {
+	case "r":
 		kind := provider(k)
-		if kind != "" {
-			rows := m.relatedReferences(refs, kind)
-			if len(rows) == 1 {
-				return m.activateReference(rows[0])
-			}
-			return m.showEntities("Relatert: "+kind, "related", rows, nil)
+		rows := m.relatedReferences(refs, kind)
+		if len(rows) == 1 {
+			return m.activateReference(rows[0])
 		}
-		return m.unavailable()
-	}
-	if op == "t" {
-		kind := provider(k)
-		if kind != "" {
-			var rows []model.TaskReference
-			for _, r := range m.allReferences() {
-				if r.Provider == kind {
-					rows = append(rows, r)
-				}
-			}
-			if len(refs) == 0 {
-				return m.unavailable()
-			}
-			return m.showEntities("Koble til: "+kind, "link", rows, refs)
-		}
-		return m.unavailable()
-	}
-	if op == "a" {
-		switch k {
-		case "+", "-":
-			return m.startAutoMerge(refs, k == "+")
-		case "f", "m", "r":
-			if k == "r" && allProvider(refs, "github") {
-				return m.startCopilotReview(refs)
-			}
-			if allProvider(refs, "jira") {
-				m.sequenceRefs = refs
-				return m.startJiraAction(k)
-			}
-		case "s":
-			return m.composeReferences(refs)
-		case "k":
-			return m.archiveReferences(refs)
-		case "d":
-			return m.deleteReferences(refs)
-		case "u":
-			return m.refreshVisible()
-		case "n":
-			return m.newTaskFrom(refs)
-		case "e":
-			if allProvider(refs, "task") && m.visibleProvider() != "task" && len(refs) == 1 {
-				next, _ := m.activateReference(refs[0])
-				m = next.(Model)
-			}
-			if m.visibleProvider() == "task" && len(m.tasks.visibleTasks()) > 0 {
-				return m.updateTasks(tea.KeyPressMsg{Code: 'E', Text: "E"})
-			}
-		case "x":
-			if m.visibleProvider() == "jira" {
-				m.jira.filters = jira.Filters{}
-				m.jira.custom = ""
-				m.jira.input.SetValue("")
-				m.jira.input.Prompt = ""
-				return m, m.refreshJira()
-			}
-		case "q":
-			if m.jira != nil && m.visibleProvider() == "jira" {
-				return m, m.jira.edit("name", "Lagre søk som: ", "")
-			}
-		case "l", "p":
-			if m.mmReader != nil && m.visibleProvider() == "mattermost" && !m.mmReader.busy {
-				mode := "Password"
-				if k == "p" {
-					mode = "PAT"
-				}
-				return m, m.mmReader.prompt(mode)
-			}
-		case "h":
-			if m.visibleProvider() == "mattermost" {
-				return m.dispatchKey("H")
-			}
-		case "v":
-			if m.visibleProvider() == "mattermost" {
-				return m, m.mmRead()
-			}
-		case "w":
-			if m.visibleProvider() == "github" {
-				return m.beginRemoveLocal(refs)
-			}
-			if m.visibleProvider() == "mattermost" {
-				return m.dispatchKey("-")
-			}
-		case "b":
-			if m.visibleProvider() == "mattermost" {
-				return m.dispatchKey("D")
-			}
-		case "down", "up":
-			if m.visibleProvider() == "mattermost" {
-				delta := max(1, m.height/2)
-				if k == "up" {
-					delta = -delta
-				}
-				m.mmReader.scroll = max(0, m.mmReader.scroll+delta)
-				return m, nil
-			}
-		case "z":
-			if m.snoozes.active {
-				return m.restoreDeferred(refs)
-			}
-		}
-	}
-	if op == "e" {
-		switch k {
-		case "e":
-			if prefix == "e" && m.visibleProvider() == "copilot" {
-				m.sequence = "ee"
-				return m, nil
-			}
-			return m.openReferences(refs, true)
-		case "n":
-			return m.openReferences(refs, false)
-		case "v":
-			if m.local != nil && m.visibleProvider() == "github" {
-				m.local.editorChoice = 0
-				m.local.choosing = true
-				return m, nil
-			}
-		case "l":
-			var links []model.TaskReference
-			for _, r := range refs {
-				for _, link := range messageLinks(r.Title) {
-					links = append(links, model.TaskReference{Provider: "external", URL: link, Title: link, Key: link})
-				}
-			}
-			return m.showEntities("Lenker", "external", links, nil)
-		}
-	}
-	if kind := provider(k); kind != "" {
-		targets := m.relatedReferences(refs, kind)
-		if len(targets) == 0 {
+		return m.showEntities("Relatert: "+kind, "related", rows, nil)
+	case "t":
+		if len(refs) == 0 {
 			return m.unavailable()
 		}
-		m.sequenceRefs = targets
-		m.sequence = prefix + k
+		var rows []model.TaskReference
+		for _, r := range m.allReferences() {
+			if r.Provider == provider(k) {
+				rows = append(rows, r)
+			}
+		}
+		return m.showEntities("Koble til: "+provider(k), "link", rows, refs)
+	}
+	switch prefix + k {
+	case "a+", "a-":
+		return m.startAutoMerge(refs, k == "+")
+	case "af", "am", "ar":
+		if m.visibleProvider() == "github" {
+			return m.startCopilotReview(refs)
+		}
+		return m.startJiraAction(k)
+	case "as":
+		return m.composeReferences(refs)
+	case "ak":
+		return m.archiveReferences(refs)
+	case "ad":
+		return m.deleteReferences(refs)
+	case "au":
+		return m.refreshVisible()
+	case "an":
+		return m.newTask()
+	case "ae":
+		return m.updateTasks(tea.KeyPressMsg{Code: 'E', Text: "E"})
+	case "ax":
+		m.jira.filters = jira.Filters{}
+		m.jira.custom = ""
+		m.jira.input.SetValue("")
+		m.jira.input.Prompt = ""
+		return m, m.refreshJira()
+	case "aq":
+		return m, m.jira.edit("name", "Lagre søk som: ", "")
+	case "al", "ap":
+		if !m.mmReader.busy {
+			mode := "Password"
+			if k == "p" {
+				mode = "PAT"
+			}
+			return m, m.mmReader.prompt(mode)
+		}
+	case "ah":
+		return m.dispatchKey("H")
+	case "av":
+		return m, m.mmRead()
+	case "aw":
+		if m.visibleProvider() == "github" {
+			return m.beginRemoveLocal(refs)
+		}
+		return m.dispatchKey("-")
+	case "ab":
+		return m.dispatchKey("D")
+	case "adown", "aup":
+		delta := max(1, m.height/2)
+		if k == "up" {
+			delta = -delta
+		}
+		m.mmReader.scroll = max(0, m.mmReader.scroll+delta)
 		return m, nil
+	case "az":
+		return m.restoreDeferred(refs)
+	case "ee", "ew":
+		target := ""
+		if m.visibleProvider() == "copilot" {
+			target = k
+		}
+		return m.openReferencesWithTarget(refs, true, target)
+	case "en":
+		return m.openReferences(refs, false)
+	case "ev":
+		if m.local != nil {
+			m.local.editorChoice = 0
+			m.local.choosing = true
+			return m, nil
+		}
+	case "el":
+		var links []model.TaskReference
+		for _, r := range refs {
+			for _, link := range messageLinks(r.Title) {
+				links = append(links, model.TaskReference{Provider: "external", URL: link, Title: link, Key: link})
+			}
+		}
+		return m.showEntities("Lenker", "external", links, nil)
 	}
 	return m.unavailable()
 }
@@ -360,41 +304,20 @@ func (m Model) refreshVisible() (tea.Model, tea.Cmd) {
 	}
 	return m.unavailable()
 }
-func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
-	refs = underlyingReferences(refs)
+func (m Model) newTask() (tea.Model, tea.Cmd) {
 	if m.tasks.loadFailed {
 		return m.unavailable()
 	}
-	title := "Ny oppgave"
-	if m.visibleProvider() == "task" {
-		refs = nil
-	}
-	if len(refs) > 0 {
-		title = refs[0].Title
-	}
-	m.rememberProvider("task")
-	m.jiraActive = false
-	m.copilotActive = false
-	if m.mmReader != nil {
-		m.mmReader.active = false
-	}
-	m.snoozes.active = false
-	m.detail = nil
-	m.tasks.items = append(m.tasks.items, model.Task{Title: title, References: append([]model.TaskReference(nil), refs...)})
+	m.tasks.items = append(m.tasks.items, model.Task{Title: "Ny oppgave"})
 	m.tasks.selected = len(m.tasks.items) - 1
 	m.tasks.row = 0
-	m.tasks.active = true
 	m.tasks.archived = false
 	m.tasks.query = ""
 	m.tasks.details = false
-	m.dialog = nil
 	if err := m.ensureTaskIDs(); err != nil {
 		return m, nil
 	}
-	if len(refs) == 0 {
-		return m.updateTasks(tea.KeyPressMsg{Code: 'E', Text: "E"})
-	}
-	return m, nil
+	return m.updateTasks(tea.KeyPressMsg{Code: 'E', Text: "E"})
 }
 func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd) {
 	if m.mattermost == nil {
@@ -525,51 +448,11 @@ func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool,
 				return copilotOpenMsg{}
 			}
 		}
-		supported := map[string]model.TaskReference{}
-		for _, r := range refs {
-			if r.Provider == "github" || r.Provider == "copilot" {
-				supported[refID(r)] = r
-			} else {
-				for _, kind := range []string{"github", "copilot"} {
-					for _, target := range m.relatedReferences([]model.TaskReference{r}, kind) {
-						supported[refID(target)] = target
-					}
-				}
-			}
-		}
-		if len(supported) == 0 {
-			return m.unavailable()
-		}
-		var prs, ai []model.TaskReference
-		for _, r := range sortedRefs(supported) {
-			if r.Provider == "github" {
-				prs = append(prs, r)
-			} else {
-				ai = append(ai, r)
-			}
-		}
-		cmds := []tea.Cmd{}
-		for _, group := range [][]model.TaskReference{prs, ai} {
-			if len(group) > 0 {
-				next, cmd := m.openReferencesWithTarget(group, true, target)
-				m = next.(Model)
-				if cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
-		}
-		return m, tea.Batch(cmds...)
-
+		return m.unavailable()
 	}
 	links := []model.TaskReference{}
 	for _, r := range refs {
-		if r.Provider == "task" {
-			for _, task := range m.tasks.items {
-				if task.ID == r.Key {
-					links = append(links, task.References...)
-				}
-			}
-		} else if r.Provider == "copilot" {
+		if r.Provider == "copilot" {
 			m.sequenceNotice = "AI-sesjoner har ingen nettleseradresse; bruk ee for prosjektet."
 			return m, nil
 		} else {

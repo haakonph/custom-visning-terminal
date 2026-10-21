@@ -21,7 +21,8 @@ func TestWorktreeResultsAcrossCopilotAndTasks(t *testing.T) {
 		t.Fatal("worktree result lost while Copilot was active")
 	}
 	m, _ = sequence(m, "vg")
-	m, _ = sequence(m, "an")
+	refs := m.currentReferences()
+	m = createTaskWithReferences(t, m, refs)
 	if !m.tasks.active || len(m.tasks.items) != 1 {
 		t.Fatal("task creation failed after returning from Copilot")
 	}

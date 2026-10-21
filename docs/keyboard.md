@@ -1,171 +1,122 @@
 # Tastaturnavigasjon
 
-Dette er den fullstendige oversikten. Tastene gjelder i navigasjon, også i
-read-only detaljer. Tekstfelt og dialoger eier inntastingen sin. Enter bekrefter
-et valg eller et tekstfelt; den åpner ikke lenger elementer fra hovedlisten.
-Gamle enkelttaster og tall-/Tab-snarveier er fjernet.
+Handlinger gjelder den aktive visningen og valget der. Menyene og `?` viser bare
+handlingene for denne visningen. En meny avsluttes med én handling; handlinger
+kan ikke kjedes gjennom andre typer eller relasjoner.
 
-## Tastene fra spesifikasjonen
+Eksempel: Fra GitHub kan `rt` åpne en relatert Jira-sak. Flere treff gir en
+valgliste der Enter åpner saken. Bruk deretter `af` i Jira for å velge en
+statusovergang. Den tidligere kjeden `atfq` er fjernet.
+
+## Navigasjon og valg
 
 | Tast | Handling |
 | --- | --- |
-| `j` / `k` / `↓` / `↑` | Neste/forrige rad; rull i detaljer |
-| `h` / `l` / `←` / `→` | Forrige/neste fane; på oppgavesiden forrige/neste oppgave |
-| `d` | Detaljer; for en chatmelding åpnes tråden |
-| `/` | Søk eller filtrer i aktiv visning |
-| `?` | Vis tilgjengelige hurtigtaster |
-| `vh` | Oppsettshjelp for aktiv side; vises automatisk når en visning mangler oppsett |
+| `j` / `k` / `↓` / `↑` | Velg rad; rull i detaljer |
+| `h` / `l` / `←` / `→` | Bytt fane; i oppgaver byttes oppgave |
+| `d` | Vis detaljer; i chat åpnes tråden |
+| `/` | Søk eller filtrer i aktiv liste |
+| `?` | Vis hjelp for aktiv visning |
 | `Space` | Marker eller fjern markering av aktiv rad |
-| `Shift+↑` / `Shift+↓` | Utvid markeringen med aktiv og neste/forrige rad |
-| `x` | Fjern alle markeringer uten å endre søk eller filtre |
-| `z` + valgfritt tall + `h` / `d` | Utsett valgte elementer; uten tall brukes 1 |
-| `zz` + valgfritt tall + `h` / `d` / `m` / `D` | Vis og utsett hele sammenhengen; `zzh` betyr én time |
-| `Esc` | Avbryt sekvens/dialog, lukk detaljer eller fjern markeringer |
-
-Flervalg finnes for oppgaver, PR-er, Jira-saker, AI-sesjoner, chatmeldinger,
-oppgavereferanser og valglister. Markeringer beholdes ved bytte av fane/filter,
-men markeringer i en annen type eller en annen oppgaves referanser tas ikke med
-som et skjult valg. Uten markering bruker handlinger den aktive raden.
-Detaljer og tittelredigering gjelder ett aktivt element.
-
-| Ting | Tast |
-| --- | --- |
-| Interne oppgaver | `o` |
-| GitHub / Git management | `g` |
-| Jira / task management | `t` |
-| AI / Copilot | `a` |
-| Chat / Mattermost | `c` |
-
-| Starttast | Mønster | Handling |
-| --- | --- | --- |
-| `r` | `ro`, `rg`, `rt`, `ra`, `rc` | Relaterte elementer av valgt type |
-| `v` | `vo`, `vg`, `vt`, `va`, `vc` | Visningsside |
-| `t` | `to`, `tg`, `tt`, `ta`, `tc` | Velg elementer som skal kobles til valget |
-| `e` | `ee`, `en`, eller `e` + ting … + `e`/`n` | Åpne i editor / nettleser |
-| `a` | `a` + eventuelle ting … + handling | Utfør handling på valget/relasjonen |
-
-Ved kobling vises lastede elementer og lagrede referanser av valgt type.
-Velg med j/k, Space eller Shift+piltaster, og bekreft med Enter. Alle valgte
-kilder kobles til alle valgte mål, uten selvkoblinger eller duplikater. Koblingene
-er lokale og toveis, og lagres i `links.sqlite` i konfigurasjonsmappen
-(`CUSTOM_VISNING_LINKS` kan overstyre plasseringen). En oppgave får også
-referansene lagt til i sin egen lagring. Eksisterende oppgavereferanser,
-Jira-nøkler, PR-lenker i meldinger og AI-sesjonenes Jira-/repo-/branchdata brukes
-som naturlige relasjoner. Gamle oppgaver får en stabil intern ID ved behov.
-
-Ett relatert treff åpnes direkte; flere treff vises i en søkbar valgliste.
-Fra listen kan man markere flere og fortsette med `a`, `e`, `r` eller `t`.
-Enter går til aktivt treff. Hver ting i en sekvens følger én relasjon; en handling
-utvides aldri til et helt nettverk av indirekte sammenkoblede oppgaver.
-
-## Handlinger og kjeding
-
-| Handling | Tast etter `a` |
-| --- | --- |
-| Rediger og send melding til konfigurert Mattermost-webhook | `s` |
-| Arkiver valgte elementer lokalt / gjenopprett fra arkivvisningen | `k` |
-| Slett intern oppgave eller valgte referanser i oppgavedetaljer | `d` |
-| Flytt Jira-saker: hent og velg faktisk overgang | `f` |
-| Tilordne Jira til meg | `m` |
-| Fjern min Jira-tilordning, uten å fjerne andre ansvarlige | `r` |
-
-`as` lager et redigerbart Markdown-utkast fra valgte elementer uansett type.
-Inne i utkastet betyr `ee` rediger igjen og `as` send. Teksten må bekreftes ved
-å sende; åpning av utkastet sender ingen melding. Mottakeren er den konfigurerte
-webhook-kanalen, ikke automatisk kanalen til en markert chatmelding.
-
-`ak` skjuler elementene fra vanlige lister uten å endre eksterne systemer.
-`vb` viser det lokale arkivet, der `ak` gjenoppretter valgte elementer.
-`d` viser lagrede detaljer om arkiverte/utsatte elementer uten å velge en annen rad.
-Utsatt-visningen støtter også søk, flervalg og samlet gjenoppretting med `az`.
-`ad` sletter ikke PR-er, Jira-saker, AI-historikk eller chatmeldinger eksternt.
-Ved oppgavesletting fjernes også tilhørende lokale koblinger.
-
-| Tast etter Jira-flytting (`af` eller `atf`) | Målstatus |
-| --- | --- |
-| `q` | QA |
-| `u` | Under arbeid |
-| `a` | Avklaring |
-| `f` | Ferdig |
-
-Overgangene hentes fra hver saks arbeidsflyt. Navn som QA/Quality Assurance,
-In Progress/Under arbeid, Clarification/Avklaring og Done/Closed/Ferdig støttes.
-Listen viser bare entydige målstatuser som er felles for alle valgte saker.
-Velg en annen tilgjengelig overgang med j/k og Enter. En snarvei med manglende
-eller tvetydig status utfører ingen endring. Jira kan avvise overganger som
-krever flere felt. Ved feil stoppes resten av flervalget; tidligere saker kan
-allerede være oppdatert. Esc avbryter før utføring, ikke en allerede sendt endring.
-
-Eksempler:
-
-- `atfq` fra GitHub: Jira-sakene til valgte PR-er flyttes til QA, uten visningsbytte.
-- `atfu`, `atfa`, `atff`: samme målvalg, andre statuser.
-- `atm` / `atr`: tilordne meg / fjern meg fra tilhørende Jira-saker.
-- `afq` / `am` / `ar` direkte i Jira: handling på valgte saker.
-- `etn`: tilhørende Jira-saker åpnes i nettleseren.
-- `eae`: tilhørende AI-sesjoners prosjekt åpnes i IntelliJ.
-- `atgs`: følg Jira, så GitHub, og lag melding om PR-ene som ble funnet.
-- `aod`: slett den tilhørende interne oppgaven.
-- `to` fra AI/chat/Jira/GitHub: velg intern oppgave som skal få referansene.
-
-Målene tas fra valget når sekvensen starter. Bakgrunnsoppdateringer flytter ikke
-handlingen til en annen rad. QA-tasten kan også skrives mens overgangene lastes.
-`ee` bruker IntelliJ. I AI-visningen venter `ee` på tredje tast:
-`eee` åpner chattens arbeidsmappe (`cwd`), mens `eew` åpner Git-/worktreeroten
-(`gitRoot`). Hvis den foretrukne mappen mangler eller ikke finnes lokalt, brukes
-prosjektroten og deretter den andre mappen. Esc avbryter uten å åpne editoren.
-I andre visninger og i relasjonskjeder som `eae` virker `ee`/editorhandlingen som før.
-Fra typer uten eget prosjekt følges relasjoner til lastede
-PR-er og AI-prosjekter. `en` åpner HTTPS-adresser; AI-sesjoner uten nettadresse
-kan bare åpnes i editor. En referanse som ikke er lastet kan ikke åpnes i editor
-ved å falle tilbake til en tilfeldig aktiv PR.
-
-## Valg som ikke var definert i listen
-
-Følgende utvider mønsteret for funksjoner som allerede fantes:
-
-| Sekvens | Betydning |
-| --- | --- |
-| `au` | Oppdater/synkroniser aktiv visning eller detaljer; prøv GitHub-oppstart igjen |
-| `an` | Ny intern oppgave fra valgte elementer; på oppgavesiden en tom oppgave |
-| `ae` | Endre aktiv oppgaves tittel; `aoe` kan først finne en tilhørende oppgave |
-| `aq` / `ax` | Lagre aktivt Jira-søk / nullstill Jira-hurtigfiltre og egen JQL |
-| `vs` / `vr` | Innstillinger / forrige hovedvisning |
-| `vi` | Copilot-diagnostikk |
-| `vf` / `vj` | Jira-hurtigfiltre / egen JQL |
-| `vz` / `az` | Vis utsatte / gjenopprett valgte utsatte elementer |
-| `vb` | Vis lokalt arkiv |
-| `vk` | Velg hvilke Mattermost-kanaler som skal overvåkes |
-| `al` / `ap` | Chat-innlogging med passord/TOTP / PAT |
-| `av` / `aw` / `ab` | Merk kanal lest / slutt å overvåke / tøm lokal chatkonto og lagret sesjon |
-| `ah` / `a↓` / `a↑` | Eldre chatmeldinger / rull en halv side ned/opp |
-| `el` | Vis en liste over eksterne lenker i valgte elementer |
-| `ev` | Velg editor med j/k + Enter: IntelliJ, VS Code eller egendefinert |
-| `z` + valgfritt tall + `m` / `D` | Utsett til kl. 06 etter antall kalenderdager; uten tall brukes 1 |
+| `Shift+↑` / `Shift+↓` | Utvid markeringen |
+| `x` | Fjern markeringer; behold søk og filtre |
+| `z` + valgfritt tall + `h` / `d` / `m` / `D` | Utsett valget; uten tall brukes 1 |
+| `zz` + valgfritt tall + tidsenhet | Vis og utsett hele sammenhengen |
+| `Esc` | Avbryt meny/dialog, lukk detaljer eller fjern markeringer |
+| `Enter` | Bekreft tekst eller valg i dialoger og valglister |
 | `Ctrl+C` | Avslutt og kanseller bakgrunnsarbeid |
-| `Enter` | Bekreft valg/tekst i dialoger; ikke en snarvei i hovedlisten |
 
-`a` og `c` velger AI og chat i kjeder. `s` avslutter med melding og `k` med
-arkivering. For eksempel følger `aas` AI og lager melding om sesjonene, mens
-`acs` følger chat og lager melding om treffene. `aak` og `ack` arkiverer de
-tilhørende AI-sesjonene og chatmeldingene. Det trengs ikke kolon i sekvensene.
+Detaljer bruker elementet som vises, selv om den underliggende listen har andre
+markeringer. Fanebytte, søk og markeringskommandoer endrer ikke listen bak
+detaljene. Tekstfelt mottar inntasting som tekst og starter ingen menyer.
 
-Listen definerte heller ikke om kobling, arkivering og sletting skulle endre
-systemene eksternt, hvilken chatkanal en melding skulle sendes til, hvordan
-flertydige relasjoner skulle velges, eller hva som skulle skje når en valgt type
-mangler data/konfigurasjon. Her er valgene: koblinger/arkiv er lokale, sletting er
-avgrenset til interne oppgaver/referanser, meldinger bruker konfigurert webhook,
-flere treff gir valgliste, og manglende mål gir en synlig melding uten å velge et
-annet objekt. Ingen nye API-er for ekstern sletting, fjernarkivering eller
-endring av eksterne relasjoner er innført.
+Flervalg beholdes ved bytte av fane/filter innenfor samme type. Markeringer i
+andre visninger eller en annen oppgaves referanser tas ikke med som skjulte mål.
 
-## Oppsettshjelp
+For utsetting betyr `h` timer og `d` kalenderdager med samme lokale klokkeslett.
+`m` og `D` betyr antall kalenderdager fram til kl. 06. `zz` viser medlemmene før
+lagring; Esc avbryter. Utsetting er en egen dialog, ikke en kjede av handlinger.
 
-Når en visning mangler konfigurasjon, åpnes en veiledning med steg i appen og
-utenfor appen. `vs` åpner relevante innstillinger; Esc returnerer til veiledningen.
-Enter prøver å åpne siden igjen. `vg`/`vt`/`va`/`vc` og `vo` bytter side, og
-j/k, piltaster eller PageUp/PageDown ruller veiledningen. Ctrl+C avslutter.
+## Visningsmenyen (`v`)
 
-Mattermost-server og brukernavn kan lagres i innstillingene og tas i bruk med
-Enter eller `vc` ved første oppsett. GitHub/Jira-token og webhook krever omstart
-fra terminalen der innloggingen eller miljøvariablene ble satt.
+| Tast | Visning |
+| --- | --- |
+| `vo` / `vg` / `vt` / `va` / `vc` | Oppgaver / GitHub / Jira / AI / chat |
+| `vs` / `vr` | Innstillinger / forrige hovedvisning |
+| `vz` / `vb` | Utsatte / lokalt arkiv |
+| `vh` | Oppsett for aktiv side |
+| `vf` / `vj` | Hurtigfiltre / egen JQL; bare i Jira-listen |
+| `vi` | Diagnostikk; bare i AI-visningen |
+| `vk` | Velg kanaler; bare i chat |
+
+## Handlingsmenyen (`a`)
+
+| Visning | Taster og handlinger |
+| --- | --- |
+| Vanlige visninger | `au` oppdater, `as` lag meldingsutkast fra valget, `ak` arkiver lokalt |
+| GitHub | `a+` automerge på, `a-` automerge av, `ar` be om Copilot-review, `aw` slett lokale worktrees |
+| Jira | `af` flytt sak, `am` tilordne meg, `ar` fjern min tilordning |
+| Jira-liste | `aq` lagre søk, `ax` nullstill filtre og JQL |
+| Oppgaver | `an` ny tom oppgave, `ae` endre tittel, `ad` slett valgte oppgaver |
+| Oppgavedetaljer | `ad` fjern valgte referanser fra oppgaven |
+| Chat | `al` passordinnlogging, `ap` PAT, `av` merk kanal lest, `aw` slutt å overvåke, `ab` tøm lokal konto |
+| Chat | `ah` hent eldre meldinger, `a↓` / `a↑` rull en halv side |
+| Utsatte | `az` hent tilbake valgte elementer |
+| Arkiv | `ak` gjenopprett valgte elementer |
+| AI-diagnostikk | `au` oppdater |
+
+Opprett en oppgave med `vo`, deretter `an`. Referanser kan kobles til etterpå med
+koblingsmenyen. Opprettelse fra andre visninger er fjernet.
+
+`as` åpner et redigerbart Markdown-utkast. I utkastet betyr `ee` rediger igjen og
+`as` send til konfigurert Mattermost-webhook. Åpning av utkastet sender ingenting.
+
+Jira-overganger hentes fra arbeidsflyten til de valgte sakene. Etter `af` velges
+en overgang med j/k og Enter, eller `q` QA, `u` under arbeid, `a` avklaring og
+`f` ferdig. En snarvei må ha en entydig overgang som alle valgte saker støtter.
+Tasten kan skrives mens overganger lastes. Esc avbryter før utføring. Ved feil
+stoppes resten av flervalget; tidligere saker kan allerede være oppdatert.
+
+## Åpningsmenyen (`e`)
+
+| Visning | Taster og handlinger |
+| --- | --- |
+| GitHub | `ee` åpne valgt PR i IntelliJ, `en` åpne i nettleser |
+| GitHub-liste | `ev` velg editor med j/k og Enter |
+| Jira | `en` åpne valgt sak i nettleser |
+| AI | `ee` åpne chatmappe, `ew` åpne worktree i IntelliJ |
+| Chat | `en` åpne valgt melding i nettleser, `el` velg lenker i meldingen |
+| Oppgavedetaljer | `en` åpne valgt referanse i nettleser |
+
+AI bruker nå `ee` og `ew` i stedet for `eee` og `eew`. Hvis den foretrukne lokale
+mappen mangler, brukes prosjektroten og deretter den andre mappen.
+AI-sesjoner uten nettadresse kan åpnes i editor. Editorhandlinger følger ingen
+relasjoner automatisk. Åpne først ønsket PR eller AI-sesjon i dens visning.
+
+## Relasjoner og lokale koblinger
+
+`r` åpner relaterte elementer, mens `t` velger mål for en lokal kobling:
+
+| Type | Relatert | Koble til |
+| --- | --- | --- |
+| Oppgaver | `ro` | `to` |
+| GitHub | `rg` | `tg` |
+| Jira | `rt` | `tt` |
+| AI | `ra` | `ta` |
+| Chat | `rc` | `tc` |
+
+Ett relatert treff åpnes direkte. Flere treff vises i en søkbar valgliste.
+Valglister tilbyr navigasjon og bekreftelse. Åpne treffet med Enter før du utfører
+handlinger. Ved kobling lagrer Enter koblingene mellom valgte kilder og mål.
+
+Koblinger lagres lokalt i `links.sqlite` (`CUSTOM_VISNING_LINKS` kan overstyre
+plasseringen). Oppgaver beholder også egne referanser. Arkivering er lokal;
+sletting gjelder bare interne oppgaver og deres referanser. Eksisterende lagrede
+koblinger beholdes. Jira-nøkler, PR-lenker og AI-metadata brukes fortsatt for å
+finne relaterte elementer.
+
+## Oppsett
+
+Manglende konfigurasjon åpner veiledning for visningen. Enter prøver igjen,
+`vs` åpner innstillingene, og visningsmenyen kan bytte side. j/k og
+PageUp/PageDown ruller. Tekstfelt og oppsettdialoger eier inntastingen sin.

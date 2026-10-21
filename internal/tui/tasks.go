@@ -324,7 +324,7 @@ func (t *taskState) moveTask(delta int, wrap bool) {
 
 func (m Model) tasksView() tea.View {
 	t := m.tasks
-	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), "vg GitHub · vt Jira · / søk · h/l oppgave · d detaljer · ae endre tittel · ak arkiver · vb vis arkiv"}
+	lines := []string{accent.Render(" CUSTOM VISNING · OPPGAVER"), m.shortcuts()}
 	if t.archived {
 		lines = append(lines, " Arkiverte oppgaver · ak gjenopprett · vo aktive")
 	}
@@ -334,7 +334,7 @@ func (m Model) tasksView() tea.View {
 	} else if t.query != "" {
 		lines = append(lines, "Søk: "+clean(t.query))
 	}
-	footer := "j/k velg · d detaljer · en åpne · an ny · ae tittel · d detaljer · ad slett · ak arkiver · vb vis arkiv · Esc tilbake · Ctrl+C avslutt"
+	footer := m.shortcuts()
 	capacity := max(1, m.height-len(lines)-2)
 	indices := t.visibleTasks()
 	list := []string{accent.Render(fmt.Sprintf(" OPPGAVER (%d/%d)", len(indices), len(t.items)))}

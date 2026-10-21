@@ -219,7 +219,7 @@ func TestResponsiveViewAndHelp(t *testing.T) {
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	m, _ = update(m, key('?'))
-	if !strings.Contains(m.View().Content, "Hurtigtaster · custom-visning · Versjon dev") {
+	if !strings.Contains(m.View().Content, "Hurtigtaster · github · custom-visning · Versjon dev") {
 		t.Fatal("help or development version missing")
 	}
 	m = m.WithVersion("main-42.1-abcdef123456")
@@ -259,7 +259,7 @@ func TestHelpScrollAndSmallWindows(t *testing.T) {
 		}
 	}
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 10})
-	if !strings.Contains(m.View().Content, "Delvis oppdatering") {
+	if !strings.Contains(m.View().Content, "åpne i nettleser") {
 		t.Fatal("cannot reach the end of help")
 	}
 	for range 200 {

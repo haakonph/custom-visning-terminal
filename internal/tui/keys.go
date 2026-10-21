@@ -1,73 +1,196 @@
 package tui
 
-const shortcuts = "j/k ↑/↓ velg · h/l ←/→ fane · d detaljer · Space marker · r relatert · v visning · t koble · e åpne · a handling · / søk · vh oppsett · ? hjelp · Ctrl+C avslutt"
-const helpText = `Hurtigtaster
-j/k / ↑/↓   Naviger opp/ned
-h/l / ←/→   Forrige/neste fane; oppgaver: forrige/neste oppgave
-d           Detaljer; chat: tråd
-Space       Marker/fjern markering, i alle fem typer
-Shift+↑/↓   Utvid markeringen med aktiv og neste/forrige rad
-x           Fjern alle markeringer; behold søk og filtre
-/           Søk/filtrer; Enter beholder søket, Esc avbryter
-?           Vis/lukk hjelp
-Esc         Avbryt sekvens, lukk detaljer eller fjern markering
-z / zz      Utsett valgte elementer / hele sammenhengen
-            h timer / d kalenderdager / m eller D dager kl. 06
-            Uten tall: 1. zh = én time; zzh = hele sammenhengen én time
-            zz viser kjente relasjoner før du velger tid; Esc avbryter
+import "strings"
 
-Ting: o oppgaver · g GitHub · t Jira · a AI/Copilot · c chat/Mattermost
-vo/vg/vt/va/vc  Visningsside
-ro/rg/rt/ra/rc  Relaterte elementer av valgt type
-                Flere treff vises i en søkbar valgliste
-                Velg og fortsett med r/e/a/t, eller Enter for å gå dit
-to/tg/tt/ta/tc  Koble til valgte mål av typen; Enter lagrer lokalt
-                Space og Shift+↑/↓ velger flere kilder og mål
-ee/en           Editor (IntelliJ) / nettleser
-eee/eew         AI-visning: chattens arbeidsmappe / worktree i IntelliJ
-e + ting + e/n  Følg relasjon(er), åpne i editor/nettleser
-as/ak/ad        Melding / lokalt arkiv / slett lokal oppgave/referanse
-aw              GitHub: slett valgte lokale worktrees; y bekrefter, Esc avbryter
-a+/a-          GitHub: automerge på / av for valgte PR-er
-                Merge when ready: GitHub merger når kravene er oppfylt
-                AUTO viser ON/OFF/UNKNOWN; QUEUE viser mergekøen
-ar              GitHub: be om ny Copilot-review for valgte PR-er
-                Også etter tidligere review; GitHub må ha Copilot-tilgang
-atf             Flytt tilhørende Jira-saker; velg faktisk overgang
-atfq/atfu       QA / under arbeid
-atfa/atff       Avklaring / ferdig
-atm/atr         Tilordne meg / fjern meg som ansvarlig
-af/am/ar        Samme Jira-handlinger direkte på Jira-saker
-                Målene tas fra valget ved starten av sekvensen
-                q/u/a/f kan skrives mens overganger lastes
-                Esc avbryter før utføring; feil stopper resten
-                Tidligere saker i flervalget kan være oppdatert
+type keyboardCommand struct {
+	prefix, key, label string
+}
 
-aa… / ac…       Følg AI/chat, avslutt med s melding eller k arkiv
-Eksempler: atgs, etn, aas, atgtfq (hver ting følger én relasjon)
+// One list controls which commands can run and which commands help and menus show.
+// Commands always use the current view; a target type cannot extend a command.
+func (m Model) keyboardCommands() []keyboardCommand {
+	var commands []keyboardCommand
+	add := func(prefix, key, label string) {
+		commands = append(commands, keyboardCommand{prefix, key, label})
+	}
+	if m.mattermost != nil && m.mattermost.active {
+		add("e", "e", "rediger melding")
+		add("a", "s", "send melding")
+		return commands
+	}
+	for _, target := range []struct{ key, label string }{
+		{"o", "oppgaver"}, {"g", "GitHub"}, {"t", "Jira"}, {"a", "AI"}, {"c", "chat"},
+		{"s", "innstillinger"}, {"r", "forrige visning"}, {"z", "utsatte"}, {"b", "arkiv"}, {"h", "oppsett"},
+	} {
+		add("v", target.key, target.label)
+	}
+	if m.setup.provider != "" {
+		return commands
+	}
+	kind := m.visibleProvider()
+	if kind == "dialog" {
+		if m.dialog.mode == "archive" || m.dialog.restore {
+			add("a", "k", "gjenopprett fra arkiv")
+		} else if m.dialog.mode == "deferred" || (m.dialog.mode == "snapshot" && m.snoozes.active) {
+			add("a", "z", "hent tilbake")
+		}
+		return commands
+	}
+	add("a", "u", "oppdater visningen")
+	if kind == "deferred" {
+		add("a", "z", "hent tilbake")
+		return commands
+	}
+	if kind == "copilot" && m.copilot.diagnosticsOpen {
+		return commands
+	}
+	// Relations and local links are explicit navigation/selection dialogs. Actions
+	// on a related item require opening that item's view first.
+	for _, target := range []struct{ key, label string }{
+		{"o", "oppgaver"}, {"g", "GitHub"}, {"t", "Jira"}, {"a", "AI"}, {"c", "chat"},
+	} {
+		add("r", target.key, "relaterte "+target.label)
+		add("t", target.key, "koble til "+target.label)
+	}
+	add("a", "s", "lag meldingsutkast fra valget")
+	add("a", "k", "arkiver valget lokalt")
+	switch kind {
+	case "github":
+		add("a", "+", "automerge på")
+		add("a", "-", "automerge av")
+		add("a", "r", "be om Copilot-review")
+		add("a", "w", "slett lokale worktrees")
+		add("e", "e", "åpne i IntelliJ")
+		if !m.detailsOpen() {
+			add("e", "v", "velg editor")
+		}
+		add("e", "n", "åpne i nettleser")
+	case "jira":
+		add("a", "f", "flytt valgte saker")
+		add("a", "m", "tilordne meg")
+		add("a", "r", "fjern min tilordning")
+		if !m.detailsOpen() {
+			add("a", "q", "lagre søk")
+			add("a", "x", "nullstill filtre og JQL")
+			add("v", "f", "hurtigfiltre")
+			add("v", "j", "egen JQL")
+		}
+		add("e", "n", "åpne i nettleser")
+	case "copilot":
+		add("v", "i", "diagnostikk")
+		add("e", "e", "åpne chatmappe i IntelliJ")
+		add("e", "w", "åpne worktree i IntelliJ")
+	case "task":
+		add("a", "n", "ny oppgave")
+		if m.tasks.details {
+			add("e", "n", "åpne valgt referanse i nettleser")
+			add("a", "d", "slett valgte oppgavereferanser")
+		} else {
+			add("a", "e", "endre oppgavetittel")
+			add("a", "d", "slett valgte oppgaver")
+		}
+	case "mattermost":
+		add("v", "k", "velg kanaler")
+		add("a", "l", "logg inn med passord")
+		add("a", "p", "logg inn med PAT")
+		add("a", "v", "merk kanal lest")
+		add("a", "w", "slutt å overvåke kanal")
+		add("a", "b", "tøm lokal chatkonto")
+		add("a", "h", "hent eldre meldinger")
+		add("a", "down", "rull en halv side ned")
+		add("a", "up", "rull en halv side opp")
+		add("e", "n", "åpne i nettleser")
+		add("e", "l", "vis lenker i valget")
+	}
+	return commands
+}
 
-Tillegg for funksjoner som ikke var definert i listen:
-au              Oppdater/synkroniser aktiv visning eller detaljer
-an/ae           Ny intern oppgave fra valget / endre oppgavetittel
-aq/ax           Lagre Jira-søk / nullstill hurtigfiltre og egen JQL
-vs/vi/vr        Innstillinger / Copilot-diagnostikk / forrige visning
-vh              Oppsettshjelp for aktiv side
-vf/vj           Jira-hurtigfiltre / JQL-redigering
-vz/az           Vis utsatte / hent tilbake valgte utsatte elementer
-vb              Lokalt arkiv; ak gjenoppretter valgte elementer
-vk              Velg/overvåk Mattermost-kanaler
-al/ap           Chat-innlogging med passord+TOTP / PAT
-av/aw/ab        Merk kanal lest / slutt å overvåke / tøm lokal chatkonto
-ah/a↓/a↑        Eldre chatmeldinger / rull en halv side ned/opp
-el              Velg lenker fra valgte elementer
-ev             Velg editor med j/k + Enter (IntelliJ, VS Code, egendefinert)
-Ctrl+C          Avslutt og kanseller bakgrunnsarbeid
-Enter           Bekreft i dialoger, valglister og tekstfelt
+func (m Model) commandAllowed(prefix, key string) bool {
+	for _, command := range m.keyboardCommands() {
+		if command.prefix == prefix && command.key == key {
+			return true
+		}
+	}
+	return false
+}
 
-Gamle enkelttaster og nummer-/Tab-snarveier er fjernet.
-Tekstfelt mottar bokstavene som tekst; de starter ikke tastsekvenser.
-Koblinger og arkivering er lokale. ad sletter ikke eksterne ressurser.
-AI-sesjoner uten HTTPS-adresse åpnes i editor, ikke nettleser.
-Jira-status må være tilgjengelig og entydig; andre ansvarlige fjernes ikke.
-UNKNOWN betyr at GitHub ikke har levert en status.
-Delvis oppdatering beholder cache og tidspunkt for siste fulle synk.`
+func (m Model) sequenceHint(prefix string) string {
+	var hints []string
+	for _, command := range m.keyboardCommands() {
+		if command.prefix == prefix {
+			hints = append(hints, command.key+" "+command.label)
+		}
+	}
+	return strings.Join(hints, " · ")
+}
+
+func (m Model) detailsOpen() bool {
+	switch m.visibleProvider() {
+	case "github":
+		return m.detail != nil
+	case "jira":
+		return m.jira.detail != nil
+	case "copilot":
+		return m.copilot.detail != nil || m.copilot.diagnosticsOpen
+	case "dialog":
+		return m.dialog.mode == "snapshot"
+	}
+	return false
+}
+
+func (m Model) canShowDetails() bool {
+	if m.detailsOpen() || (m.visibleProvider() == "task" && m.tasks.details) {
+		return false
+	}
+	return m.dialog == nil || m.dialog.mode == "archive" || m.dialog.mode == "deferred"
+}
+
+func (m Model) shortcuts() string {
+	if !m.keyboardNavigation() {
+		return "Enter bekreft · Esc avbryt · Ctrl+C avslutt"
+	}
+	parts := []string{"j/k ↑/↓ velg/rull"}
+	if !m.detailsOpen() {
+		if m.canShowDetails() {
+			parts = append(parts, "d detaljer")
+		}
+		parts = append(parts, "Space marker", "/ søk")
+	}
+	for _, menu := range []struct{ prefix, label string }{{"v", "visning"}, {"a", "handling"}, {"e", "åpne"}, {"r", "relatert"}, {"t", "koble"}} {
+		if m.sequenceHint(menu.prefix) != "" {
+			parts = append(parts, menu.prefix+" "+menu.label)
+		}
+	}
+	return strings.Join(append(parts, "? hjelp", "Esc tilbake", "Ctrl+C avslutt"), " · ")
+}
+
+func (m Model) helpText() string {
+	kind := m.visibleProvider()
+	lines := []string{"Hurtigtaster · " + kind, "j/k / ↑/↓   Velg rad eller rull i detaljer"}
+	composing := m.mattermost != nil && m.mattermost.active
+	switch {
+	case composing:
+		lines[0] = "Hurtigtaster · meldingsutkast"
+	case m.setup.provider != "":
+		lines = append(lines, "Enter       Prøv visningen igjen", "f           Konfigurer integrasjon", "PageUp/Down Rull veiledningen")
+	case !m.detailsOpen():
+		if kind == "github" || kind == "jira" || kind == "task" || kind == "mattermost" {
+			lines = append(lines, "h/l / ←/→   Forrige/neste fane eller oppgave")
+		}
+		if m.canShowDetails() {
+			lines = append(lines, "d           Detaljer; chat: tråd")
+		}
+		lines = append(lines, "/           Søk/filtrer i visningen", "Space       Marker/fjern markering", "Shift+↑/↓   Utvid markeringen", "x           Fjern markeringer")
+		if m.dialog != nil {
+			lines = append(lines, "Enter       Bekreft valg / åpne valgt element")
+		}
+	}
+	if !composing && m.setup.provider == "" && m.dialog == nil && !(kind == "copilot" && m.copilot.diagnosticsOpen) {
+		lines = append(lines, "z           Utsett valget; tall + h/d/m/D velger tid", "zz          Utsett hele sammenhengen; viser medlemmene først")
+	}
+	lines = append(lines, "? / Esc     Lukk hjelp / avbryt", "Ctrl+C      Avslutt", "", "Velg meny, deretter én handling:")
+	for _, command := range m.keyboardCommands() {
+		lines = append(lines, command.prefix+command.key+"  "+command.label)
+	}
+	return strings.Join(lines, "\n")
+}

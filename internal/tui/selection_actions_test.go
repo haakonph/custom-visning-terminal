@@ -121,7 +121,15 @@ func TestSpaceSelectionActions(t *testing.T) {
 				existing := model.TaskReference{Provider: "jira", URL: "https://jira.example/browse/OLD-1", Title: "Existing"}
 				m.tasks.items = []model.Task{{Title: "Existing task", References: []model.TaskReference{existing}}}
 				if actionKey == 't' {
-					m, _ = sequence(m, "an")
+					m, _ = sequence(m, "voan")
+					m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+					m, _ = sequence(m, "vrto")
+					for i, ref := range m.dialog.filtered() {
+						if ref.Key == m.tasks.items[1].ID {
+							m.dialog.selected = i
+						}
+					}
+					m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 				} else {
 					m, _ = sequence(m, "to")
 					m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -130,7 +138,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 				if actionKey == 't' {
 					taskIndex = 1
 				}
-				if (actionKey == 't' && !m.tasks.active) || len(m.tasks.items) != taskIndex+1 {
+				if len(m.tasks.items) != taskIndex+1 {
 					t.Fatal("wrong task created/selected")
 				}
 				saved := newTasks()

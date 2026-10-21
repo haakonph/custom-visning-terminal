@@ -25,7 +25,7 @@ func sequence(m Model, text string) (Model, tea.Cmd) {
 type keyboardTransport func(*http.Request) (*http.Response, error)
 
 func (f keyboardTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-func TestChainedJiraActionBeforeAndAfterLoading(t *testing.T) {
+func TestJiraActionBeforeAndAfterLoading(t *testing.T) {
 	for _, fast := range []bool{true, false} {
 		t.Run(fmt.Sprint(fast), func(t *testing.T) {
 			t.Setenv("XDG_CACHE_HOME", t.TempDir())
@@ -57,7 +57,11 @@ func TestChainedJiraActionBeforeAndAfterLoading(t *testing.T) {
 				}
 				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 			})
-			m, load := sequence(m, "atf")
+			m.jiraActive = true
+			m.jira.rows = []jira.Issue{{Key: "APP-1", URL: client.IssueURL("APP-1")}, {Key: "APP-2", URL: client.IssueURL("APP-2")}}
+			m.jira.query = m.jira.currentQuery()
+			m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+			m, load := sequence(m, "af")
 			if load == nil || m.jiraAction == nil {
 				t.Fatal("not loading")
 			}
@@ -72,7 +76,7 @@ func TestChainedJiraActionBeforeAndAfterLoading(t *testing.T) {
 				t.Fatal("QA not scheduled")
 			}
 			m, _ = update(m, apply())
-			if m.jiraActive || m.jiraAction != nil || len(gets) != 2 || len(posts) != 2 || !strings.Contains(m.sequenceNotice, "APP-1, APP-2") {
+			if !m.jiraActive || m.jiraAction != nil || len(gets) != 2 || len(posts) != 2 || !strings.Contains(m.sequenceNotice, "APP-1, APP-2") {
 				t.Fatalf("wrong targets/state: %v %v %s", gets, posts, m.sequenceNotice)
 			}
 		})
@@ -83,15 +87,18 @@ func TestSequenceCancellationAndStaleJiraResult(t *testing.T) {
 	client, _ := jira.New("https://jira.example", "secret")
 	m = m.WithJira(client, false)
 	m.snapshot.Datasets[0].PRs[0].Title = "APP-1"
-	m, _ = sequence(m, "atf")
+	m.jiraActive = true
+	m.jira.rows = []jira.Issue{{Key: "APP-1"}}
+	m, _ = sequence(m, "af")
 	request := m.jiraAction
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	m, cmd := update(m, jiraActionMsg{request: request, transitions: map[string][]jira.Transition{}})
 	if m.jiraAction != nil || cmd != nil || m.sequence != "" {
 		t.Fatal("cancelled action resumed")
 	}
-	m, _ = sequence(m, "at")
+	m, _ = sequence(m, "a")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	m.jiraActive = false
 	m, _ = sequence(m, "j")
 	if m.selected != 1 || m.sequence != "" {
 		t.Fatal("Esc did not restore navigation")
@@ -135,7 +142,8 @@ func TestJiraSelectionLinkingAndDetails(t *testing.T) {
 	m.jira.rows = []jira.Issue{{Key: "APP-1", Title: "One", URL: "https://jira.example/browse/APP-1", Description: "Details"}, {Key: "APP-2", Title: "Two", URL: "https://jira.example/browse/APP-2"}}
 	m.jira.query = m.jira.currentQuery()
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
-	m, _ = sequence(m, "an")
+	refs := m.currentReferences()
+	m = createTaskWithReferences(t, m, refs)
 	if len(m.tasks.items) != 1 || len(m.tasks.items[0].References) != 2 {
 		t.Fatal("Jira multiselect not linked")
 	}

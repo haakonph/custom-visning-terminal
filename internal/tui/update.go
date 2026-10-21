@@ -113,22 +113,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSettings(msg)
 		}
 	}
-	if m.help && !m.tasks.active && !m.jiraActive && !m.copilotActive {
-		if key, ok := msg.(tea.KeyPressMsg); ok {
-			switch key.String() {
-			case "esc", "?":
-				m.help = false
-			case "j", "down":
-				m.helpOffset = min(m.helpOffset+1, max(0, len(strings.Split(helpText, "\n"))-max(1, m.height-1)))
-			case "k", "up":
-				m.helpOffset = max(0, m.helpOffset-1)
-			case "q", "ctrl+c":
-				m.cancel()
-				return m, tea.Quit
-			}
-			return m, nil
-		}
-	}
 	if handled, cmd := m.snoozeMessage(msg); handled {
 		return m, cmd
 	}

@@ -437,7 +437,7 @@ func (m Model) jiraView() tea.View {
 	if j.notice != "" {
 		lines = append(lines, warning.Render(clean(j.notice)))
 	}
-	lines = append(lines, shortcuts)
+	lines = append(lines, m.shortcuts())
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}
