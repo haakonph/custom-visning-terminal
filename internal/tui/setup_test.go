@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	"github.com/zalando/go-keyring"
 )
 
 func TestStartupSetupOffersMissingIntegrationsAndCanBeSkipped(t *testing.T) {
@@ -271,6 +273,8 @@ func TestFirstMattermostSetupPreservesPreviousProviderWithoutGitHub(t *testing.T
 }
 
 func TestWebhookWizardActivatesSenderAndClearsSecret(t *testing.T) {
+	keyring.MockInit()
+	t.Setenv("MATTERMOST_WEBHOOK_URL", "")
 	isolateSetup(t)
 	m := ready(t).WithSetup("webhook")
 	next, _ := m.updateSetup("f")
@@ -284,11 +288,37 @@ func TestWebhookWizardActivatesSenderAndClearsSecret(t *testing.T) {
 	m = next.(Model)
 	next, _ = m.finishSetupValidation(cmd().(setupValidated))
 	m = next.(Model)
+	endpoint, err := mm.LoadWebhook(m.ctx)
+	if err != nil || endpoint != "https://chat.example/hooks/secret" {
+		t.Fatal("webhook not persisted")
+	}
 	if m.mattermost == nil || !w.valid {
 		t.Fatal("webhook not activated")
 	}
 	if w.values[0] != "" || w.input.Value() != "" {
 		t.Fatal("credential retained in form")
+	}
+	if strings.Contains(m.View().Content, "/hooks/secret") {
+		t.Fatal("credential visible")
+	}
+}
+
+func TestWebhookWizardDoesNotClaimSuccessWhenKeychainFails(t *testing.T) {
+	keyring.MockInitWithError(errors.New("keychain unavailable"))
+	t.Cleanup(func() { keyring.MockInit() })
+	isolateSetup(t)
+	m := ready(t).startSetupWizard("webhook", nil)
+	w := m.setup.wizard
+	w.input.SetValue("https://chat.example/hooks/secret")
+	next, cmd := m.updateSetupWizard(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	next, _ = m.finishSetupValidation(cmd().(setupValidated))
+	m = next.(Model)
+	if w.valid || w.busy || m.mattermost != nil {
+		t.Fatal("failed persistence reported as success")
+	}
+	if !strings.Contains(w.notice, "nøkkelring") {
+		t.Fatal("missing recovery guidance")
 	}
 	if strings.Contains(m.View().Content, "/hooks/secret") {
 		t.Fatal("credential visible")

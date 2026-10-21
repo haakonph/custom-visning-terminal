@@ -93,7 +93,9 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		fmt.Fprintln(stderr, "Jira unavailable:", jiraErr)
 	}
 	dashboard := tui.New(ctx, source, persistence).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
-	if endpoint := os.Getenv("MATTERMOST_WEBHOOK_URL"); endpoint != "" {
+	if endpoint, err := mattermost.LoadWebhook(ctx); err != nil {
+		fmt.Fprintln(stderr, "Mattermost webhook unavailable:", err)
+	} else if endpoint != "" {
 		sender, err := mattermost.New(endpoint)
 		if err != nil {
 			fmt.Fprintln(stderr, "Mattermost unavailable:", err)

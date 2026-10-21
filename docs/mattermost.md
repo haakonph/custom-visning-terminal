@@ -147,3 +147,12 @@ formatkontroll. SQLite-migreringene og dokumentasjonen kan kontrolleres med
 `make check-generated` og `go run ./cmd/db-docs -check`.
 
 Se [fullstendig tastaturoversikt](keyboard.md) for kjeding og alle tillegg.
+
+## Lagring av incoming-webhook
+
+Webhook-oppsettet i appen lagrer HTTPS-adressen i operativsystemets nøkkelring.
+Den lastes ved oppstart og beholdes gjennom omstart og appoppdateringer.
+`MATTERMOST_WEBHOOK_URL` overstyrer den lagrede adressen uten å erstatte den.
+Adressen skrives ikke til `config.json`. Hvis nøkkelringen ikke er tilgjengelig,
+viser oppsettet en feil og lar deg prøve igjen etter at nøkkelringen er aktivert
+eller låst opp. Tidligere oppsett som bare lå i minnet må legges inn én gang til.

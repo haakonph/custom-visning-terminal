@@ -155,7 +155,7 @@ func (m Model) setupLines() []string {
 			"Velg kanal, gi webhooken et navn, lagre og kopier hele HTTPS-adressen.",
 			"Hvis menyen mangler eller oppretting er sperret, kontakt Mattermost-administrator.",
 			"I appen: Trykk f og lim inn adressen i det maskerte feltet. Enter aktiverer sending uten omstart.",
-			"Adressen brukes bare til appen avsluttes. Ingen testmelding sendes under oppsettet.",
+			"Adressen lagres i operativsystemets nøkkelring og beholdes ved omstart og oppdatering. Ingen testmelding sendes.",
 			"Alternativ for oppstart fra terminal:",
 			"Les inn hele HTTPS-adressen i Bash uten å vise den eller legge den i historikken:",
 			`  read -rsp 'Mattermost webhook: ' MATTERMOST_WEBHOOK_URL; echo; export MATTERMOST_WEBHOOK_URL`,
