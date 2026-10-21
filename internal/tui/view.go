@@ -70,6 +70,9 @@ func (m Model) View() tea.View {
 	if m.mattermost != nil && m.mattermost.active {
 		return m.mattermostView()
 	}
+	if m.folders.picking || m.folders.active {
+		return m.foldersView()
+	}
 	if m.dialog != nil {
 		return m.entityView()
 	}

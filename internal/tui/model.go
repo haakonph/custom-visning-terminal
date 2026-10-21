@@ -17,6 +17,7 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	folders          folderState
 	usage            *usage.Recorder
 	usageView        bool
 	usageOffset      int

@@ -185,6 +185,14 @@ erDiagram
         INTEGER position PK
         TEXT issue_key FK
     }
+    local_folders {
+        TEXT path PK
+        TEXT repository
+        TEXT issue_key
+        TEXT title
+        INTEGER favorite
+        INTEGER hidden
+    }
     local_repositories {
         TEXT identity PK
         TEXT path

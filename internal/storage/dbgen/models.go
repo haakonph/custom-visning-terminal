@@ -208,6 +208,15 @@ type JiraQueryMembership struct {
 	IssueKey string
 }
 
+type LocalFolder struct {
+	Path       string
+	Repository string
+	IssueKey   string
+	Title      string
+	Favorite   int64
+	Hidden     int64
+}
+
 type LocalRepository struct {
 	Identity string
 	Path     string

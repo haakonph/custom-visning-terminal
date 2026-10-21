@@ -221,6 +221,33 @@ instansers nye tall etter omstart. Datoer følger maskinens lokale tidssone.
 Lagringsfeil stopper ikke dashboardet; statistikkvisningen varsler hvis nye
 tellere foreløpig bare finnes i minnet.
 
+## Lokale mapper og opprettelse fra Jira
+
+`vl` viser lokale mapper som appen kjenner: registrerte repository paths,
+Git-worktrees i disse repoene, appens PR-worktrees, varme main-utsjekker og
+mapper opprettet fra Jira. Listen skanner ikke hele disken. `h/l` bytter mellom
+**Alle**, **Favoritter** og **Skjulte**; `/` søker i repo, Jira-nøkkel, tittel og sti.
+`af` slår favoritt av/på, `ah` skjuler eller viser mappen igjen. Skjulte mapper
+kan hentes tilbake i fanen Skjulte. `ee` åpner valgt mappe i konfigurert
+standardeditor, `au` oppdaterer listen, og Esc går tilbake.
+
+Velg én Jira-sak og trykk `aw` eller `ee`. Velg deretter et GitHub-repo og
+bekreft med Enter. Listen henter alle sider med tilgjengelige repoer og viser
+bare repoer der GitHub uttrykkelig oppgir skrivetilgang; arkiverte/deaktiverte
+repoer utelates. `/` filtrerer repoene. Rettighetene kontrolleres på nytt før
+opprettelsen. Esc avbryter valget før opprettelse.
+
+Mappen opprettes under appens datamappe som `jira/<owner>/<repo>/<sak>` med
+branchen `custom-visning/jira/<sak>` fra oppdatert `workspace.main_branch`
+(standard `main`). Eksisterende arbeidsmapper og brancher overskrives ikke.
+Samme sak/repo gjenbruker en tidligere registrert mappe når repo og branch
+fortsatt stemmer. Opprettelse pusher ingen branch og endrer ikke Jira-saken.
+Åpne mappen med `ee` etter opprettelse. GitHub-innlogging, Git og eventuelt
+GitHub CLI for kloning må være konfigurert som for PR-worktrees.
+
+Favoritter, skjuling og Jira-kobling lagres i `folders.sqlite` i appens
+datamappe, separat fra tjenestenes cache, og beholdes etter omstart.
+
 ## GitHub-rettigheter
 
 For et klassisk PAT / GitHub CLI OAuth-token:
@@ -1055,7 +1082,7 @@ må tillate disse rettighetene.
 | GitHub | `accounts`, `github_repositories`, `github_pull_requests`, `github_labels`, `github_pull_request_reviewers`, `sync_state`, `github_view_memberships` |
 | Jira | `jira_projects`, `jira_issues`, `jira_labels`, `jira_queries`, `jira_query_memberships` |
 | Copilot | `copilot_sessions`, `copilot_events`, `copilot_traces`, `copilot_usage` |
-| Lokalt | `tasks`, `task_references`, `snoozes`, `local_repositories`, `local_worktrees` |
+| Lokalt | `tasks`, `task_references`, `snoozes`, `local_repositories`, `local_worktrees`, `local_folders` |
 
 PR-er lagres én gang i hvert kontolager og knyttes til faner med egne rader som
 bevarer rekkefølgen. Jira beholder JQL-rekkefølgen på samme måte. Copilot har
