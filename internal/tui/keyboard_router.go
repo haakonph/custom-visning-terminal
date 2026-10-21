@@ -138,6 +138,10 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	if !m.keyboardNavigation() {
 		return m, nil, false
 	}
+	if m.visibleProvider() == "copilot" && m.copilot != nil && m.copilot.diagnosticsOpen && k == "y" {
+		m.copilot.notice = "Kopiering sendt til terminalen (krever støtte for OSC 52)."
+		return m, tea.SetClipboard(m.copilot.otlpExporterConfig()), true
+	}
 	if m.mattermost != nil && m.mattermost.active {
 		switch k {
 		case "a", "e":

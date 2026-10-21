@@ -80,3 +80,28 @@ func testCopilot(t *testing.T) *copilot.Service {
 	}
 	return client
 }
+
+func TestCopilotDiagnosticsExporterConfig(t *testing.T) {
+	m := ready(t).WithCopilot(testCopilot(t), true)
+	m.width, m.height = 120, 40
+	m.copilot.diagnostics = copilot.Diagnostics{Port: 14318}
+	m, _ = sequence(m, "vi")
+	for _, want := range []string{"http://127.0.0.1:14318", "http/json", "http/protobuf", "grpc støttes ikke", "/v1/traces", "/v1/logs", "/v1/metrics", "y kopierer"} {
+		if !strings.Contains(m.View().Content, want) {
+			t.Errorf("diagnostics missing %q", want)
+		}
+	}
+	want := "export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14318\nexport OTEL_EXPORTER_OTLP_PROTOCOL=http/json"
+	if got := m.copilot.otlpExporterConfig(); got != want {
+		t.Fatalf("export config = %q, want %q", got, want)
+	}
+	m, cmd := update(m, key('y'))
+	if cmd == nil || !strings.Contains(m.copilot.notice, "Kopiering sendt") {
+		t.Fatal("diagnostics copy shortcut did not issue clipboard command")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	_, cmd = update(m, key('y'))
+	if cmd != nil {
+		t.Fatal("copy shortcut active outside diagnostics")
+	}
+}

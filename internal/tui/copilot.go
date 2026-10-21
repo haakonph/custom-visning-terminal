@@ -256,6 +256,10 @@ func metric(n *int64) string {
 	}
 	return fmt.Sprint(*n)
 }
+func (c *copilotState) otlpExporterConfig() string {
+	return fmt.Sprintf("export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:%d\nexport OTEL_EXPORTER_OTLP_PROTOCOL=http/json", c.diagnostics.Port)
+}
+
 func (m Model) copilotView() tea.View {
 	c := m.copilot
 	lines := []string{accent.Render(" CUSTOM VISNING · Copilot"), muted.Render(" vg GitHub · vt Jira · vs innstillinger · va Copilot · lokal historikk · egen OTLP-mottaker")}
@@ -263,6 +267,14 @@ func (m Model) copilotView() tea.View {
 	if c.diagnosticsOpen {
 		d := c.diagnostics
 		body = append(body, "Diagnostikk", "Sesjonsmappe: "+d.SessionRoot, "Eget datalager: "+d.StorePath, fmt.Sprintf("Innsamling: %t · OTLP: %t · port %d · oppdaget: %d", d.CollectionEnabled, d.ReceiverRunning, d.Port, d.Discovered), "Siste OTLP: "+d.LastOtel, fmt.Sprintf("Innhold mottatt: %t · lagring: %t · visning: %t", d.ContentReceived, d.CaptureContent, d.ShowContent))
+		body = append(body,
+			fmt.Sprintf("OTLP localhost-URL: http://127.0.0.1:%d", d.Port),
+			"OTLP-protokoller: http/json og http/protobuf støttes · grpc støttes ikke",
+			"HTTP-endepunkter: /v1/traces · /v1/logs · /v1/metrics",
+			"y kopierer URL og protokoll som eksportinnstillinger:",
+			c.otlpExporterConfig(),
+			"Alternativ protokoll: OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
+		)
 		body = append(body, d.Errors...)
 	} else if c.detail != nil {
 		s := c.detail.Session
