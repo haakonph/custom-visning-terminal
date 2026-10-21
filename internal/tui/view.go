@@ -58,6 +58,9 @@ func (m Model) View() tea.View {
 	if m.sequence != "" || m.sequenceNotice != "" || m.jiraAction != nil {
 		return m.keyboardView()
 	}
+	if m.usageView {
+		return m.usageStatsView()
+	}
 	if m.settings.active {
 		return m.settingsView()
 	}

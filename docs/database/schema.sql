@@ -289,6 +289,16 @@ CREATE TABLE tasks (
     title TEXT NOT NULL
 , archived INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE usage_metrics (
+    day TEXT NOT NULL,
+    category TEXT NOT NULL,
+    name TEXT NOT NULL,
+    source TEXT NOT NULL,
+    target TEXT NOT NULL,
+    count INTEGER NOT NULL CHECK (count > 0),
+    PRIMARY KEY (day, category, name, source, target)
+);
+
 CREATE VIEW overview_items AS
 SELECT 'github' AS provider, p.id AS item_id, p.title, p.url, p.updated_at AS last_activity,
        r.name AS repository, p.head_ref AS branch, p.review AS status

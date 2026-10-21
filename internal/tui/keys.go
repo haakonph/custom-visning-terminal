@@ -51,6 +51,7 @@ au              Oppdater/synkroniser aktiv visning eller detaljer
 an/ae           Ny intern oppgave fra valget / endre oppgavetittel
 aq/ax           Lagre Jira-søk / nullstill hurtigfiltre og egen JQL
 vs/vi/vr        Innstillinger / Copilot-diagnostikk / forrige visning
+vm              Lokal bruksstatistikk; h/l velger 7 dager / 30 dager / alt
 vh              Oppsettshjelp for aktiv side
 vf/vj           Jira-hurtigfiltre / JQL-redigering
 vz/az           Vis utsatte / hent tilbake valgte utsatte elementer

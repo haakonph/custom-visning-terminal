@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/usage"
 )
 
 type Cache interface {
@@ -16,6 +17,11 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	usage            *usage.Recorder
+	usageView        bool
+	usageOffset      int
+	usagePeriod      int
+	usageNotice      string
 	notifications    notificationState
 	auto             refreshState
 	setup            setupState

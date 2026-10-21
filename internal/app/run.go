@@ -17,6 +17,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/tui"
+	"github.com/haakonph/custom-visning-terminal/internal/usage"
 )
 
 func Run(ctx context.Context, stderr io.Writer) error { return RunMode(ctx, stderr, false) }
@@ -59,7 +60,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	}()
 	if startCopilot {
 		dashboard := tui.New(ctx, nil, nil).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
-		return runDashboard(ctx, dashboard)
+		return runDashboard(ctx, dashboard, stderr)
 	}
 
 	var jiraClient *jira.Client
@@ -127,10 +128,24 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		}
 		dashboard = dashboard.WithSetup(kind)
 	}
-	return runDashboard(ctx, dashboard)
+	return runDashboard(ctx, dashboard, stderr)
 }
 
-func runDashboard(ctx context.Context, dashboard tui.Model) error {
+func runDashboard(ctx context.Context, dashboard tui.Model, stderr io.Writer) error {
+	if os.Getenv("CUSTOM_VISNING_METRICS_DISABLED") == "1" {
+		dashboard = dashboard.WithUsage(nil, "Deaktivert med CUSTOM_VISNING_METRICS_DISABLED=1.")
+	} else if recorder, err := usage.Open(usage.DefaultPath()); err != nil {
+		fmt.Fprintln(stderr, "Lokal bruksstatistikk er utilgjengelig; fortsetter uten innsamling.")
+		dashboard = dashboard.WithUsage(nil, "Kunne ikke åpne den lokale statistikkdatabasen.")
+	} else {
+		dashboard = dashboard.WithUsage(recorder, "")
+		recorder.Record("session", "start", "app", "")
+		defer func() {
+			if err := recorder.Close(); err != nil {
+				fmt.Fprintln(stderr, "Kunne ikke lagre lokal bruksstatistikk.")
+			}
+		}()
+	}
 	configured, err := dashboard.WithMattermostConfig()
 	if err != nil {
 		dashboard = dashboard.WithSetupProblem("mattermost", "Kunne ikke klargjøre Mattermost: "+err.Error())

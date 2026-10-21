@@ -317,3 +317,12 @@ type TaskReference struct {
 	Title        string
 	Role         string
 }
+
+type UsageMetric struct {
+	Day      string
+	Category string
+	Name     string
+	Source   string
+	Target   string
+	Count    int64
+}

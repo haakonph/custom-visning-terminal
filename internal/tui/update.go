@@ -15,7 +15,7 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if result, ok := msg.(notificationResult); ok {
 		if result.failed {
 			m.notice = "Kunne ikke vise eller åpne skrivebordsvarsel. Kontroller varslingstillatelser og varslingsverktøy."
