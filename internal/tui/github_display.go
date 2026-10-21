@@ -151,9 +151,14 @@ func copilotReviewLabel(p model.PullRequest) string {
 	case "Dismissed":
 		icon = "⚪"
 	}
-	label := icon + " " + r.Recommendation
-	if r.Comments > 0 {
-		label += fmt.Sprintf(" · %d", r.Comments)
+	return fmt.Sprintf("%s %d", icon, r.Comments)
+}
+
+func (m Model) reviewLabel(p model.PullRequest) string {
+	if p.Review == model.Pending && m.mattermost != nil {
+		if at := m.mattermost.sent[p.URL]; !at.IsZero() {
+			return age(at)
+		}
 	}
-	return label
+	return string(p.Review)
 }

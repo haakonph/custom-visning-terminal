@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -156,5 +157,47 @@ func TestMattermostRespectsConfiguredJiraPattern(t *testing.T) {
 	text = mattermostText(rows, func(key string) string { return "https://jira.example/browse/" + key }, regexp.MustCompile(`ABC-[0-9]{3,5}`))
 	if !strings.Contains(text, "[ABC-123](https://jira.example/browse/ABC-123)") {
 		t.Fatal(text)
+	}
+}
+
+func TestReviewAgeTracksOnlySuccessfullySentLinksAndSurvivesRestart(t *testing.T) {
+	m := ready(t).WithMattermost(&fakeMessageSender{err: errors.New("offline")})
+	p := m.snapshot.Datasets[0].PRs[0]
+	p.Review = model.Pending
+	if got := m.reviewLabel(p); got != string(model.Pending) {
+		t.Fatal(got)
+	}
+	m.mattermost.active = true
+	m.mattermost.text = "[PR](" + p.URL + ")"
+	m, cmd := sequence(m, "as")
+	m, _ = update(m, cmd())
+	if len(m.mattermost.sent) != 0 {
+		t.Fatal("failed send recorded")
+	}
+	m.mattermost.sender = &fakeMessageSender{}
+	m, cmd = sequence(m, "as")
+	m, _ = update(m, cmd())
+	if got := m.reviewLabel(p); got != "now" {
+		t.Fatal(got)
+	}
+	m = m.WithMattermost(&fakeMessageSender{})
+	if got := m.reviewLabel(p); got != "now" {
+		t.Fatal("restart lost send time", got)
+	}
+	m.mattermost.sent[p.URL] = time.Now().Add(-2 * time.Hour)
+	for _, width := range []int{60, 100, 120, 160} {
+		m.width = width
+		if row := m.row(p, false, true); !strings.Contains(row, "2h") || strings.Contains(row, "PENDING") {
+			t.Fatal(row)
+		}
+	}
+	other := p
+	other.URL += "0"
+	if got := m.reviewLabel(other); got != string(model.Pending) {
+		t.Fatal("unmentioned PR changed", got)
+	}
+	p.Review = model.Status("APPROVED")
+	if got := m.reviewLabel(p); got != "APPROVED" {
+		t.Fatal(got)
 	}
 }

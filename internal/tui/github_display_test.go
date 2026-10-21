@@ -168,14 +168,21 @@ func TestReviewSummaryRendering(t *testing.T) {
 }
 
 func TestCopilotReviewLabel(t *testing.T) {
+	for _, tc := range []struct{ recommendation, want string }{
+		{"Approval", "🟢 0"}, {"Changes", "🔴 0"}, {"Review", "🟡 0"}, {"Comments", "💬 0"}, {"Dismissed", "⚪ 0"},
+	} {
+		if got := copilotReviewLabel(model.PullRequest{CopilotReview: &model.CopilotReview{Recommendation: tc.recommendation}}); got != tc.want {
+			t.Fatalf("got %q, want %q", got, tc.want)
+		}
+	}
 	if got := copilotReviewLabel(model.PullRequest{}); got != "—" {
 		t.Fatal(got)
 	}
 	p := model.PullRequest{CopilotReview: &model.CopilotReview{Recommendation: "Approval", Comments: 3}}
-	if got := copilotReviewLabel(p); got != "🟢 Approval · 3" {
+	if got := copilotReviewLabel(p); got != "🟢 3" {
 		t.Fatal(got)
 	}
-	if got := reviewSummaryLabel(p); !strings.Contains(got, "Copilot: 🟢 Approval · 3") {
+	if got := reviewSummaryLabel(p); !strings.Contains(got, "Copilot: 🟢 3") {
 		t.Fatal(got)
 	}
 }

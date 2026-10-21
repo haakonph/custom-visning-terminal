@@ -8,10 +8,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type messageSender interface {
@@ -22,15 +25,29 @@ type mattermostState struct {
 	active, sending bool
 	text, notice    string
 	offset          int
+	sent            map[string]time.Time
 }
 type mattermostEdited struct {
 	text string
 	err  error
 }
-type mattermostSent struct{ err error }
+type mattermostSent struct {
+	err     error
+	links   []string
+	at      time.Time
+	saveErr error
+}
 
 func (m Model) WithMattermost(sender messageSender) Model {
-	m.mattermost = &mattermostState{sender: sender}
+	m.mattermost = &mattermostState{sender: sender, sent: map[string]time.Time{}}
+	if m.entities != nil {
+		sent, err := storage.LoadReviewMessages(m.entities.path)
+		if err != nil {
+			m.notice = "Kunne ikke lese sendetider for Mattermost: " + err.Error()
+		} else {
+			m.mattermost.sent = sent
+		}
+	}
 	return m
 }
 func markdownLink(title, link string) string {
@@ -134,6 +151,12 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 		} else {
 			s.active = false
 			m.notice = "Meldingen er sendt til Mattermost"
+			for _, link := range msg.links {
+				s.sent[link] = msg.at
+			}
+			if msg.saveErr != nil {
+				m.notice += "; kunne ikke lagre sendetid: " + msg.saveErr.Error()
+			}
 		}
 		return true, nil
 	case tea.KeyPressMsg:
@@ -164,7 +187,24 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.sending = true
 			s.notice = "Sender…"
 			sender, text, ctx := s.sender, s.text, m.ctx
-			return true, func() tea.Msg { return mattermostSent{sender.Send(ctx, text)} }
+			path := ""
+			if m.entities != nil {
+				path = m.entities.path
+			}
+			return true, func() tea.Msg {
+				result := mattermostSent{err: sender.Send(ctx, text)}
+				if result.err != nil {
+					return result
+				}
+				result.at = time.Now()
+				for _, link := range mm.PRLinks(text) {
+					result.links = append(result.links, link.URL)
+				}
+				if len(result.links) > 0 {
+					result.saveErr = storage.SaveReviewMessages(path, result.links, result.at)
+				}
+				return result
+			}
 		}
 		return true, nil
 	}

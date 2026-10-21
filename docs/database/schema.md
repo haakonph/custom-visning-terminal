@@ -229,6 +229,10 @@ erDiagram
         TEXT post_id PK,FK
         TEXT pr_url PK
     }
+    review_messages {
+        TEXT pull_request_url PK
+        TEXT sent_at
+    }
     schema_migrations {
         INTEGER version PK
     }

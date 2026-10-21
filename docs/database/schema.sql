@@ -243,6 +243,11 @@ CREATE TABLE mattermost_pr_mentions (
  FOREIGN KEY(server,user_id,post_id) REFERENCES mattermost_posts(server,user_id,id) ON DELETE CASCADE
 );
 
+CREATE TABLE review_messages (
+    pull_request_url TEXT PRIMARY KEY,
+    sent_at TEXT NOT NULL
+);
+
 CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY);
 
 CREATE TABLE snooze_references (
