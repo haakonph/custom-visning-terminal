@@ -41,6 +41,19 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	}
 	if result, ok := msg.(copilotReviewRequested); ok {
 		m.reviewRequestBusy = false
+		for _, url := range result.urls {
+			for _, dataset := range m.snapshot.Datasets {
+				for i := range dataset.PRs {
+					p := &dataset.PRs[i]
+					if p.URL == url && !copilotReviewPending(*p) {
+						p.RequestedReviewers = append(p.RequestedReviewers, "copilot-pull-request-reviewer[bot]")
+					}
+				}
+			}
+			if m.detail != nil && m.detail.pr.URL == url && !copilotReviewPending(m.detail.pr) {
+				m.detail.pr.RequestedReviewers = append(m.detail.pr.RequestedReviewers, "copilot-pull-request-reviewer[bot]")
+			}
+		}
 		m.sequenceNotice = fmt.Sprintf("Ny Copilot-review forespurt for %d PR-er; au henter status", result.count)
 		if result.err != nil {
 			m.sequenceNotice = result.err.Error()

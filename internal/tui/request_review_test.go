@@ -38,6 +38,16 @@ func TestCopilotReviewSelectionAndDuplicate(t *testing.T) {
 		t.Fatal("duplicate request scheduled")
 	}
 	m, _ = update(m, cmd())
+	if !copilotReviewPending(m.detail.pr) {
+		t.Fatal("detail should show requested review immediately")
+	}
+	for _, dataset := range m.snapshot.Datasets {
+		for _, pr := range dataset.PRs {
+			if pr.URL == p.URL && !copilotReviewPending(pr) {
+				t.Fatal("requested review missing from snapshot")
+			}
+		}
+	}
 	if len(source.calls) != 1 || source.calls[0] != p.URL || m.reviewRequestBusy || !strings.Contains(m.sequenceNotice, "1 PR-er") {
 		t.Fatalf("calls=%v notice=%s", source.calls, m.sequenceNotice)
 	}
@@ -53,6 +63,16 @@ func TestCopilotReviewPartialFailure(t *testing.T) {
 	m, _ = update(m, cmd())
 	if len(source.calls) != 2 || m.reviewRequestBusy || !strings.Contains(m.sequenceNotice, "1 forespørsler sendt") {
 		t.Fatal(source.calls, m.sequenceNotice)
+	}
+	for _, dataset := range m.snapshot.Datasets {
+		for _, pr := range dataset.PRs {
+			if pr.URL == rows[0].URL && !copilotReviewPending(pr) {
+				t.Fatal("successful request should show pending")
+			}
+			if pr.URL == rows[1].URL && copilotReviewPending(pr) {
+				t.Fatal("failed request should not show pending")
+			}
+		}
 	}
 	if _, cmd = m.startCopilotReview([]model.TaskReference{{Provider: "jira"}}); cmd != nil {
 		t.Fatal("wrong provider allowed")

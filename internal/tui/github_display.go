@@ -113,7 +113,7 @@ func reviewSummaryLabel(p model.PullRequest) string {
 		state = model.Unknown
 	}
 	label := "Review: " + string(state)
-	if p.CopilotReview != nil {
+	if p.CopilotReview != nil || copilotReviewPending(p) {
 		label += " · Copilot: " + copilotReviewLabel(p)
 	}
 	s := p.ReviewSummary
@@ -135,7 +135,20 @@ func reviewSummaryLabel(p model.PullRequest) string {
 	return label
 }
 
+func copilotReviewPending(p model.PullRequest) bool {
+	for _, reviewer := range p.RequestedReviewers {
+		login := strings.TrimSuffix(strings.ToLower(reviewer), "[bot]")
+		if login == "copilot" || login == "copilot-pull-request-reviewer" {
+			return true
+		}
+	}
+	return false
+}
+
 func copilotReviewLabel(p model.PullRequest) string {
+	if copilotReviewPending(p) {
+		return "⏳"
+	}
 	r := p.CopilotReview
 	if r == nil {
 		return "—"
@@ -151,7 +164,10 @@ func copilotReviewLabel(p model.PullRequest) string {
 	case "Dismissed":
 		icon = "⚪"
 	}
-	return fmt.Sprintf("%s %d", icon, r.Comments)
+	if r.Comments > 0 {
+		return fmt.Sprintf("%s %d", icon, r.Comments)
+	}
+	return icon
 }
 
 func (m Model) reviewLabel(p model.PullRequest) string {
