@@ -21,7 +21,7 @@ import (
 )
 
 func (s *Service) handler() http.Handler {
-	return s.options.Usage.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return s.options.AccessLog.Handler(s.options.Usage.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
 		if h, _, err := net.SplitHostPort(host); err == nil {
 			host = h
@@ -88,7 +88,7 @@ func (s *Service) handler() http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte("{}"))
 		}
-	}), "/v1/traces", "/v1/logs", "/v1/metrics")
+	}), "/v1/traces", "/v1/logs", "/v1/metrics"))
 }
 func decodeOTLP(signal, kind string, b []byte) ([]Event, error) {
 	if kind == "application/x-protobuf" {

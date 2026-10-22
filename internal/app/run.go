@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/accesslog"
 	"github.com/haakonph/custom-visning-terminal/internal/cache"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
@@ -48,6 +49,17 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	if copilotErr != nil {
 		return copilotErr
 	}
+	requestLog, logErr := accesslog.Open(accesslog.DefaultPath())
+	if logErr != nil {
+		fmt.Fprintln(stderr, "Kunne ikke åpne HTTP-loggen; fortsetter uten logging:", logErr)
+	} else {
+		defer func() {
+			if err := requestLog.Close(); err != nil {
+				fmt.Fprintln(stderr, "Kunne ikke skrive HTTP-loggen:", err)
+			}
+		}()
+	}
+	copilotOptions.AccessLog = requestLog
 	// Keep metrics alive from receiver startup through its shutdown, so final
 	// requests are recorded before the counters are flushed and closed.
 	recorder, usageNotice := openUsage(stderr)

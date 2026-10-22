@@ -13,20 +13,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/haakonph/custom-visning-terminal/internal/accesslog"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 	"github.com/haakonph/custom-visning-terminal/internal/usage"
 )
 
 type Options struct {
-	SessionRoot    string          `json:"session_root"`
-	StorePath      string          `json:"store_path"`
-	Port           int             `json:"port"`
-	Enabled        bool            `json:"enabled"`
-	CaptureContent bool            `json:"capture_content"`
-	ShowContent    bool            `json:"show_content"`
-	JiraPattern    string          `json:"jira_pattern"`
-	Usage          *usage.Recorder `json:"-"`
+	SessionRoot    string            `json:"session_root"`
+	StorePath      string            `json:"store_path"`
+	Port           int               `json:"port"`
+	Enabled        bool              `json:"enabled"`
+	CaptureContent bool              `json:"capture_content"`
+	ShowContent    bool              `json:"show_content"`
+	JiraPattern    string            `json:"jira_pattern"`
+	Usage          *usage.Recorder   `json:"-"`
+	AccessLog      *accesslog.Logger `json:"-"`
 }
 
 func DefaultOptions() (Options, error) {

@@ -226,6 +226,26 @@ instansers nye tall etter omstart. Datoer følger maskinens lokale tidssone.
 Lagringsfeil stopper ikke dashboardet; statistikkvisningen varsler hvis nye
 tellere foreløpig bare finnes i minnet.
 
+## HTTP-logg
+
+Alle innkommende HTTP-kall til appens lokale OTLP-mottaker logges i `http.log`
+under `os.UserConfigDir()/custom-visning/`. På macOS er dette normalt
+`~/Library/Application Support/custom-visning/http.log`, på Linux
+`~/.config/custom-visning/http.log`. `CUSTOM_VISNING_HTTP_LOG` overstyrer stien.
+
+Hvert fullførte kall gir én JSON-linje med tidspunkt (UTC), faktisk HTTP-metode
+og sti, avsenderadresse, svarstatus, varighet i millisekunder og antall svarbytes.
+Også ukjente endepunkter og avviste kall logges, med den faktiske stien.
+Query-parametere, headere og forespørsels-/svarinnhold lagres ikke i loggen.
+En handler som panikker logges med `aborted: true`; status `0` betyr at ingen
+endelig svarstatus ble sendt før panikken.
+
+Logging er uavhengig av `CUSTOM_VISNING_METRICS_DISABLED`. Loggfilen har private
+rettigheter (`0600`), og en ny loggmappe opprettes med `0700`. Filen roteres ved
+10 MB med opptil tre arkiver; arkiver eldre enn sju dager ryddes ved rotasjon.
+Feil ved åpning eller skriving varsles i terminalen; skrivefeil rapporteres ved
+avslutning. Appen fortsetter selv om logging feiler.
+
 ## Lokale mapper og opprettelse fra Jira
 
 `vl` viser lokale mapper som appen kjenner: registrerte repository paths,
