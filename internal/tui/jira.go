@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
@@ -389,23 +390,24 @@ func (m Model) jiraView() tea.View {
 	rows := j.filtered()
 	selected := max(0, min(j.selected, len(rows)-1))
 	row := func(r jira.Issue, header bool) string {
-		values := []string{r.Key, r.Status, r.Title}
-		widths := []int{13, 16, max(1, m.width-31)}
+		summary := m.jiraPRSummary(r.Key)
+		values := []string{r.Key, r.Status, summary.countLabel(), summary.status, r.Title}
+		widths := []int{13, 16, 3, 19, max(1, m.width-55)}
 		if header {
-			values = []string{"SAK", "STATUS", "TITTEL"}
+			values = []string{"SAK", "STATUS", "PR", "PR-STATUS", "TITTEL"}
 		}
 		if m.width >= 100 {
-			values = []string{r.Key, r.Priority, r.Status, r.Title, r.Assignee, age(r.Updated)}
-			widths = []int{13, 9, 16, max(1, m.width-65), 16, 6}
+			values = []string{r.Key, r.Priority, r.Status, summary.countLabel(), summary.status, r.Title, r.Assignee, age(r.Updated)}
+			widths = []int{13, 9, 16, 3, 19, max(1, m.width-89), 16, 6}
 			if header {
-				values = []string{"SAK", "PRIORITET", "STATUS", "TITTEL", "ANSVARLIG", "ENDRET"}
+				values = []string{"SAK", "PRIORITET", "STATUS", "PR", "PR-STATUS", "TITTEL", "ANSVARLIG", "ENDRET"}
 			}
 		}
-		if m.width < 45 {
-			values = []string{r.Key, r.Title}
-			widths = []int{12, max(1, m.width-13)}
+		if m.width < 75 {
+			values = []string{r.Key, summary.countLabel(), r.Title}
+			widths = []int{12, 3, max(1, m.width-17)}
 			if header {
-				values = []string{"SAK", "TITTEL"}
+				values = []string{"SAK", "PR", "TITTEL"}
 			}
 		}
 		var cells []string
@@ -415,7 +417,11 @@ func (m Model) jiraView() tea.View {
 		return strings.Join(cells, " ")
 	}
 	lines = append(lines, accent.Render(row(jira.Issue{}, true)))
-	capacity := max(1, m.height-len(lines)-6)
+	var prLines []string
+	if len(rows) > 0 {
+		prLines = strings.Split(lipgloss.NewStyle().Width(max(1, m.width)).Render(clean(" "+m.jiraPRSummary(rows[selected].Key).detail())), "\n")
+	}
+	capacity := max(1, m.height-len(lines)-6-len(prLines))
 	start := max(0, selected-capacity+1)
 	for i := start; i < min(len(rows), start+capacity); i++ {
 		line := row(rows[i], false)
@@ -432,6 +438,7 @@ func (m Model) jiraView() tea.View {
 	}
 	if len(rows) > 0 {
 		r := rows[selected]
+		lines = append(lines, prLines...)
 		lines = append(lines, clean(fmt.Sprintf(" %d/%d · %s · %s · %s · frist: %s · labels: %s", selected+1, len(rows), r.Project, r.Type, r.Assignee, r.Due, strings.Join(r.Labels, ", "))), clean(" "+r.Description))
 	}
 	if j.notice != "" {

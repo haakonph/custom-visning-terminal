@@ -55,7 +55,7 @@ func (m Model) keyboardView() tea.View {
 }
 func (m Model) jiraDetailLines() []string {
 	issue := m.jira.detail
-	text := fmt.Sprintf("%s · %s\n%s · %s · %s\n\n%s", issue.Key, issue.Title, issue.Status, issue.Priority, issue.Assignee, issue.Description)
+	text := fmt.Sprintf("%s · %s\n%s · %s · %s\n\n%s", issue.Key, issue.Title, issue.Status, issue.Priority, issue.Assignee, m.jiraPRSummary(issue.Key).detail()+"\n\n"+issue.Description)
 	var lines []string
 	for _, line := range strings.Split(text, "\n") {
 		lines = append(lines, strings.Split(lipgloss.NewStyle().Width(max(1, m.width)).Render(clean(line)), "\n")...)
