@@ -20,7 +20,7 @@ func (m Model) jiraPRSummary(key string) jiraPRSummary {
 		return jiraPRSummary{status: "Ukjent", explanation: "GitHub er ikke konfigurert; antall åpne PR-er er ukjent."}
 	}
 	if len(prs) == 0 {
-		return jiraPRSummary{status: "Ingen åpne PR-er", explanation: "Ingen åpne PR-er funnet i GitHub-visningene. Mergehistorikk er ikke tilgjengelig."}
+		return jiraPRSummary{}
 	}
 	labels := []string{"Blokkert", "Endringer ønsket", "Venter på review", "Under arbeid", "Sjekker pågår", "Ukjent", "Klar til merge"}
 	counts := make([]int, len(labels))
@@ -62,9 +62,15 @@ func (s jiraPRSummary) countLabel() string {
 	if s.status == "Ukjent" && s.count == 0 {
 		return "?"
 	}
+	if s.count == 0 {
+		return ""
+	}
 	return fmt.Sprint(s.count)
 }
 
 func (s jiraPRSummary) detail() string {
+	if s.countLabel() == "" {
+		return ""
+	}
 	return fmt.Sprintf("PR-er: %s åpne · %s · %s", s.countLabel(), s.status, s.explanation)
 }
