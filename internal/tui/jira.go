@@ -391,23 +391,23 @@ func (m Model) jiraView() tea.View {
 	selected := max(0, min(j.selected, len(rows)-1))
 	row := func(r jira.Issue, header bool) string {
 		summary := m.jiraPRSummary(r.Key)
-		values := []string{r.Key, r.Status, summary.countLabel(), summary.status, r.Title}
-		widths := []int{13, 16, 3, 19, max(1, m.width-55)}
+		values := []string{r.Key, r.Status, r.Title, summary.countLabel(), summary.status}
+		widths := []int{13, 16, max(1, m.width-55), 3, 19}
 		if header {
-			values = []string{"SAK", "STATUS", "PR", "PR-STATUS", "TITTEL"}
+			values = []string{"SAK", "STATUS", "TITTEL", "PR", "PR-STATUS"}
 		}
 		if m.width >= 100 {
-			values = []string{r.Key, r.Priority, r.Status, summary.countLabel(), summary.status, r.Title, r.Assignee, age(r.Updated)}
-			widths = []int{13, 9, 16, 3, 19, max(1, m.width-89), 16, 6}
+			values = []string{r.Key, r.Priority, r.Status, r.Title, summary.countLabel(), summary.status, r.Assignee, age(r.Updated)}
+			widths = []int{13, 9, 16, max(1, m.width-89), 3, 19, 16, 6}
 			if header {
-				values = []string{"SAK", "PRIORITET", "STATUS", "PR", "PR-STATUS", "TITTEL", "ANSVARLIG", "ENDRET"}
+				values = []string{"SAK", "PRIORITET", "STATUS", "TITTEL", "PR", "PR-STATUS", "ANSVARLIG", "ENDRET"}
 			}
 		}
 		if m.width < 75 {
-			values = []string{r.Key, summary.countLabel(), r.Title}
-			widths = []int{12, 3, max(1, m.width-17)}
+			values = []string{r.Key, r.Title, summary.countLabel()}
+			widths = []int{12, max(1, m.width-17), 3}
 			if header {
-				values = []string{"SAK", "PR", "TITTEL"}
+				values = []string{"SAK", "TITTEL", "PR"}
 			}
 		}
 		var cells []string
@@ -419,7 +419,9 @@ func (m Model) jiraView() tea.View {
 	lines = append(lines, accent.Render(row(jira.Issue{}, true)))
 	var prLines []string
 	if len(rows) > 0 {
-		prLines = strings.Split(lipgloss.NewStyle().Width(max(1, m.width)).Render(clean(" "+m.jiraPRSummary(rows[selected].Key).detail())), "\n")
+		if detail := m.jiraPRSummary(rows[selected].Key).detail(); detail != "" {
+			prLines = strings.Split(lipgloss.NewStyle().Width(max(1, m.width)).Render(clean(" "+detail)), "\n")
+		}
 	}
 	capacity := max(1, m.height-len(lines)-6-len(prLines))
 	start := max(0, selected-capacity+1)
