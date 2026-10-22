@@ -318,7 +318,7 @@ func (m Model) foldersView() tea.View {
 			if folder.Favorite {
 				mark = "★ "
 			}
-			rows = append(rows, mark+folder.Repository+"  "+folder.IssueKey+"  "+folder.Title+"  "+folder.Path)
+			rows = append(rows, folderTableRow(m.width-2, mark, folder.Repository, folder.IssueKey, folder.Title, folder.Path))
 		}
 	}
 	lines := []string{accent.Render(cell(title, m.width))}
@@ -331,6 +331,9 @@ func (m Model) foldersView() tea.View {
 	}
 	if loading {
 		lines = append(lines, "Laster…")
+	}
+	if !f.picking {
+		lines = append(lines, accent.Render("  "+folderTableRow(m.width-2, "★", "REPOSITORY", "JIRA", "TITTEL", "STI")))
 	}
 	if len(rows) == 0 && !loading {
 		lines = append(lines, "Ingen mapper eller repoer i dette utvalget.")
@@ -360,4 +363,27 @@ func (m Model) foldersView() tea.View {
 	view := tea.NewView(strings.Join(lines, "\n"))
 	view.AltScreen = true
 	return view
+}
+
+// Keep headers and values aligned, reserving room for the path in narrow terminals.
+func folderTableRow(width int, favorite, repository, issue, title, path string) string {
+	width = max(1, width)
+	values := []string{favorite, repository, issue, title, path}
+	widths := []int{2, 22, 12, 24, 1}
+	if width < 100 {
+		widths = []int{2, 16, 10, 16, 1}
+	}
+	if width < 70 {
+		values = []string{favorite, repository, path}
+		widths = []int{2, min(16, width/3), 1}
+	}
+	used := len(widths) - 1
+	for _, size := range widths[:len(widths)-1] {
+		used += size
+	}
+	widths[len(widths)-1] = max(1, width-used)
+	for i := range values {
+		values[i] = cell(values[i], widths[i])
+	}
+	return cell(strings.Join(values, " "), width)
 }
