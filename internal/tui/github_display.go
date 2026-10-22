@@ -84,14 +84,20 @@ func prInfoLabel(p model.PullRequest) string {
 	if p.Mergeability == model.Conflicting {
 		status = string(model.Conflicting)
 	}
-	if p.OpenComments == nil || *p.OpenComments <= 0 {
+	parts := []string{}
+	if status != "" && status != string(model.Unknown) {
+		parts = append(parts, status)
+	}
+	if p.AutoMerge == "ON" {
+		parts = append(parts, "auto")
+	}
+	if p.OpenComments != nil && *p.OpenComments > 0 {
+		parts = append(parts, fmt.Sprintf("%d åpne", *p.OpenComments))
+	}
+	if len(parts) == 0 {
 		return status
 	}
-	comments := fmt.Sprintf("%d åpne", *p.OpenComments)
-	if status == "" || status == string(model.Unknown) {
-		return comments
-	}
-	return status + " · " + comments
+	return strings.Join(parts, " · ")
 }
 
 func queueLabel(p model.PullRequest) string {

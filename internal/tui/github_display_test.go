@@ -26,7 +26,10 @@ func TestGitHubDisplaySettingsAndIdentity(t *testing.T) {
 		if ansi.StringWidth(row) > width {
 			t.Fatalf("row exceeds width %d: %q", width, row)
 		}
-		if width >= 100 && (!strings.Contains(header, "AUTO") || !strings.Contains(header, "INFO") || strings.Contains(header, "QUEUE") || !strings.Contains(row, "ON") || !strings.Contains(row, "#2 QUEUED")) {
+		if strings.Contains(header, "AUTO") {
+			t.Fatal(header)
+		}
+		if width >= 100 && (!strings.Contains(header, "INFO") || strings.Contains(header, "QUEUE") || !strings.Contains(row, "#2 QUEUED · auto")) {
 			t.Fatal(row)
 		}
 	}
@@ -192,16 +195,23 @@ func TestOpenCommentsInfo(t *testing.T) {
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
 	for _, tc := range []struct {
-		count  int
-		status model.Status
-		want   string
+		count     int
+		status    model.Status
+		autoMerge model.Status
+		want      string
 	}{
-		{0, model.Mergeable, ""},
-		{0, model.Conflicting, "CONFLICT"},
-		{3, model.Mergeable, "3 åpne"},
-		{12, model.Conflicting, "CONFLICT · 12 åpne"},
+		{0, model.Mergeable, "", ""},
+		{0, model.Conflicting, "", "CONFLICT"},
+		{3, model.Mergeable, "", "3 åpne"},
+		{12, model.Conflicting, "", "CONFLICT · 12 åpne"},
+		{0, model.Mergeable, "ON", "auto"},
+		{0, model.Mergeable, "OFF", ""},
+		{0, model.Mergeable, model.Unknown, ""},
+		{0, model.Conflicting, "ON", "CONFLICT · auto"},
+		{3, model.Mergeable, "ON", "auto · 3 åpne"},
+		{1, model.Conflicting, "ON", "CONFLICT · auto · 1 åpne"},
 	} {
-		p := model.PullRequest{OpenComments: &tc.count, Mergeability: tc.status, MergeQueue: "NONE"}
+		p := model.PullRequest{OpenComments: &tc.count, Mergeability: tc.status, MergeQueue: "NONE", AutoMerge: tc.autoMerge}
 		if got := prInfoLabel(p); got != tc.want {
 			t.Fatalf("got %q, want %q", got, tc.want)
 		}
@@ -211,7 +221,7 @@ func TestOpenCommentsInfo(t *testing.T) {
 			if tc.count == 0 && strings.Contains(row, "0 åpne") {
 				t.Fatalf("width %d: zero open comments shown: %q", width, row)
 			}
-			if !strings.Contains(row, tc.want) || ansi.StringWidth(row) > width {
+			if !strings.Contains(row, ansi.Truncate(tc.want, 22, "…")) || ansi.StringWidth(row) > width {
 				t.Fatalf("width %d: %q", width, row)
 			}
 		}
