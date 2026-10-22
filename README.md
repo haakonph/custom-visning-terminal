@@ -705,6 +705,9 @@ Terminalen har et eget datalager i `os.UserConfigDir()/custom-visning-terminal/c
 på Linux normalt `~/.config/custom-visning-terminal/copilot.sqlite`). Lagrede sesjoner,
 inkludert mottatt telemetri, beholdes mellom oppstarter, også om kildefilene fjernes.
 Databasen oppdateres atomisk med tilgang `0600`, og nye lagringsmapper opprettes med `0700`.
+Lagringen er inkrementell: bare nye eller endrede hendelser, sesjoner og trace-koblinger
+skrives. Uendret historikk beholdes, og sesjonssammendrag gjenbrukes til sesjonen endres.
+Ved lagringsfeil beholdes ventende endringer i minnet og forsøkes lagret på nytt.
 Lageret er separat fra både GitHub-cachen og den andre appens database.
 
 Hvis appen melder `could not read Copilot store`, viser feilmeldingen hvilken

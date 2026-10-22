@@ -19,8 +19,17 @@ func (q *Queries) ClearCopilotSessions(ctx context.Context) error {
 	return err
 }
 
+const deleteCopilotSession = `-- name: DeleteCopilotSession :exec
+DELETE FROM copilot_sessions WHERE id = ?
+`
+
+func (q *Queries) DeleteCopilotSession(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteCopilotSession, id)
+	return err
+}
+
 const insertCopilotSessions = `-- name: InsertCopilotSessions :exec
-INSERT INTO copilot_sessions (id, name, client, cwd, project_root, git_root, branch, repository, remote, extra_metadata, model, agent, jira, started_at, last_activity, status, status_source, input_tokens, output_tokens, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+INSERT INTO copilot_sessions (id, name, client, cwd, project_root, git_root, branch, repository, remote, extra_metadata, model, agent, jira, started_at, last_activity, status, status_source, input_tokens, output_tokens, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20) ON CONFLICT (id) DO UPDATE SET name = excluded.name, client = excluded.client, cwd = excluded.cwd, project_root = excluded.project_root, git_root = excluded.git_root, branch = excluded.branch, repository = excluded.repository, remote = excluded.remote, extra_metadata = excluded.extra_metadata, model = excluded.model, agent = excluded.agent, jira = excluded.jira, started_at = excluded.started_at, last_activity = excluded.last_activity, status = excluded.status, status_source = excluded.status_source, input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens, duration_ms = excluded.duration_ms
 `
 
 type InsertCopilotSessionsParams struct {

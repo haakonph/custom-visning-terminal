@@ -19,7 +19,7 @@ func (q *Queries) ClearCopilotTraces(ctx context.Context) error {
 }
 
 const insertCopilotTraces = `-- name: InsertCopilotTraces :exec
-INSERT INTO copilot_traces (trace_id, session_id) VALUES (?1, ?2)
+INSERT INTO copilot_traces (trace_id, session_id) VALUES (?1, ?2) ON CONFLICT (trace_id) DO UPDATE SET session_id = excluded.session_id
 `
 
 type InsertCopilotTracesParams struct {
