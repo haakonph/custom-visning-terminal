@@ -176,7 +176,11 @@ func (m Model) View() tea.View {
 			p := rows[m.selected]
 			lines = append(lines, muted.Render(clean(" "+reviewSummaryLabel(p))))
 			lines = append(lines, " Local: "+m.localLabel(p)+" · Jira: "+strings.Join(p.JiraKeys(m.jiraPattern), ", ")+" · l relaterte saker")
-			detail := fmt.Sprintf(" %d/%d · automerge: %s (a+ på / a- av) · queue: %s · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), autoMergeLabel(p), queueLabel(p), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
+			auto := ""
+			if label := autoMergeLabel(p); label != "" {
+				auto = " · automerge: " + label
+			}
+			detail := fmt.Sprintf(" %d/%d%s · queue: %s · merge: %s · reviewers: %s · teams: %s · labels: %s", m.selected+1, len(rows), auto, queueLabel(p), p.Mergeability, strings.Join(p.RequestedReviewers, ", "), m.githubTeams(p.RequestedTeams), strings.Join(p.Labels, ", "))
 			lines = append(lines, muted.Render(clean(detail)))
 			if m.mmReader != nil {
 				lines = append(lines, fmt.Sprintf(" Mattermost mentions (%d) · v vis referanser · M kanaler", m.mmMentionCount(p.URL)))
