@@ -186,7 +186,25 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
+	if k != "p" && m.folders.repositoryView {
+		m.folders.generation++
+		m.folders.repoLoading = false
+		m.folders.repositoryView, m.folders.active, m.folders.searching = false, false, false
+		m.folders.query = ""
+	}
+	if k == "p" {
+		m.folders.active, m.folders.repositoryView = true, true
+		m.folders.picking, m.folders.searching = false, false
+		m.folders.selected, m.folders.query = 0, ""
+		m.setup = setupState{}
+		m.detail, m.dialog = nil, nil
+		if m.mattermost != nil {
+			m.mattermost.active = false
+		}
+		return m, m.loadWritableRepositories()
+	}
 	if k == "l" {
+		m.folders.repositoryView = false
 		if m.local == nil {
 			return m.WithSetup("editor"), nil
 		}
@@ -198,6 +216,7 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		return m, m.loadFolders()
 	}
 	m.folders.active = false
+	m.folders.repositoryView = false
 	if k == "m" {
 		m.usageView = true
 		m.usageOffset = 0

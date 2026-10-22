@@ -65,6 +65,8 @@ func (m Model) usageScreen() string {
 		return "mattermost.compose"
 	case m.folders.picking:
 		return "folders.repository.choose"
+	case m.folders.repositoryView:
+		return "repositories.list"
 	case m.folders.active:
 		return "folders.list"
 	case m.dialog != nil:
@@ -139,7 +141,7 @@ func (m Model) usageCommand(k string) (category, name, target string) {
 		}
 		op := m.sequence[:1]
 		if op == "v" {
-			target = map[string]string{"o": "task", "g": "github", "t": "jira", "a": "copilot", "c": "mattermost", "s": "settings", "z": "deferred", "b": "archive", "i": "diagnostics", "f": "jira.filters", "j": "jira.jql", "k": "mattermost.channels", "h": "setup", "m": "metrics", "l": "folders", "r": "previous"}[k]
+			target = map[string]string{"o": "task", "g": "github", "t": "jira", "a": "copilot", "c": "mattermost", "s": "settings", "z": "deferred", "b": "archive", "i": "diagnostics", "f": "jira.filters", "j": "jira.jql", "k": "mattermost.channels", "h": "setup", "m": "metrics", "l": "folders", "p": "repositories", "r": "previous"}[k]
 			if target != "" {
 				return "command", "view", target
 			}
