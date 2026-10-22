@@ -692,6 +692,8 @@ Direkteoppstart bruker bare Copilot; start på vanlig måte for å bytte mellom
 Appen leser `workspace.yaml` og `events.jsonl` fra `~/.copilot/session-state`,
 med de samme datakildene som Copilot-visningen i `custom-visning`. Den importerer
 historikken i bakgrunnen ved oppstart og leser nye data hvert andre sekund.
+Uendrede kildefiler sjekkes via filmetadata uten å åpnes på nytt. Nye eller endrede
+filer åpnes ved neste skanning; hendelsesfiler leses videre fra forrige posisjon.
 Terminalvisningen venter ikke på at Copilot-lageret skal leses. Copilot viser
 lasting til historikken er klar; en lesefeil vises i Copilot uten å overskrive
 lageret eller hindre GitHub-/Jira-visningen i å starte. Samtale,
