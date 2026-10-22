@@ -71,10 +71,10 @@ func (m Model) displayReference(r model.TaskReference) model.TaskReference {
 }
 
 func autoMergeLabel(p model.PullRequest) string {
-	if p.AutoMerge == "" {
-		return string(model.Unknown)
+	if p.AutoMerge == "ON" {
+		return "ON"
 	}
-	return string(p.AutoMerge)
+	return ""
 }
 
 // prInfoLabel prioritizes merge blockers in the compact table cell.
