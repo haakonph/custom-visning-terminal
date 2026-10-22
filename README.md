@@ -203,6 +203,11 @@ går tilbake til visningen du kom fra.
   radflytting. Pil- og bokstavsnarveier samles under samme kommandonavn.
 - **Oppstarter** teller appøkter. Statistikksidens egen rulling og periodevalg
   teller ikke som bruk av arbeidsvisningene.
+- **Innkommende HTTP-kall** teller fullførte kall til appens lokale OTLP-mottaker,
+  fordelt på HTTP-metode, endepunkt og svarstatus. `/v1/traces`, `/v1/logs` og
+  `/v1/metrics` vises separat. Alle andre stier samles som «Ukjent endepunkt»,
+  og uvanlige HTTP-metoder samles som `OTHER`. Også avviste kall og feil telles.
+  Query-parametere, headere, avsenderadresser og innhold lagres ikke i tellerne.
 
 Dataene er daglige tellere med faste navn på funksjoner og visninger. Søketekst,
 meldinger, titler, lenker, repositorynavn, kanalnavn, bruker-ID-er, passord og
