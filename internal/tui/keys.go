@@ -18,6 +18,7 @@ z / zz      Utsett valgte elementer / hele sammenhengen
 
 Ting: o oppgaver · g GitHub · t Jira · a AI/Copilot · c chat/Mattermost
 vo/vg/vt/va/vc  Visningsside
+vp              Repoer med skrivetilgang: / søk · Enter/en GitHub · au oppdater
 vl              Lokale mapper: Alle / Favoritter / Skjulte
                 af favoritt · ah skjul/vis · ee editor · au oppdater
 aw / ee         Jira: opprett mappe fra én sak; velg repo med skrivetilgang

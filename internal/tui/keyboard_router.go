@@ -442,7 +442,7 @@ func sequenceHint(prefix string) string {
 	case 't':
 		return "o oppgaver · g GitHub · t Jira · a AI · c chat (velg koblingsmål)"
 	case 'v':
-		return "o/g/t/a/c visning · m bruksstatistikk · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler · h oppsett"
+		return "o/g/t/a/c visning · p repoer · l mapper · m bruksstatistikk · s innstillinger · z utsatte · b arkiv · i diagnostikk · f filtre · j JQL · k kanaler · h oppsett"
 	case 'e':
 		return "e editor · n nettleser · o/g/t/a/c relatert mål · v editorvalg · l lenker"
 	case 'a':

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ type folderState struct {
 	selected, tab                    int
 	query, notice                    string
 	picking                          bool
+	repositoryView                   bool
 	repositories                     []string
 	issue                            model.TaskReference
 	generation                       uint64
@@ -42,6 +44,46 @@ type folderCreated struct {
 	err    error
 }
 type folderOpened struct{ err error }
+type repositoryOpened struct{ err error }
+
+func (m *Model) loadWritableRepositories() tea.Cmd {
+	if m.folders.repoLoading {
+		return nil
+	}
+	source, ok := m.source.(writableRepositorySource)
+	if !ok {
+		m.folders.notice = "GitHub må være konfigurert. Åpne vg og vh for oppsett."
+		return nil
+	}
+	m.folders.generation++
+	generation, parent := m.folders.generation, m.ctx
+	m.folders.repoLoading = true
+	m.folders.notice = "Henter repoer med skrivetilgang…"
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+		defer cancel()
+		rows, err := source.WritableRepositories(ctx)
+		return folderReposLoaded{rows, err, generation}
+	}
+}
+
+func (m Model) openWritableRepository() (tea.Model, tea.Cmd) {
+	rows := m.folderRepositories()
+	if len(rows) == 0 || m.folders.repoLoading {
+		return m, nil
+	}
+	id := rows[min(m.folders.selected, len(rows)-1)]
+	owner, name, ok := strings.Cut(id, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return m, nil
+	}
+	link, parent := "https://github.com/"+url.PathEscape(owner)+"/"+url.PathEscape(name), m.ctx
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+		defer cancel()
+		return repositoryOpened{openBrowser(ctx, link)}
+	}
+}
 
 func (m *Model) loadFolders() tea.Cmd {
 	if m.local == nil || m.folders.loading {
@@ -88,26 +130,19 @@ func (m *Model) startIssueFolder(refs []model.TaskReference) tea.Cmd {
 		m.sequenceNotice = "Velg én Jira-oppgave for å opprette en mappe."
 		return nil
 	}
-	source, ok := m.source.(writableRepositorySource)
+	_, ok := m.source.(writableRepositorySource)
 	if !ok {
 		m.sequenceNotice = "GitHub må være konfigurert for å hente repoer med skrivetilgang."
 		return nil
 	}
-	m.folders.generation++
-	generation := m.folders.generation
-	m.folders.picking, m.folders.repoLoading = true, true
+	m.folders.repositoryView = false
+	m.folders.picking = true
+	m.folders.searching = false
 	m.folders.issue = refs[0]
 	m.folders.repositories = nil
 	m.folders.selected = 0
 	m.folders.query = ""
-	m.folders.notice = "Henter repoer med skrivetilgang…"
-	parent := m.ctx
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
-		defer cancel()
-		rows, err := source.WritableRepositories(ctx)
-		return folderReposLoaded{rows, err, generation}
-	}
+	return m.loadWritableRepositories()
 }
 func (m *Model) folderMessage(msg tea.Msg) bool {
 	switch r := msg.(type) {
@@ -121,12 +156,18 @@ func (m *Model) folderMessage(msg tea.Msg) bool {
 		}
 		m.folders.selected = max(0, min(m.folders.selected, len(m.folderRows())-1))
 	case folderReposLoaded:
-		if r.generation != m.folders.generation || !m.folders.picking {
+		if r.generation != m.folders.generation || (!m.folders.picking && !m.folders.repositoryView) {
 			return true
 		}
 		m.folders.repoLoading = false
-		m.folders.repositories = r.rows
+		if r.err == nil {
+			m.folders.repositories = r.rows
+		}
+		m.folders.selected = max(0, min(m.folders.selected, len(m.folderRepositories())-1))
 		m.folders.notice = "Velg repository og trykk Enter for å opprette mappen."
+		if m.folders.repositoryView {
+			m.folders.notice = "Viser aktive repoer tokenet gir skrivetilgang til. Arkiverte og deaktiverte repoer utelates."
+		}
 		if r.err != nil {
 			m.folders.notice = r.err.Error()
 		} else if len(r.rows) == 0 {
@@ -157,6 +198,11 @@ func (m *Model) folderMessage(msg tea.Msg) bool {
 		}
 		m.folders.query = r.folder.Path
 		m.folders.notice = "Mappe klar: " + r.folder.Path + " · ee åpner editor"
+	case repositoryOpened:
+		m.folders.notice = "Repository åpnet på GitHub."
+		if r.err != nil {
+			m.folders.notice = "Kunne ikke åpne nettleseren: " + r.err.Error()
+		}
 	case folderOpened:
 		m.folders.busy = false
 		m.folders.notice = "Mappen er åpnet i editor."
@@ -199,7 +245,7 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	count := len(m.folderRows())
-	if f.picking {
+	if f.picking || f.repositoryView {
 		count = len(m.folderRepositories())
 	}
 	switch k {
@@ -208,7 +254,11 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			f.notice = "Vent til opprettelsen er ferdig."
 			return m, nil
 		}
-		if f.picking {
+		if f.repositoryView {
+			f.repositoryView, f.active, f.repoLoading = false, false, false
+			f.query = ""
+			f.generation++
+		} else if f.picking {
 			f.picking = false
 			f.repoLoading = false
 			f.generation++
@@ -221,7 +271,7 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		f.selected = max(0, f.selected-1)
 	case "h", "left", "l", "right":
-		if !f.picking {
+		if !f.picking && !f.repositoryView {
 			delta := 1
 			if k == "h" || k == "left" {
 				delta = 2
@@ -232,6 +282,9 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		f.searching = true
 	case "enter":
+		if f.repositoryView {
+			return m.openWritableRepository()
+		}
 		if f.picking && !f.repoLoading && !f.busy && count > 0 {
 			source, ok := m.source.(writableRepositorySource)
 			if !ok {
@@ -255,6 +308,15 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 func (m Model) folderAction(prefix, k string) (tea.Model, tea.Cmd) {
+	if m.folders.repositoryView {
+		if prefix == "a" && k == "u" {
+			return m, m.loadWritableRepositories()
+		}
+		if prefix == "e" && k == "n" {
+			return m.openWritableRepository()
+		}
+		return m, nil
+	}
 	if m.folders.picking {
 		return m, nil
 	}
@@ -308,7 +370,7 @@ func (m Model) foldersView() tea.View {
 	f := m.folders
 	title := "Lokale mapper · Alle / Favoritter / Skjulte"
 	var rows []string
-	if f.picking {
+	if f.picking || f.repositoryView {
 		title = "Ny mappe fra " + f.issue.Key + " · velg repository med skrivetilgang"
 		rows = m.folderRepositories()
 	} else {
@@ -321,9 +383,12 @@ func (m Model) foldersView() tea.View {
 			rows = append(rows, folderTableRow(m.width-2, mark, folder.Repository, folder.IssueKey, folder.Title, folder.Path))
 		}
 	}
+	if f.repositoryView {
+		title = fmt.Sprintf("Repoer med skrivetilgang · %d av %d", len(rows), len(f.repositories))
+	}
 	lines := []string{accent.Render(cell(title, m.width))}
 	loading := f.loading
-	if f.picking {
+	if f.picking || f.repositoryView {
 		loading = f.repoLoading
 	}
 	if f.query != "" || f.searching {
@@ -332,7 +397,7 @@ func (m Model) foldersView() tea.View {
 	if loading {
 		lines = append(lines, "Laster…")
 	}
-	if !f.picking {
+	if !f.picking && !f.repositoryView {
 		lines = append(lines, accent.Render("  "+folderTableRow(m.width-2, "★", "REPOSITORY", "JIRA", "TITTEL", "STI")))
 	}
 	if len(rows) == 0 && !loading {
@@ -353,8 +418,11 @@ func (m Model) foldersView() tea.View {
 		lines = append(lines, cell(f.notice, m.width))
 	}
 	hint := "h/l faner · j/k velg · / søk · af favoritt · ah skjul/vis · ee editor · au oppdater · Esc tilbake"
-	if f.picking {
+	if f.picking || f.repositoryView {
 		hint = "j/k velg · / søk · Enter opprett · Esc avbryt"
+	}
+	if f.repositoryView {
+		hint = "j/k velg · / søk · Enter/en GitHub · au oppdater · Esc tilbake"
 	}
 	lines = append(lines, muted.Render(cell(hint, m.width)))
 	if len(lines) > max(1, m.height) {

@@ -246,6 +246,12 @@ rettigheter (`0600`), og en ny loggmappe opprettes med `0700`. Filen roteres ved
 Feil ved åpning eller skriving varsles i terminalen; skrivefeil rapporteres ved
 avslutning. Appen fortsetter selv om logging feiler.
 
+## Repoer med skrivetilgang
+
+`vp` viser aktive GitHub-repoer tokenet ditt har skrivetilgang til, også uten lokale mapper eller Jira-oppsett. Listen hentes fra alle sider hos GitHub. Arkiverte og deaktiverte repoer utelates. Tokenets repository-tilgang og organisasjonens SSO begrenser utvalget.
+
+Bruk `/` for å søke på eier/reponavn, `j/k` for å velge, `Enter` eller `en` for å åpne på GitHub, `au` for å hente listen på nytt og `Esc` for å gå tilbake.
+
 ## Lokale mapper og opprettelse fra Jira
 
 `vl` viser lokale mapper som appen kjenner: registrerte repository paths,
