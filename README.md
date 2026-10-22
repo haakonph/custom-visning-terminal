@@ -203,6 +203,11 @@ går tilbake til visningen du kom fra.
   radflytting. Pil- og bokstavsnarveier samles under samme kommandonavn.
 - **Oppstarter** teller appøkter. Statistikksidens egen rulling og periodevalg
   teller ikke som bruk av arbeidsvisningene.
+- **Innkommende HTTP-kall** teller fullførte kall til appens lokale OTLP-mottaker,
+  fordelt på HTTP-metode, endepunkt og svarstatus. `/v1/traces`, `/v1/logs` og
+  `/v1/metrics` vises separat. Alle andre stier samles som «Ukjent endepunkt»,
+  og uvanlige HTTP-metoder samles som `OTHER`. Også avviste kall og feil telles.
+  Query-parametere, headere, avsenderadresser og innhold lagres ikke i tellerne.
 
 Dataene er daglige tellere med faste navn på funksjoner og visninger. Søketekst,
 meldinger, titler, lenker, repositorynavn, kanalnavn, bruker-ID-er, passord og
@@ -220,6 +225,26 @@ statistikkvisningen viser tidligere lagrede tall pluss egen økt, og leser andre
 instansers nye tall etter omstart. Datoer følger maskinens lokale tidssone.
 Lagringsfeil stopper ikke dashboardet; statistikkvisningen varsler hvis nye
 tellere foreløpig bare finnes i minnet.
+
+## HTTP-logg
+
+Alle innkommende HTTP-kall til appens lokale OTLP-mottaker logges i `http.log`
+under `os.UserConfigDir()/custom-visning/`. På macOS er dette normalt
+`~/Library/Application Support/custom-visning/http.log`, på Linux
+`~/.config/custom-visning/http.log`. `CUSTOM_VISNING_HTTP_LOG` overstyrer stien.
+
+Hvert fullførte kall gir én JSON-linje med tidspunkt (UTC), faktisk HTTP-metode
+og sti, avsenderadresse, svarstatus, varighet i millisekunder og antall svarbytes.
+Også ukjente endepunkter og avviste kall logges, med den faktiske stien.
+Query-parametere, headere og forespørsels-/svarinnhold lagres ikke i loggen.
+En handler som panikker logges med `aborted: true`; status `0` betyr at ingen
+endelig svarstatus ble sendt før panikken.
+
+Logging er uavhengig av `CUSTOM_VISNING_METRICS_DISABLED`. Loggfilen har private
+rettigheter (`0600`), og en ny loggmappe opprettes med `0700`. Filen roteres ved
+10 MB med opptil tre arkiver; arkiver eldre enn sju dager ryddes ved rotasjon.
+Feil ved åpning eller skriving varsles i terminalen; skrivefeil rapporteres ved
+avslutning. Appen fortsetter selv om logging feiler.
 
 ## Lokale mapper og opprettelse fra Jira
 

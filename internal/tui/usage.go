@@ -226,7 +226,7 @@ func (m Model) usageStatsLines() []string {
 		for _, c := range counts {
 			if c.Category != category {
 				category = c.Category
-				heading := map[string]string{"command": "Kommandoer", "navigation": "Faktisk navigasjon", "session": "Oppstarter"}[category]
+				heading := map[string]string{"command": "Kommandoer", "navigation": "Faktisk navigasjon", "session": "Oppstarter", "http.incoming": "Innkommende HTTP-kall (metode · endepunkt → status)"}[category]
 				lines = append(lines, "", heading)
 			}
 			path := c.Source
@@ -234,6 +234,9 @@ func (m Model) usageStatsLines() []string {
 				path += " → " + c.Target
 			}
 			label := usageLabels[c.Name]
+			if c.Category == "http.incoming" && c.Source == "unknown" {
+				path = "Ukjent endepunkt → " + c.Target
+			}
 			if label == "" {
 				label = c.Name
 			}

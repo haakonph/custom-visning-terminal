@@ -134,6 +134,19 @@ func TestUsageViewWithoutRecorder(t *testing.T) {
 	}
 }
 
+func TestUsageViewShowsIncomingRequests(t *testing.T) {
+	m, r := measuredModel(t)
+	r.Record("http.incoming", "POST", "/v1/logs", "200")
+	r.Record("http.incoming", "GET", "unknown", "404")
+	m, _ = sequence(m, "vm")
+	view := ansi.Strip(m.View().Content)
+	for _, text := range []string{"Innkommende HTTP-kall", "POST", "/v1/logs → 200", "GET", "Ukjent endepunkt → 404"} {
+		if !strings.Contains(view, text) {
+			t.Errorf("metrics view missing %q: %s", text, view)
+		}
+	}
+}
+
 func TestUsageTracksTaskAndChatNavigationWithoutEntityNames(t *testing.T) {
 	m, r := measuredModel(t)
 	m.tasks.items = []model.Task{{ID: "private-id-1", Title: "private-title-1"}, {ID: "private-id-2", Title: "private-title-2"}}

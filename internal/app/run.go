@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/accesslog"
 	"github.com/haakonph/custom-visning-terminal/internal/cache"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
@@ -48,6 +49,28 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	if copilotErr != nil {
 		return copilotErr
 	}
+	requestLog, logErr := accesslog.Open(accesslog.DefaultPath())
+	if logErr != nil {
+		fmt.Fprintln(stderr, "Kunne ikke åpne HTTP-loggen; fortsetter uten logging:", logErr)
+	} else {
+		defer func() {
+			if err := requestLog.Close(); err != nil {
+				fmt.Fprintln(stderr, "Kunne ikke skrive HTTP-loggen:", err)
+			}
+		}()
+	}
+	copilotOptions.AccessLog = requestLog
+	// Keep metrics alive from receiver startup through its shutdown, so final
+	// requests are recorded before the counters are flushed and closed.
+	recorder, usageNotice := openUsage(stderr)
+	if recorder != nil {
+		defer func() {
+			if err := recorder.Close(); err != nil {
+				fmt.Fprintln(stderr, "Kunne ikke lagre lokal bruksstatistikk.")
+			}
+		}()
+	}
+	copilotOptions.Usage = recorder
 	copilotClient, copilotErr := copilot.NewDeferred(copilotOptions)
 	if copilotErr != nil {
 		return copilotErr
@@ -60,7 +83,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 	}()
 	if startCopilot {
 		dashboard := tui.New(ctx, nil, nil).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, true)
-		return runDashboard(ctx, dashboard, stderr)
+		return runDashboard(ctx, dashboard, stderr, recorder, usageNotice)
 	}
 
 	var jiraClient *jira.Client
@@ -130,24 +153,24 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		}
 		dashboard = dashboard.WithSetup(kind)
 	}
-	return runDashboard(ctx, dashboard, stderr)
+	return runDashboard(ctx, dashboard, stderr, recorder, usageNotice)
 }
 
-func runDashboard(ctx context.Context, dashboard tui.Model, stderr io.Writer) error {
+func openUsage(stderr io.Writer) (*usage.Recorder, string) {
 	if os.Getenv("CUSTOM_VISNING_METRICS_DISABLED") == "1" {
-		dashboard = dashboard.WithUsage(nil, "Deaktivert med CUSTOM_VISNING_METRICS_DISABLED=1.")
-	} else if recorder, err := usage.Open(usage.DefaultPath()); err != nil {
-		fmt.Fprintln(stderr, "Lokal bruksstatistikk er utilgjengelig; fortsetter uten innsamling.")
-		dashboard = dashboard.WithUsage(nil, "Kunne ikke åpne den lokale statistikkdatabasen.")
-	} else {
-		dashboard = dashboard.WithUsage(recorder, "")
-		recorder.Record("session", "start", "app", "")
-		defer func() {
-			if err := recorder.Close(); err != nil {
-				fmt.Fprintln(stderr, "Kunne ikke lagre lokal bruksstatistikk.")
-			}
-		}()
+		return nil, "Deaktivert med CUSTOM_VISNING_METRICS_DISABLED=1."
 	}
+	recorder, err := usage.Open(usage.DefaultPath())
+	if err != nil {
+		fmt.Fprintln(stderr, "Lokal bruksstatistikk er utilgjengelig; fortsetter uten innsamling.")
+		return nil, "Kunne ikke åpne den lokale statistikkdatabasen."
+	}
+	return recorder, ""
+}
+
+func runDashboard(ctx context.Context, dashboard tui.Model, stderr io.Writer, recorder *usage.Recorder, usageNotice string) error {
+	dashboard = dashboard.WithUsage(recorder, usageNotice)
+	recorder.Record("session", "start", "app", "")
 	configured, err := dashboard.WithMattermostConfig()
 	if err != nil {
 		dashboard = dashboard.WithSetupProblem("mattermost", "Kunne ikke klargjøre Mattermost: "+err.Error())
