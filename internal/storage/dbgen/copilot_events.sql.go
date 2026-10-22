@@ -19,7 +19,7 @@ func (q *Queries) ClearCopilotEvents(ctx context.Context) error {
 }
 
 const insertCopilotEvents = `-- name: InsertCopilotEvents :exec
-INSERT INTO copilot_events (session_id, event_key, source_key, source, observed_session_id, trace_id, span_id, event_id, start_time, state, metric_series, time, event_type, content, role, tool, call_id, args, result, error, warning, agent, parent, model, metadata, raw, temporality) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
+INSERT INTO copilot_events (session_id, event_key, source_key, source, observed_session_id, trace_id, span_id, event_id, start_time, state, metric_series, time, event_type, content, role, tool, call_id, args, result, error, warning, agent, parent, model, metadata, raw, temporality) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27) ON CONFLICT (session_id, event_key) DO UPDATE SET source_key = excluded.source_key, source = excluded.source, observed_session_id = excluded.observed_session_id, trace_id = excluded.trace_id, span_id = excluded.span_id, event_id = excluded.event_id, start_time = excluded.start_time, state = excluded.state, metric_series = excluded.metric_series, time = excluded.time, event_type = excluded.event_type, content = excluded.content, role = excluded.role, tool = excluded.tool, call_id = excluded.call_id, args = excluded.args, result = excluded.result, error = excluded.error, warning = excluded.warning, agent = excluded.agent, parent = excluded.parent, model = excluded.model, metadata = excluded.metadata, raw = excluded.raw, temporality = excluded.temporality
 `
 
 type InsertCopilotEventsParams struct {

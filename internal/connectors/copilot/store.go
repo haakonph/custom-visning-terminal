@@ -27,7 +27,7 @@ func (s *Service) sessionLocked(id string) *storedSession {
 	if v == nil {
 		v = &storedSession{Meta: map[string]any{}, Events: map[string]Event{}}
 		s.data.Sessions[id] = v
-		s.dirty = true
+		s.markSessionLocked(id)
 	}
 	return v
 }
@@ -42,7 +42,7 @@ func (s *Service) metadataLocked(id string, m map[string]any) {
 		}
 		if hash(v.Meta[k]) != hash(val) {
 			v.Meta[k] = val
-			s.dirty = true
+			s.markSessionLocked(id)
 		}
 	}
 }
@@ -88,6 +88,7 @@ func (s *Service) ingestLocked(events []Event) {
 					v := s.sessionLocked(id)
 					for k, ev := range old.Events {
 						v.Events[k] = ev
+						s.markEventLocked(id, k)
 					}
 					for k, val := range old.Meta {
 						if _, ok := v.Meta[k]; !ok {
@@ -95,12 +96,22 @@ func (s *Service) ingestLocked(events []Event) {
 						}
 					}
 					delete(s.data.Sessions, previous)
-					s.dirty = true
+					delete(s.changedSessions, previous)
+					delete(s.summaries, previous)
+					if s.removedSessions == nil {
+						s.removedSessions = map[string]bool{}
+					}
+					s.removedSessions[previous] = true
+					s.markSessionLocked(id)
+					for trace, session := range s.data.Traces {
+						if session == previous {
+							s.setTraceLocked(trace, id)
+						}
+					}
 				}
 			}
 			if s.data.Traces[e.TraceID] != id {
-				s.data.Traces[e.TraceID] = id
-				s.dirty = true
+				s.setTraceLocked(e.TraceID, id)
 			}
 		}
 		if id == "" {
@@ -115,17 +126,58 @@ func (s *Service) ingestLocked(events []Event) {
 			}
 		}
 		v.Events[key] = e
-		s.dirty = true
+		s.markEventLocked(id, key)
 	}
 }
+
+func (s *Service) markSessionLocked(id string) {
+	if s.changedSessions == nil {
+		s.changedSessions = map[string]map[string]bool{}
+	}
+	if s.changedSessions[id] == nil {
+		s.changedSessions[id] = map[string]bool{}
+	}
+	delete(s.summaries, id)
+}
+
+func (s *Service) markEventLocked(id, key string) {
+	s.markSessionLocked(id)
+	s.changedSessions[id][key] = true
+}
+
+func (s *Service) setTraceLocked(trace, id string) {
+	s.data.Traces[trace] = id
+	if s.changedTraces == nil {
+		s.changedTraces = map[string]bool{}
+	}
+	s.changedTraces[trace] = true
+}
+
 func (s *Service) saveLocked() error {
-	if !s.dirty {
+	if len(s.changedSessions) == 0 && len(s.changedTraces) == 0 && len(s.removedSessions) == 0 {
 		return nil
 	}
-	if err := storage.Save(s.options.StorePath, s.storageSnapshot()); err != nil {
+	changes := diskStore{Version: 1, Sessions: map[string]*storedSession{}, Traces: map[string]string{}, Summaries: map[string]Session{}}
+	for id, keys := range s.changedSessions {
+		session := s.data.Sessions[id]
+		events := make(map[string]Event, len(keys))
+		for key := range keys {
+			events[key] = session.Events[key]
+		}
+		changes.Sessions[id] = &storedSession{Meta: session.Meta, Events: events}
+		changes.Summaries[id] = s.summaryLocked(id, session)
+	}
+	for trace := range s.changedTraces {
+		changes.Traces[trace] = s.data.Traces[trace]
+	}
+	removed := make([]string, 0, len(s.removedSessions))
+	for id := range s.removedSessions {
+		removed = append(removed, id)
+	}
+	if err := storage.SaveCopilotChanges(s.options.StorePath, changes, removed); err != nil {
 		return err
 	}
-	s.dirty = false
+	s.changedSessions, s.changedTraces, s.removedSessions = nil, nil, nil
 	return nil
 }
 func sortedEvents(v *storedSession) []Event {
@@ -142,6 +194,27 @@ func sortedEvents(v *storedSession) []Event {
 	return events
 }
 func (s *Service) summaryLocked(id string, v *storedSession) Session {
+	if s.summaries == nil {
+		s.summaries = map[string]Session{}
+	}
+	out, ok := s.summaries[id]
+	if !ok {
+		out = s.buildSummaryLocked(id, v)
+		s.summaries[id] = out
+	}
+	// Inferred activity ages even when the underlying events do not change.
+	if out.StatusSource == "inferred" {
+		if at, err := time.Parse(time.RFC3339Nano, out.LastActivity); err == nil {
+			out.Status = "inactive"
+			if time.Since(at) < 2*time.Minute {
+				out.Status = "active"
+			}
+		}
+	}
+	return out
+}
+
+func (s *Service) buildSummaryLocked(id string, v *storedSession) Session {
 	events := sortedEvents(v)
 	meta := map[string]any{}
 	for _, e := range events {

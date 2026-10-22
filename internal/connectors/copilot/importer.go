@@ -129,14 +129,19 @@ func localEvent(raw map[string]any, id string) Event {
 	return e
 }
 
-// openRegular checks the path and the opened descriptor, never importing symlinks.
-func openRegular(path string) (*os.File, os.FileInfo, error) {
+// openRegular checks metadata before opening a file. A nil file with no error
+// means the previously consumed file is unchanged. Changed files are checked
+// again through the opened descriptor; symlinks are never imported.
+func openRegular(path string, previous os.FileInfo) (*os.File, os.FileInfo, error) {
 	st, err := os.Lstat(path)
 	if err != nil {
 		return nil, nil, err
 	}
 	if !st.Mode().IsRegular() {
 		return nil, nil, errors.New("not a regular file")
+	}
+	if previous != nil && os.SameFile(previous, st) && previous.Size() == st.Size() && previous.ModTime() == st.ModTime() {
+		return nil, st, nil
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -194,7 +199,12 @@ func (s *Service) Scan(ctx context.Context) {
 	}
 }
 func (s *Service) importWorkspace(ctx context.Context, id, path string) {
-	f, info, err := openRegular(path)
+	old := s.cursors[path]
+	var previous os.FileInfo
+	if old != nil {
+		previous = old.info
+	}
+	f, info, err := openRegular(path, previous)
 	if errors.Is(err, os.ErrNotExist) {
 		return
 	}
@@ -202,12 +212,15 @@ func (s *Service) importWorkspace(ctx context.Context, id, path string) {
 		s.report(id + ": workspace.yaml er ikke lesbar eller er en symlink")
 		return
 	}
+	if f == nil {
+		return
+	}
 	defer f.Close()
-	old := s.cursors[path]
 	if old != nil && os.SameFile(old.info, info) && old.info.ModTime() == info.ModTime() && old.info.Size() == info.Size() {
 		return
 	}
 	if info.Size() > 1<<20 {
+		s.cursors[path] = &cursor{info: info}
 		s.report(id + ": workspace.yaml overskrider 1 MiB")
 		return
 	}
@@ -216,6 +229,9 @@ func (s *Service) importWorkspace(ctx context.Context, id, path string) {
 		s.report(id + ": kunne ikke lese workspace.yaml")
 		return
 	}
+	// A fully read but malformed workspace should only be parsed again after
+	// it changes. Read failures above remain retryable without a metadata change.
+	s.cursors[path] = &cursor{info: info}
 	var m map[string]any
 	if yaml.Unmarshal(b, &m) != nil || m == nil {
 		s.report(id + ": ugyldig workspace.yaml")
@@ -226,7 +242,6 @@ func (s *Service) importWorkspace(ctx context.Context, id, path string) {
 	s.mu.Lock()
 	s.metadataLocked(id, meta)
 	s.mu.Unlock()
-	s.cursors[path] = &cursor{info: info}
 }
 func (s *Service) acceptLine(ctx context.Context, id string, b []byte, complete bool) {
 	if len(bytes.TrimSpace(b)) == 0 {
@@ -248,7 +263,14 @@ func (s *Service) acceptLine(ctx context.Context, id string, b []byte, complete 
 	s.mu.Unlock()
 }
 func (s *Service) importEvents(ctx context.Context, id, path string) {
-	f, info, err := openRegular(path)
+	c := s.cursors[path]
+	var previous os.FileInfo
+	// A cancelled or failed read may leave bytes unread even when metadata has
+	// not changed. Only fully consumed snapshots can skip opening the file.
+	if c != nil && c.position == c.info.Size() {
+		previous = c.info
+	}
+	f, info, err := openRegular(path, previous)
 	if errors.Is(err, os.ErrNotExist) {
 		return
 	}
@@ -256,8 +278,10 @@ func (s *Service) importEvents(ctx context.Context, id, path string) {
 		s.report(id + ": events.jsonl er ikke lesbar eller er en symlink")
 		return
 	}
+	if f == nil {
+		return
+	}
 	defer f.Close()
-	c := s.cursors[path]
 	if c == nil || !os.SameFile(c.info, info) || info.Size() < c.position || (info.Size() == c.position && info.ModTime() != c.info.ModTime()) {
 		c = &cursor{info: info}
 		s.cursors[path] = c

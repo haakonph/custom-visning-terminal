@@ -90,7 +90,12 @@ type Service struct {
 	cancel      context.CancelFunc
 	done        chan struct{}
 	started     bool
-	dirty       bool
+	// Pending changes survive failed transactions and are cleared only after
+	// commit. Session event sets contain only keys that need to be upserted.
+	changedSessions map[string]map[string]bool
+	changedTraces   map[string]bool
+	removedSessions map[string]bool
+	summaries       map[string]Session
 }
 
 func New(o Options) (*Service, error) {

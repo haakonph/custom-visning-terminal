@@ -19,8 +19,22 @@ func (q *Queries) ClearCopilotUsage(ctx context.Context) error {
 	return err
 }
 
+const deleteCopilotEventUsage = `-- name: DeleteCopilotEventUsage :exec
+DELETE FROM copilot_usage WHERE session_id = ? AND event_key = ?
+`
+
+type DeleteCopilotEventUsageParams struct {
+	SessionID string
+	EventKey  string
+}
+
+func (q *Queries) DeleteCopilotEventUsage(ctx context.Context, arg DeleteCopilotEventUsageParams) error {
+	_, err := q.db.ExecContext(ctx, deleteCopilotEventUsage, arg.SessionID, arg.EventKey)
+	return err
+}
+
 const insertCopilotUsage = `-- name: InsertCopilotUsage :exec
-INSERT INTO copilot_usage (session_id, event_key, input_tokens, output_tokens, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5)
+INSERT INTO copilot_usage (session_id, event_key, input_tokens, output_tokens, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (session_id, event_key) DO UPDATE SET input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens, duration_ms = excluded.duration_ms
 `
 
 type InsertCopilotUsageParams struct {

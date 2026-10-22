@@ -37,11 +37,50 @@ func floatPointer(v sql.NullFloat64) *float64 {
 func jsonText(v any) (string, error) { b, err := json.Marshal(v); return string(b), err }
 
 func writeCopilot(ctx context.Context, q *dbgen.Queries, data model.CopilotStore) error {
-	if data.Version != 1 || data.Sessions == nil || data.Traces == nil {
-		return errors.New("invalid Copilot store")
-	}
 	if err := q.ClearCopilotSessions(ctx); err != nil {
 		return err
+	}
+	return writeCopilotChanges(ctx, q, data)
+}
+
+// SaveCopilotChanges atomically upserts the supplied sessions, events and trace
+// mappings. Omitted rows are preserved; only explicitly removed sessions are
+// deleted. Callers must migrate any legacy store before applying changes.
+func SaveCopilotChanges(path string, data model.CopilotStore, removed []string) error {
+	if len(data.Sessions) == 0 && len(data.Traces) == 0 && len(removed) == 0 {
+		return nil
+	}
+	db, err := open(path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	ctx := context.Background()
+	q := dbgen.New(tx)
+	// A removed trace session may have been recreated before this flush. Delete
+	// its old rows first; the changes below contain all moved or recreated data.
+	for _, id := range removed {
+		if err := q.DeleteCopilotSession(ctx, id); err != nil {
+			return err
+		}
+	}
+	if err := writeCopilotChanges(ctx, q, data); err != nil {
+		return err
+	}
+	if err := q.SetState(ctx, "copilot"); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func writeCopilotChanges(ctx context.Context, q *dbgen.Queries, data model.CopilotStore) error {
+	if data.Version != 1 || data.Sessions == nil || data.Traces == nil {
+		return errors.New("invalid Copilot store")
 	}
 	for id, s := range data.Sessions {
 		if s == nil || s.Meta == nil || s.Events == nil {
@@ -75,6 +114,8 @@ func writeCopilot(ctx context.Context, q *dbgen.Queries, data model.CopilotStore
 				if err = q.InsertCopilotUsage(ctx, dbgen.InsertCopilotUsageParams{SessionID: id, EventKey: key, InputTokens: intNull(e.InputTokens), OutputTokens: intNull(e.OutputTokens), DurationMs: floatNull(e.DurationMs)}); err != nil {
 					return err
 				}
+			} else if err := q.DeleteCopilotEventUsage(ctx, dbgen.DeleteCopilotEventUsageParams{SessionID: id, EventKey: key}); err != nil {
+				return err
 			}
 		}
 	}
