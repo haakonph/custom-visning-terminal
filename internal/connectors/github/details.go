@@ -24,6 +24,18 @@ func (c *Client) Details(ctx context.Context, p model.PullRequest) (model.PRDeta
 		return d, safeError(err)
 	}
 	warn := func(section string, err error) { d.Warnings = append(d.Warnings, section+": "+safeError(err).Error()) }
+	status := p
+	status.ID = pr.GetNodeID()
+	if status.ID == "" {
+		warn("Status", fmt.Errorf("missing PR node ID"))
+	} else {
+		rows := []model.PullRequest{status}
+		if err := c.enrich(ctx, rows); err != nil {
+			warn("Status", err)
+		} else {
+			d.PullRequest = &rows[0]
+		}
+	}
 	for page := 1; page != 0; {
 		rows, response, err := c.api.PullRequests.ListFiles(ctx, owner, repo, p.Number, &gh.ListOptions{Page: page, PerPage: 100})
 		if err != nil {

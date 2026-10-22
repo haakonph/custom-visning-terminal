@@ -72,17 +72,32 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if result, ok := msg.(detailMsg); ok {
+		var cmd tea.Cmd
 		if m.detail != nil && m.detail.request == result.request {
 			m.detail.loading = false
+			if result.autoMergeVersion != m.autoMergeVersion {
+				return m, m.loadDetails()
+			}
 			if result.err == nil {
 				m.detail.data = retainDetailSections(m.detail.data, result.data)
+				if pr := result.data.PullRequest; pr != nil && pr.Key() == m.detail.pr.Key() {
+					m.detail.pr = *pr
+					for _, dataset := range m.snapshot.Datasets {
+						for i := range dataset.PRs {
+							if dataset.PRs[i].Key() == pr.Key() {
+								dataset.PRs[i] = *pr
+							}
+						}
+					}
+					cmd = m.persist()
+				}
 				if len(result.data.Warnings) == 0 {
 					m.detail.synced = time.Now()
 				}
 			}
 			m.detail.err = result.err
 		}
-		return m, nil
+		return m, cmd
 	}
 	if m.detail != nil {
 		if result, ok := msg.(openMsg); ok {

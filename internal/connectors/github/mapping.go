@@ -35,7 +35,7 @@ const detailsQuery = `query($ids:[ID!]!) {
   mergeQueueEntry { position state }
   reviewRequests(first:100) {
    pageInfo { hasNextPage }
-   nodes { requestedReviewer { ... on User { login } ... on Team { slug organization { login } } } }
+   nodes { requestedReviewer { ... on User { login } ... on Bot { login } ... on Team { slug organization { login } } } }
   }
   commits(last:1) { nodes { commit { statusCheckRollup { state } } } }
  } }
