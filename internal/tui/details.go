@@ -21,9 +21,10 @@ type detailState struct {
 	request uint64
 }
 type detailMsg struct {
-	request uint64
-	data    model.PRDetails
-	err     error
+	autoMergeVersion uint64
+	request          uint64
+	data             model.PRDetails
+	err              error
 }
 
 func (m *Model) loadDetails() tea.Cmd {
@@ -45,11 +46,12 @@ func (m *Model) loadDetails() tea.Cmd {
 	m.auto.detail.started = time.Now()
 	m.detail.err = nil
 	request, pr, parent := m.detail.request, m.detail.pr, m.ctx
+	autoMergeVersion := m.autoMergeVersion
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		data, err := source.Details(ctx, pr)
-		return detailMsg{request: request, data: data, err: err}
+		return detailMsg{request: request, data: data, err: err, autoMergeVersion: autoMergeVersion}
 	}
 }
 func (m Model) detailLines() []string {

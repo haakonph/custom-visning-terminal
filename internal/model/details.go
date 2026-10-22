@@ -16,8 +16,10 @@ type PRComment struct {
 }
 type ActionCheck struct{ Name, Status, Conclusion string }
 type PRDetails struct {
-	Files    []ChangedFile
-	Comments []PRComment
-	Checks   []ActionCheck
-	Warnings []string
+	// PullRequest is present only when current status was fetched successfully.
+	PullRequest *PullRequest
+	Files       []ChangedFile
+	Comments    []PRComment
+	Checks      []ActionCheck
+	Warnings    []string
 }

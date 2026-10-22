@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
@@ -109,5 +110,20 @@ func TestCopilotReviewIdentityAndPendingDraft(t *testing.T) {
 	applyCopilotReview(&p, &d)
 	if p.CopilotReview == nil || p.CopilotReview.ID != "submitted" {
 		t.Fatalf("expected the completed review identity, got %+v", p.CopilotReview)
+	}
+}
+
+func TestCopilotBotReviewRequest(t *testing.T) {
+	if !strings.Contains(detailsQuery, "... on Bot { login }") {
+		t.Fatal("requested bot reviewers must include their login")
+	}
+	var d details
+	if err := json.Unmarshal([]byte(`{"reviewRequests":{"pageInfo":{"hasNextPage":false},"nodes":[{"requestedReviewer":{"login":"copilot-pull-request-reviewer"}}]}}`), &d); err != nil {
+		t.Fatal(err)
+	}
+	var p model.PullRequest
+	applyDetails(&p, &d)
+	if len(p.RequestedReviewers) != 1 || p.RequestedReviewers[0] != "copilot-pull-request-reviewer" {
+		t.Fatalf("lost bot request: %+v", p)
 	}
 }

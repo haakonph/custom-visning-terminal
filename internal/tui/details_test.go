@@ -59,3 +59,43 @@ func TestDetailsFromMattermostPRRoundTrip(t *testing.T) {
 		t.Fatal("could not return from GitHub details to Mattermost references")
 	}
 }
+
+func TestDetailRefreshCompletesCopilotReview(t *testing.T) {
+	m := ready(t)
+	p := m.filtered()[0]
+	p.RequestedReviewers = []string{"copilot-pull-request-reviewer[bot]"}
+	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{p}
+	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{p}
+	m.detail = &detailState{request: 2, pr: p}
+	fresh := p
+	fresh.RequestedReviewers = nil
+	fresh.CopilotReview = &model.CopilotReview{ID: "completed", Recommendation: "Approval", Comments: 2}
+	m, _ = update(m, detailMsg{request: 1, data: model.PRDetails{PullRequest: &fresh}})
+	if !copilotReviewPending(m.detail.pr) {
+		t.Fatal("stale response changed status")
+	}
+	m, _ = update(m, detailMsg{request: 2, data: model.PRDetails{PullRequest: &fresh}})
+	for _, pr := range []model.PullRequest{m.detail.pr, m.snapshot.Datasets[model.Open].PRs[0], m.snapshot.Datasets[model.Reviews].PRs[0]} {
+		if got := copilotReviewLabel(pr); got != "🟢 2" {
+			t.Fatalf("completed review still shows %q", got)
+		}
+	}
+	m, _ = update(m, detailMsg{request: 2, data: model.PRDetails{Warnings: []string{"Status: offline"}}})
+	if got := copilotReviewLabel(m.detail.pr); got != "🟢 2" {
+		t.Fatalf("status lost after failure: %q", got)
+	}
+}
+
+func TestDetailStatusDoesNotUndoAutoMerge(t *testing.T) {
+	m := ready(t)
+	p := m.filtered()[0]
+	p.AutoMerge = "ON"
+	m.autoMergeVersion = 1
+	m.detail = &detailState{request: 2, pr: p}
+	stale := p
+	stale.AutoMerge = "OFF"
+	m, _ = update(m, detailMsg{request: 2, data: model.PRDetails{PullRequest: &stale}})
+	if m.detail.pr.AutoMerge != "ON" {
+		t.Fatal("stale detail status undid automerge")
+	}
+}
