@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -166,7 +167,7 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 	// Validate the editor before any clone or fetch.
 	if _, err := l.launcher.Command(editor, "."); err != nil {
 		*m = m.WithSetupProblem("editor", err.Error())
-		return nil
+		return m.notifyLocalFailure("Kunne ikke starte editor", "", err)
 	}
 	rows := m.selectedPRs()
 	if len(rows) == 0 {
@@ -247,7 +248,7 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 		if msg.err != nil {
 			l.results = append(l.results, "IntelliJ-opprydding: "+msg.err.Error())
 		}
-		return true, nil
+		return true, m.notifyLocalFailure("IntelliJ-opprydding feilet", "", msg.err)
 	case localWarmTick:
 		return true, tea.Batch(m.warmLocal(), m.cleanupIntelliJ(false), localWarmTimer())
 	case localWarmResult:
@@ -261,7 +262,7 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 			l.warmNotice = fmt.Sprintf("Main %s: %s", m.githubName(msg.repository), msg.err)
 			l.results = append(l.results, l.warmNotice)
 		}
-		return true, m.warmLocal()
+		return true, tea.Batch(m.warmLocal(), m.notifyLocalFailure("Main-klargjøring feilet", m.githubName(msg.repository), msg.err))
 	case localStatuses:
 		l.statusLoading = false
 		for key, s := range msg.values {
@@ -308,7 +309,17 @@ func (m *Model) localMessage(msg tea.Msg) (bool, tea.Cmd) {
 		l.statuses[msg.p.Key()] = s
 		l.results = append(l.results, result)
 		m.notice = result
-		return true, m.nextLocal()
+		var notification tea.Cmd
+		if msg.err != nil {
+			title := "Kunne ikke åpne PR i editor"
+			if msg.updated {
+				title = "Bakgrunnsoppdatering feilet"
+			}
+			notification = m.notifyLocalFailure(title, fmt.Sprintf("%s #%d", m.githubName(msg.p.Repository), msg.p.Number), msg.err)
+		} else if s.Note != "" && s.Note != "headless indexing not configured" {
+			notification = m.notifyLocalFailure("PR-klargjøring krever oppmerksomhet", fmt.Sprintf("%s #%d", m.githubName(msg.p.Repository), msg.p.Number), errors.New(s.Note))
+		}
+		return true, tea.Batch(m.nextLocal(), notification)
 	}
 	return false, nil
 }
@@ -323,4 +334,17 @@ func (m Model) localLabel(p model.PullRequest) string {
 		return "Preparing"
 	}
 	return m.local.statuses[p.Key()].String()
+}
+
+// Operational failures must reach the desktop even when another view is active.
+// These alerts have no browser action and are independent of CI preferences.
+func (m *Model) notifyLocalFailure(title, label string, err error) tea.Cmd {
+	if err == nil || m.ctx.Err() != nil {
+		return nil
+	}
+	body := err.Error()
+	if label != "" {
+		body = label + ": " + body
+	}
+	return m.notifyDesktop(desktopNotification{title: title, body: body, icon: "failure"})
 }

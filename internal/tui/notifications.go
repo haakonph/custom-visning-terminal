@@ -88,6 +88,10 @@ func (m *Model) notifyPullRequests(msg refreshMsg) tea.Cmd {
 	if len(events) == 0 {
 		return nil
 	}
+	return m.notifyDesktop(events...)
+}
+
+func (m *Model) notifyDesktop(events ...desktopNotification) tea.Cmd {
 	parent := m.ctx
 	cmds := make([]tea.Cmd, 0, len(events))
 	for _, event := range events {
@@ -118,7 +122,7 @@ func sendDesktopNotification(ctx context.Context, platform string, event desktop
 
 func deliverNotification(ctx context.Context, platform string, event desktopNotification, run notificationRunner, open func(context.Context, string) error) error {
 	parsed, err := url.Parse(event.url)
-	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" || parsed.User != nil {
+	if event.url != "" && (err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" || parsed.User != nil) {
 		return fmt.Errorf("invalid GitHub PR URL")
 	}
 	name, args := notificationCommand(platform, event)
@@ -129,7 +133,7 @@ func deliverNotification(ctx context.Context, platform string, event desktopNoti
 	if err != nil {
 		return err
 	}
-	if platform == "linux" && strings.TrimSpace(string(output)) == "default" {
+	if event.url != "" && platform == "linux" && strings.TrimSpace(string(output)) == "default" {
 		return open(ctx, event.url)
 	}
 	return nil
@@ -139,13 +143,20 @@ func notificationCommand(platform string, event desktopNotification) (string, []
 	switch platform {
 	case "darwin":
 		// No shell or AppleScript interpolation. terminal-notifier handles the click.
-		args := []string{"-title", event.title, "-message", event.body, "-open", event.url}
+		args := []string{"-title", event.title, "-message", event.body}
+		if event.url != "" {
+			args = append(args, "-open", event.url)
+		}
 		if event.icon != "" {
 			args = append(args, "-appIcon", (&url.URL{Scheme: "file", Path: event.icon}).String())
 		}
 		return "terminal-notifier", args
 	case "linux":
-		args := []string{"--app-name=custom-visning", "--action=default=Åpne PR", "--wait", "--expire-time=30000"}
+		args := []string{"--app-name=custom-visning"}
+		if event.url != "" {
+			args = append(args, "--action=default=Åpne PR", "--wait")
+		}
+		args = append(args, "--expire-time=30000")
 		if event.icon != "" {
 			args = append(args, "--icon="+event.icon)
 		}

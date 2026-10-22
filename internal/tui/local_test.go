@@ -246,3 +246,41 @@ func TestMainWarmQueuePrefersUnpreparedRepository(t *testing.T) {
 		t.Fatal("slow preparation starved a new repository")
 	}
 }
+
+func TestLocalFailuresNotifyWhileSettingsOpen(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     error
+		note    string
+		updated bool
+		want    bool
+	}{
+		{"first preparation fails", errors.New("clone failed"), "", false, true},
+		{"background update fails", errors.New("offline"), "", true, true},
+		{"build fails in status", nil, "npm preparation failed", true, true},
+		{"unsafe update preserved", nil, "local commits or rewritten history; update manually", true, true},
+		{"success", nil, "", true, false},
+		{"indexing not configured", nil, "headless indexing not configured", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := localModel(t)
+			defer m.cancel()
+			m.settings.active = true
+			m.notifications.options = notificationOptions{}
+			p := m.filtered()[0]
+			m.local.preparing[p.Key()] = true
+			m.local.running = 1
+			if tc.updated {
+				m.local.running = 0
+				m.local.updating[p.Key()] = true
+			}
+			m, cmd := update(m, localResult{p: p, status: local.Status{Path: "/tmp/existing", Note: tc.note}, err: tc.err, updated: tc.updated})
+			if (cmd != nil) != tc.want {
+				t.Fatalf("notification scheduled=%v, want %v", cmd != nil, tc.want)
+			}
+			if !m.settings.active || m.local.running != 0 || m.local.preparing[p.Key()] || m.local.updating[p.Key()] {
+				t.Fatal("result interrupted settings or left an opening job pending")
+			}
+		})
+	}
+}
