@@ -297,12 +297,13 @@ func (m Model) copilotView() tea.View {
 		if c.filtering || c.input.Value() != "" {
 			lines = append(lines, c.input.View())
 		}
+		lines = append(lines, accent.Render(m.copilotListRow("STATUS", "SESJON", "REPOSITORY", "JIRA")))
 		rows := c.rows()
 		capacity := max(1, m.height-len(lines)-4)
 		start := max(0, c.selected-capacity+1)
 		for i := start; i < min(len(rows), start+capacity); i++ {
 			s := rows[i]
-			line := cell(s.Status, 16) + " " + cell(s.Name, max(12, m.width-65)) + " " + cell(m.githubName(s.Repository), 22) + " " + s.Jira
+			line := m.copilotListRow(s.Status, s.Name, m.githubName(s.Repository), s.Jira)
 			if i == c.selected {
 				line = selection.Render(cell(line, m.width))
 			} else {
@@ -348,6 +349,11 @@ func (m Model) copilotView() tea.View {
 	v.WindowTitle = "custom-visning · Copilot"
 	return v
 }
+
+func (m Model) copilotListRow(status, name, repository, jira string) string {
+	return cell(status, 16) + " " + cell(name, max(12, m.width-65)) + " " + cell(repository, 22) + " " + jira
+}
+
 func cleanMultiline(s string) string {
 	parts := strings.Split(s, "\n")
 	for i, p := range parts {
