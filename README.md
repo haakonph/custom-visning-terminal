@@ -332,6 +332,19 @@ Konflikter prioriteres i kolonnen; full køstatus beholdes under tabellen og i
 detaljvisningen, som også forklarer eventuelle mergekonflikter.
 Statusene finnes også under tabellen og i detaljvisningen på smalere terminaler.
 
+Jira-tabellen viser antall åpne PR-er i `PR` og samlet `PR-STATUS`.
+PR-er kobles via Jira-nøkler i tittel, beskrivelse og branchnavn, og telles én
+gang selv om de finnes i flere GitHub-faner. Status prioriteres slik:
+**Blokkert**, **Endringer ønsket**, **Venter på review**, **Under arbeid**,
+**Sjekker pågår**, **Ukjent**, **Klar til merge**. Klar krever godkjent review,
+beståtte sjekker og at PR-en kan merges. Forklaringen under tabellen følger
+valgt Jira-sak og viser antall PR-er i hver status; den finnes også i detaljene.
+På smale terminaler vises samlet status i forklaringen. Antall og status gjelder
+PR-er i de konfigurerte GitHub-visningene, ikke alle PR-er i organisasjonen.
+Uten GitHub-oppsett vises `?` når antallet er ukjent. Uten treff vises
+**Ingen åpne PR-er**; appen har ikke mergehistorikk og viser derfor ikke
+**Alle merget**.
+
 Alle fire PR-fanene grupperer PR-er under Jira-saken, på tvers av repoer.
 Gruppene viser Jira-nøkkel, sakstittel når den er lastet fra Jira, og antall PR-er.
 Første nøkkel i tittel, beskrivelse eller branchnavn bestemmer gruppen; hver PR
