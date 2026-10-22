@@ -955,6 +955,7 @@ Git HTTPS authentication uses the existing `gh auth git-credential` helper.
 Install Git and GitHub CLI and run `gh auth login --hostname github.com` with
 access to the repositories. No additional authentication mechanism is introduced.
 
+The first opening waits for the worktree to be created and prepared.
 Existing worktrees open after a quick local check of their repository identity
 and worktree root. The editor launches before waiting for repository locks,
 scanning local changes, fetching commits, or preparing the Maven project. These
@@ -967,8 +968,14 @@ fast-forward**. Missing commits are fetched if necessary. This never uses reset,
 force checkout, stash, merge commits or rebase. Other branches, local commits,
 rewritten PR history, and Git operations in progress require manual updates. Ignored files
 that would be overwritten also prevent updating. Local changes are preserved.
-If fetching or checkout fails, the editor remains open and an update notice is
-shown; cancellation stops the background operation.
+If fetching, checkout, or project preparation fails, the editor remains open.
+A system notification reports the affected PR and error, even while another view
+is active. Updates requiring manual intervention also trigger a notification.
+Opening failures, main preparation failures, and IntelliJ cleanup failures use
+the same system notifications, independently of CI/Copilot notification settings.
+They use `terminal-notifier` on macOS or `notify-send` on Linux (see desktop
+notification setup below). Details remain visible in the terminal; cancellation
+stops the background operation.
 
 `Ready`, `Modified`, and `Outdated` appear in the selected PR's detail line (and a
 LOCAL column in wide terminals). Modified and Outdated can appear together.

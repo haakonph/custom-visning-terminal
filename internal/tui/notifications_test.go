@@ -162,3 +162,25 @@ func TestNotificationSettingsApplyWithoutRestart(t *testing.T) {
 		t.Fatal("notification preferences were not persisted", m.notifications.options)
 	}
 }
+
+func TestOperationalNotificationHasNoBrowserAction(t *testing.T) {
+	for _, platform := range []string{"linux", "darwin"} {
+		t.Run(platform, func(t *testing.T) {
+			event := desktopNotification{title: "Bakgrunnsoppdatering feilet", body: "acme/api #1: offline"}
+			err := deliverNotification(context.Background(), platform, event, func(_ context.Context, name string, args ...string) ([]byte, error) {
+				for _, arg := range args {
+					if arg == "-open" || arg == "--wait" || arg == "--action=default=Åpne PR" {
+						t.Fatalf("operational alert has browser action: %s %v", name, args)
+					}
+				}
+				return []byte("default"), nil
+			}, func(context.Context, string) error {
+				t.Fatal("operational alert opened browser")
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
