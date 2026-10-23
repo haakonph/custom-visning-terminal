@@ -229,7 +229,7 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	if m.width >= 100 {
 		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", m.reviewLabel(p), 9, true}, {"CI", string(p.CI), 7, true}, {"INFO", prInfoLabel(p), 22, p.Mergeability == model.Conflicting}}
 		if m.width >= 120 {
-			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 7, false})
+			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 7, false}, column{"AI", m.localAILabel(p), 8, false})
 		}
 		if m.width >= 160 {
 			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})

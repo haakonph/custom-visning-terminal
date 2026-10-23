@@ -302,3 +302,100 @@ func TestReviewRequestAgeAndReviewerColors(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalAIStatusAndLatestRelatedSession(t *testing.T) {
+	m := unifiedModel(t)
+	p := m.snapshot.Datasets[0].PRs[0]
+	at := time.Now().Add(-90 * time.Minute).UTC().Format(time.RFC3339Nano)
+	m.copilot.sessions = []model.CopilotSession{
+		{ID: "branch", Repository: p.Repository, Branch: p.HeadRef, Status: "active", LastActivity: time.Now().Add(-2 * time.Hour).Format(time.RFC3339Nano)},
+		{ID: "jira", Jira: "APP-1", Status: "waiting", LastActivity: at},
+		{ID: "unrelated", Status: "failed", LastActivity: time.Now().Format(time.RFC3339Nano)},
+	}
+	if got := m.localAILabel(p); got != "🟡 1h" {
+		t.Fatalf("latest related: %q", got)
+	}
+	for _, tc := range []struct{ status, icon string }{{"active", "🟢"}, {"waiting", "🟡"}, {"completed", "✅"}, {"failed", "🔴"}, {"inactive", "⚪"}, {"unknown", "⚪"}} {
+		m.copilot.sessions[1].Status = tc.status
+		if got := m.localAILabel(p); got != tc.icon+" 1h" {
+			t.Errorf("%s: %q", tc.status, got)
+		}
+	}
+	m.copilot.sessions[1].LastActivity = "invalid"
+	if got := m.localAILabel(p); got != "🟢 2h" {
+		t.Fatalf("valid timestamp must win: %q", got)
+	}
+	m.copilot.sessions = m.copilot.sessions[2:]
+	if got := m.localAILabel(p); got != "" {
+		t.Fatalf("unrelated: %q", got)
+	}
+	m.entities.data.Links = append(m.entities.data.Links, model.EntityLink{Left: prRef(p), Right: copilotRef(m.copilot.sessions[0])})
+	if got := m.localAILabel(p); got != "🔴 nå" {
+		t.Fatalf("manual link: %q", got)
+	}
+	m.copilot.sessions[0].LastActivity = ""
+	if got := m.localAILabel(p); got != "🔴" {
+		t.Fatalf("missing timestamp: %q", got)
+	}
+	m.copilot = nil
+	if got := m.localAILabel(p); got != "" {
+		t.Fatalf("no provider: %q", got)
+	}
+}
+
+func TestLocalAIAge(t *testing.T) {
+	now := time.Now()
+	for _, tc := range []struct {
+		elapsed time.Duration
+		want    string
+	}{
+		{-time.Minute, "nå"}, {0, "nå"}, {59 * time.Second, "nå"}, {time.Minute, "1m"}, {59 * time.Minute, "59m"}, {time.Hour, "1h"}, {24 * time.Hour, "1d"}, {6 * 24 * time.Hour, "6d"}, {7 * 24 * time.Hour, "1u"}, {14 * 24 * time.Hour, "2u"},
+	} {
+		if got := localAIAge(now.Add(-tc.elapsed), now); got != tc.want {
+			t.Errorf("%v: %q, want %q", tc.elapsed, got, tc.want)
+		}
+	}
+}
+
+func TestGitHubAIColumnPlacementAndWidth(t *testing.T) {
+	m := unifiedModel(t)
+	p := m.snapshot.Datasets[0].PRs[0]
+	m.copilot.sessions[0].Status = "waiting"
+	m.copilot.sessions[0].LastActivity = time.Now().Add(-90 * time.Minute).Format(time.RFC3339Nano)
+	for _, width := range []int{60, 100, 119, 120, 140, 160, 200} {
+		m.width = width
+		header, row := ansi.Strip(m.row(p, true, false)), ansi.Strip(m.row(p, false, false))
+		if width >= 120 {
+			if !strings.Contains(header, "COPILOT AI") || !strings.Contains(row, "🟡 1h") {
+				t.Errorf("width %d: %s\n%s", width, header, row)
+			}
+		} else if strings.Contains(header, "COPILOT") || strings.Contains(row, "🟡") {
+			t.Errorf("narrow width %d: %s", width, row)
+		}
+		if ansi.StringWidth(header) > width || ansi.StringWidth(row) > width {
+			t.Errorf("overflow at %d: %d/%d", width, ansi.StringWidth(header), ansi.StringWidth(row))
+		}
+	}
+}
+
+func TestLocalAIRefreshContinuesOutsideAIView(t *testing.T) {
+	m := unifiedModel(t)
+	if m.copilotActive {
+		t.Fatal("expected GitHub view")
+	}
+	m.source = nil
+	if cmd := m.initProviders(); cmd == nil || !m.copilot.loading {
+		t.Fatal("AI data not loaded at startup")
+	}
+	m.copilot.loading = false
+	next, cmd := m.updateCopilot(copilotTick{})
+	m = next.(Model)
+	if cmd == nil || !m.copilot.loading {
+		t.Fatal("background tick did not refresh AI data")
+	}
+	next, cmd = m.updateCopilot(copilotResult{sessions: m.copilot.sessions})
+	m = next.(Model)
+	if cmd == nil || !m.copilot.timerPending || m.copilot.loading {
+		t.Fatal("background refresh did not schedule next tick")
+	}
+}

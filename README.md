@@ -416,6 +416,14 @@ Uten Copilot-review vises `—`. Feltet vises i tabellen fra 120 kolonner, samt
 under tabellen og i detaljvisningen, og lagres i cachen. Anbefalingen leses fra
 Copilots reviewtekst og endrer ikke GitHubs samlede review-status.
 
+Fra 120 kolonner vises `AI` rett etter `COPILOT`, med status og tid siden siste aktivitet i den
+nyeste tilknyttede lokale AI-tråden, for eksempel `🟢 1m` eller `🟡 1h`.
+`🟢` betyr aktiv, `🟡` venter, `✅` ferdig, `🔴` feil og `⚪` inaktiv/ukjent.
+Tid vises som `nå`, `1m`, `1h`, `1d` eller `1u`. Uten kjent tidspunkt vises bare
+ikonet, og uten tilknyttet tråd er feltet tomt. Koblingene er de samme som med
+`ra`: repository og branch, felles Jira-nøkkel eller manuell kobling med `ta`.
+AI-data lastes ved oppstart og oppdateres også mens GitHub-visningen er åpen.
+
 Når review er `PENDING` og en melding med PR-lenken er sendt fra appen til
 Mattermost, viser REVIEW-kolonnen tiden siden siste vellykkede sending
 (`now`, `5m`, `2h`, `3d`). Sendetidene lagres lokalt i `links.sqlite` og beholdes
