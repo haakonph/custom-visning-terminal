@@ -63,7 +63,7 @@ func (m Model) switchCopilot() (tea.Model, tea.Cmd) {
 }
 func (m *Model) refreshCopilot() tea.Cmd {
 	c := m.copilot
-	if c == nil || c.loading {
+	if c == nil || c.client == nil || c.loading {
 		return nil
 	}
 	c.loading = true
@@ -116,10 +116,7 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case copilotTick:
 		c.timerPending = false
-		if m.copilotActive {
-			return m, m.refreshCopilot()
-		}
-		return m, nil
+		return m, m.refreshCopilot()
 	case copilotResult:
 		c.loading = false
 		if msg.err != nil {
@@ -143,7 +140,7 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 				c.detail = msg.detail
 			}
 		}
-		if m.copilotActive && !c.timerPending {
+		if c.client != nil && !c.timerPending {
 			c.timerPending = true
 			return m, tea.Tick(3*time.Second, func(time.Time) tea.Msg { return copilotTick{} })
 		}

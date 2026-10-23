@@ -240,3 +240,60 @@ func (m Model) reviewRequestedAt(url string) time.Time {
 	}
 	return at
 }
+
+// localAILabel uses the same relations as ra, including explicit local links.
+func (m Model) localAILabel(p model.PullRequest) string {
+	if m.copilot == nil {
+		return ""
+	}
+	related := map[string]bool{}
+	for _, ref := range m.relatedReferences([]model.TaskReference{prRef(p)}, "copilot") {
+		related[ref.Key] = true
+	}
+	var latest *model.CopilotSession
+	var latestAt time.Time
+	for i := range m.copilot.sessions {
+		s := &m.copilot.sessions[i]
+		if !related[s.ID] {
+			continue
+		}
+		at, _ := time.Parse(time.RFC3339Nano, s.LastActivity)
+		if latest == nil || at.After(latestAt) || (at.Equal(latestAt) && s.ID < latest.ID) {
+			latest, latestAt = s, at
+		}
+	}
+	if latest == nil {
+		return ""
+	}
+	icon := "⚪"
+	switch latest.Status {
+	case "active":
+		icon = "🟢"
+	case "waiting":
+		icon = "🟡"
+	case "completed":
+		icon = "✅"
+	case "failed":
+		icon = "🔴"
+	}
+	if latestAt.IsZero() {
+		return icon
+	}
+	return icon + " " + localAIAge(latestAt, time.Now())
+}
+
+func localAIAge(at, now time.Time) string {
+	elapsed := max(time.Duration(0), now.Sub(at))
+	switch {
+	case elapsed < time.Minute:
+		return "nå"
+	case elapsed < time.Hour:
+		return fmt.Sprintf("%dm", int(elapsed/time.Minute))
+	case elapsed < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(elapsed/time.Hour))
+	case elapsed < 7*24*time.Hour:
+		return fmt.Sprintf("%dd", int(elapsed/(24*time.Hour)))
+	default:
+		return fmt.Sprintf("%du", int(elapsed/(7*24*time.Hour)))
+	}
+}

@@ -109,7 +109,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 }
 func (m Model) initProviders() tea.Cmd {
 	cmds := []tea.Cmd{}
-	if m.copilotActive {
+	if m.copilot != nil && m.copilot.client != nil {
 		cmds = append(cmds, m.refreshCopilot())
 	}
 	if m.jiraActive {
