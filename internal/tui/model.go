@@ -153,6 +153,9 @@ func (m Model) bootstrap() tea.Cmd {
 	}
 }
 func (m *Model) refresh(view model.View) tea.Cmd {
+	if view == model.SharedReviews {
+		return tea.Batch(m.refresh(model.Reviews), m.refresh(model.TeamReviews))
+	}
 	if m.loading[view] || m.snapshot.User == "" {
 		return nil
 	}

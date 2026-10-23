@@ -86,9 +86,9 @@ func TestNavigationAndFilter(t *testing.T) {
 			t.Fatalf("filter %s", filter)
 		}
 	}
-	for _, r := range "1234" {
+	for _, r := range "12345" {
 		m, _ = sequence(m, "l")
-		if m.active != model.View((r-'0')%4) {
+		if m.active != model.View((r-'0')%5) {
 			t.Fatal("switch view")
 		}
 	}

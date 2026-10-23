@@ -252,6 +252,9 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		s.authenticated = msg.authenticated
 		s.data = msg.data
 		s.reviewRequests = mattermostReviewTimes(msg.data)
+		if m.active == model.SharedReviews {
+			m.clamp()
+		}
 		s.notice = msg.notice
 		if msg.err != nil {
 			s.notice = msg.err.Error()

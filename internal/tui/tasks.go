@@ -81,7 +81,7 @@ func (m Model) taskReference() (model.TaskReference, bool) {
 	}
 	p := rows[m.selected]
 	role := ""
-	if m.active == model.Reviews || m.active == model.TeamReviews {
+	if m.active.IsReview() {
 		role = "review"
 	}
 	return model.TaskReference{Provider: "github", URL: p.URL, Key: fmt.Sprintf("%s#%d", p.Repository, p.Number), Title: p.Title, Role: role}, true

@@ -178,7 +178,7 @@ func copilotReviewLabel(p model.PullRequest) string {
 }
 
 func (m Model) reviewLabel(p model.PullRequest) string {
-	if m.active == model.Reviews || m.active == model.TeamReviews {
+	if m.active.IsReview() {
 		if own := m.ownReview(p); own != "" {
 			return own
 		}
