@@ -395,11 +395,7 @@ func (m Model) foldersView() tea.View {
 	if f.picking || f.repositoryView {
 		title = "Ny mappe fra " + f.issue.Key + " · velg repository med skrivetilgang"
 		for _, id := range m.folderRepositories() {
-			_, name, ok := strings.Cut(id, "/")
-			if !ok {
-				name = id
-			}
-			rows = append(rows, name+"  ·  "+id)
+			rows = append(rows, m.githubName(id)+"  ·  "+id)
 		}
 	} else {
 		title = "Lokale mapper · " + []string{"[Alle] Favoritter Skjulte", "Alle [Favoritter] Skjulte", "Alle Favoritter [Skjulte]"}[f.tab]

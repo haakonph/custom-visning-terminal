@@ -15,10 +15,14 @@ import (
 
 type folderSource struct {
 	fakeSource
-	checked bool
+	checked      bool
+	repositories []string
 }
 
-func (*folderSource) WritableRepositories(context.Context) ([]string, error) {
+func (s *folderSource) WritableRepositories(context.Context) ([]string, error) {
+	if s.repositories != nil {
+		return s.repositories, nil
+	}
 	return []string{"acme/write", "other/write"}, nil
 }
 func (s *folderSource) CheckWritable(context.Context, string) error {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
 func TestRepositoryViewWithoutLocalSetup(t *testing.T) {
@@ -108,12 +109,35 @@ func TestRepositoryShortNamesPreserveIdentity(t *testing.T) {
 	m, cmd := sequence(m, "vp")
 	m, _ = update(m, cmd())
 	content := m.View().Content
-	if !strings.Contains(content, "write  ·  acme/write") || !strings.Contains(content, "write  ·  other/write") || !strings.Contains(content, "(vp)") {
+	if !strings.Contains(content, "acme/write  ·  acme/write") || !strings.Contains(content, "other/write  ·  other/write") || !strings.Contains(content, "(vp)") {
 		t.Fatal(content)
 	}
 	m, _ = sequence(m, "/other")
 	rows := m.folderRepositories()
 	if len(rows) != 1 || rows[0] != "other/write" {
 		t.Fatal("display shortname replaced repository identity", rows)
+	}
+}
+
+func TestRepositoryListsUseGitViewNameRules(t *testing.T) {
+	m := ready(t)
+	m.githubHiddenPrefixes = []string{"skatteetaten-ghe"}
+	source := &folderSource{repositories: []string{"skatteetaten-ghe/glsk-api", "other/glsk-api"}}
+	m.source = source
+	m, cmd := sequence(m, "vp")
+	m, _ = update(m, cmd())
+	content := m.View().Content
+	if !strings.Contains(content, "api  ·  skatteetaten-ghe/glsk-api") || !strings.Contains(content, "other/api  ·  other/glsk-api") {
+		t.Fatal(content)
+	}
+	m.folders.repositoryView = false
+	m.folders.picking = true
+	m.folders.issue = model.TaskReference{Key: "APP-1"}
+	content = m.View().Content
+	if !strings.Contains(content, "api  ·  skatteetaten-ghe/glsk-api") || !strings.Contains(content, "other/api  ·  other/glsk-api") {
+		t.Fatal(content)
+	}
+	if got := m.folderRepositories(); len(got) != 2 || got[0] != "skatteetaten-ghe/glsk-api" {
+		t.Fatal("display formatting changed repo identity", got)
 	}
 }
