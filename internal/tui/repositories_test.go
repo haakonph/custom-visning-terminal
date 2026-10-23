@@ -101,3 +101,19 @@ func TestRepositoryViewSwitchCancelsPendingLoad(t *testing.T) {
 		t.Fatal("fresh result missing")
 	}
 }
+
+func TestRepositoryShortNamesPreserveIdentity(t *testing.T) {
+	m := ready(t)
+	m.source = &folderSource{}
+	m, cmd := sequence(m, "vp")
+	m, _ = update(m, cmd())
+	content := m.View().Content
+	if !strings.Contains(content, "write  ·  acme/write") || !strings.Contains(content, "write  ·  other/write") || !strings.Contains(content, "(vp)") {
+		t.Fatal(content)
+	}
+	m, _ = sequence(m, "/other")
+	rows := m.folderRepositories()
+	if len(rows) != 1 || rows[0] != "other/write" {
+		t.Fatal("display shortname replaced repository identity", rows)
+	}
+}

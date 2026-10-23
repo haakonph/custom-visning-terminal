@@ -25,6 +25,7 @@ type folderState struct {
 	selected, tab                    int
 	query, notice                    string
 	picking                          bool
+	openAfterCreate                  bool
 	repositoryView                   bool
 	repositories                     []string
 	issue                            model.TaskReference
@@ -40,8 +41,10 @@ type folderReposLoaded struct {
 	generation uint64
 }
 type folderCreated struct {
-	folder local.Folder
-	err    error
+	openRequested bool
+	openErr       error
+	folder        local.Folder
+	err           error
 }
 type folderOpened struct{ err error }
 type repositoryOpened struct{ err error }
@@ -135,6 +138,7 @@ func (m *Model) startIssueFolder(refs []model.TaskReference) tea.Cmd {
 		m.sequenceNotice = "GitHub må være konfigurert for å hente repoer med skrivetilgang."
 		return nil
 	}
+	m.folders.openAfterCreate = false
 	m.folders.repositoryView = false
 	m.folders.picking = true
 	m.folders.searching = false
@@ -165,6 +169,9 @@ func (m *Model) folderMessage(msg tea.Msg) bool {
 		}
 		m.folders.selected = max(0, min(m.folders.selected, len(m.folderRepositories())-1))
 		m.folders.notice = "Velg repository og trykk Enter for å opprette mappen."
+		if m.folders.openAfterCreate {
+			m.folders.notice = "Velg repository og trykk Enter for å åpne arbeidsmappen i editor."
+		}
 		if m.folders.repositoryView {
 			m.folders.notice = "Viser aktive repoer tokenet gir skrivetilgang til. Arkiverte og deaktiverte repoer utelates."
 		}
@@ -198,6 +205,12 @@ func (m *Model) folderMessage(msg tea.Msg) bool {
 		}
 		m.folders.query = r.folder.Path
 		m.folders.notice = "Mappe klar: " + r.folder.Path + " · ee åpner editor"
+		if r.openRequested {
+			m.folders.notice = "Mappe åpnet i editor: " + r.folder.Path
+			if r.openErr != nil {
+				m.folders.notice = "Mappe klar, men editor kunne ikke åpnes: " + r.openErr.Error() + " · ee prøver igjen"
+			}
+		}
 	case repositoryOpened:
 		m.folders.notice = "Repository åpnet på GitHub."
 		if r.err != nil {
@@ -292,6 +305,11 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			id, issue := m.folderRepositories()[f.selected], f.issue
 			manager, parent := m.local.manager, m.ctx
+			launcher, openRequested := m.local.launcher, f.openAfterCreate
+			editor := launcher.Editors.Default
+			if editor == "" {
+				editor = "intellij"
+			}
 			f.busy = true
 			f.notice = "Oppretter mappe for " + issue.Key + "…"
 			return m, func() tea.Msg {
@@ -301,7 +319,11 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					return folderCreated{err: err}
 				}
 				folder, err := manager.CreateIssue(ctx, id, issue.Key, issue.Title)
-				return folderCreated{folder, err}
+				result := folderCreated{folder: folder, err: err, openRequested: openRequested}
+				if err == nil && openRequested {
+					result.openErr = launcher.Launch(editor, folder.Path)
+				}
+				return result
 			}
 		}
 	}
@@ -372,7 +394,13 @@ func (m Model) foldersView() tea.View {
 	var rows []string
 	if f.picking || f.repositoryView {
 		title = "Ny mappe fra " + f.issue.Key + " · velg repository med skrivetilgang"
-		rows = m.folderRepositories()
+		for _, id := range m.folderRepositories() {
+			_, name, ok := strings.Cut(id, "/")
+			if !ok {
+				name = id
+			}
+			rows = append(rows, name+"  ·  "+id)
+		}
 	} else {
 		title = "Lokale mapper · " + []string{"[Alle] Favoritter Skjulte", "Alle [Favoritter] Skjulte", "Alle Favoritter [Skjulte]"}[f.tab]
 		for _, folder := range m.folderRows() {
@@ -384,7 +412,7 @@ func (m Model) foldersView() tea.View {
 		}
 	}
 	if f.repositoryView {
-		title = fmt.Sprintf("Repoer med skrivetilgang · %d av %d", len(rows), len(f.repositories))
+		title = fmt.Sprintf("Repoer med skrivetilgang (vp) · %d av %d", len(rows), len(f.repositories))
 	}
 	lines := []string{accent.Render(cell(title, m.width))}
 	loading := f.loading
@@ -420,6 +448,9 @@ func (m Model) foldersView() tea.View {
 	hint := "h/l faner · j/k velg · / søk · af favoritt · ah skjul/vis · ee editor · au oppdater · Esc tilbake"
 	if f.picking || f.repositoryView {
 		hint = "j/k velg · / søk · Enter opprett · Esc avbryt"
+		if f.openAfterCreate {
+			hint = "j/k velg · / søk · Enter åpne i editor · Esc avbryt"
+		}
 	}
 	if f.repositoryView {
 		hint = "j/k velg · / søk · Enter/en GitHub · au oppdater · Esc tilbake"

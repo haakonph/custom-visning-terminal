@@ -21,7 +21,7 @@ vo/vg/vt/va/vc  Visningsside
 vp              Repoer med skrivetilgang: / søk · Enter/en GitHub · au oppdater
 vl              Lokale mapper: Alle / Favoritter / Skjulte
                 af favoritt · ah skjul/vis · ee editor · au oppdater
-aw / ee         Jira: opprett mappe fra én sak; velg repo med skrivetilgang
+aw / ee         Jira: opprett / åpne arbeidsmappe; velg repo med skrivetilgang
 ro/rg/rt/ra/rc  Relaterte elementer av valgt type
                 Flere treff vises i en søkbar valgliste
                 Velg og fortsett med r/e/a/t, eller Enter for å gå dit
