@@ -251,7 +251,7 @@ avslutning. Appen fortsetter selv om logging feiler.
 
 ## Repoer med skrivetilgang
 
-`vp` viser aktive GitHub-repoer tokenet ditt har skrivetilgang til, også uten lokale mapper eller Jira-oppsett. Listen hentes fra alle sider hos GitHub. Arkiverte og deaktiverte repoer utelates. Tokenets repository-tilgang og organisasjonens SSO begrenser utvalget.
+`vp` viser aktive GitHub-repoer tokenet ditt har skrivetilgang til, også uten lokale mapper eller Jira-oppsett. Listen viser både kortnavn (reponavn uten eier) og fullstendig `owner/repo`, og hentes fra alle sider hos GitHub. Arkiverte og deaktiverte repoer utelates. Tokenets repository-tilgang og organisasjonens SSO begrenser utvalget.
 
 Bruk `/` for å søke på eier/reponavn, `j/k` for å velge, `Enter` eller `en` for å åpne på GitHub, `au` for å hente listen på nytt og `Esc` for å gå tilbake.
 
@@ -276,7 +276,7 @@ branchen `custom-visning/jira/<sak>` fra oppdatert `workspace.main_branch`
 (standard `main`). Eksisterende arbeidsmapper og brancher overskrives ikke.
 Samme sak/repo gjenbruker en tidligere registrert mappe når repo og branch
 fortsatt stemmer. Opprettelse pusher ingen branch og endrer ikke Jira-saken.
-Åpne mappen med `ee` etter opprettelse. GitHub-innlogging, Git og eventuelt
+`ee` fra Jira åpner arbeidsmappen automatisk i konfigurert standardeditor etter repovalget. `aw` oppretter bare mappen; bruk deretter `ee` for å åpne den. GitHub-innlogging, Git og eventuelt
 GitHub CLI for kloning må være konfigurert som for PR-worktrees.
 
 Favoritter, skjuling og Jira-kobling lagres i `folders.sqlite` i appens

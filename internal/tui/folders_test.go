@@ -15,10 +15,14 @@ import (
 
 type folderSource struct {
 	fakeSource
-	checked bool
+	checked      bool
+	repositories []string
 }
 
-func (*folderSource) WritableRepositories(context.Context) ([]string, error) {
+func (s *folderSource) WritableRepositories(context.Context) ([]string, error) {
+	if s.repositories != nil {
+		return s.repositories, nil
+	}
 	return []string{"acme/write", "other/write"}, nil
 }
 func (s *folderSource) CheckWritable(context.Context, string) error {
@@ -127,7 +131,7 @@ func TestJiraFolderShortcutsAndMultipleSelection(t *testing.T) {
 		m.jira.rows = []jira.Issue{{Key: "APP-12", Title: "Task", URL: client.IssueURL("APP-12")}}
 		m.jira.query = m.jira.currentQuery()
 		next, cmd := sequence(m, shortcut)
-		if cmd == nil || !next.folders.picking || next.folders.issue.Key != "APP-12" {
+		if cmd == nil || !next.folders.picking || next.folders.issue.Key != "APP-12" || next.folders.openAfterCreate != (shortcut == "ee") {
 			t.Fatalf("%s did not open repository picker: %#v", shortcut, next.folders)
 		}
 	}
@@ -136,5 +140,24 @@ func TestJiraFolderShortcutsAndMultipleSelection(t *testing.T) {
 	refs := []model.TaskReference{{Provider: "jira", Key: "APP-12"}, {Provider: "jira", Key: "APP-13"}}
 	if cmd := m.startIssueFolder(refs); cmd != nil || m.folders.picking {
 		t.Fatal("multiple issues created one ambiguous folder")
+	}
+}
+
+func TestIssueFolderEditorResultKeepsFolderOnLaunchFailure(t *testing.T) {
+	for _, openErr := range []error{nil, errors.New("editor unavailable")} {
+		m := localModel(t)
+		folder := local.Folder{Path: "/tmp/issue-worktree", Repository: "acme/api", IssueKey: "APP-12"}
+		m.folders.busy, m.folders.picking = true, true
+		m, _ = update(m, folderCreated{folder: folder, openRequested: true, openErr: openErr})
+		if m.folders.busy || m.folders.picking || !m.folders.active || len(m.folderRows()) != 1 {
+			t.Fatal("lost created folder after editor result")
+		}
+		want := "Mappe åpnet i editor"
+		if openErr != nil {
+			want = "editor unavailable"
+		}
+		if !strings.Contains(m.folders.notice, want) {
+			t.Fatal(m.folders.notice)
+		}
 	}
 }

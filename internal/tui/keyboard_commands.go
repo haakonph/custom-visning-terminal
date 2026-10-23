@@ -490,7 +490,11 @@ func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool,
 	}
 	if editor {
 		if allProvider(refs, "jira") {
-			return m, m.startIssueFolder(refs)
+			cmd := m.startIssueFolder(refs)
+			if cmd != nil {
+				m.folders.openAfterCreate = true
+			}
+			return m, cmd
 		}
 		allPR, allAI := true, true
 		for _, r := range refs {
