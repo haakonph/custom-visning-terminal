@@ -275,7 +275,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.warnings[msg.view] = "Partial results; cached rows retained"
 			}
 		}
-		if msg.view == m.active || m.relatedKey != "" {
+		if msg.view == m.active || m.active == model.SharedReviews || m.relatedKey != "" {
 			for i, p := range m.filtered() {
 				if p.URL == selectedURL {
 					m.selected = i
@@ -366,7 +366,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 func (m Model) filtered() []model.PullRequest {
-	rows := m.snapshot.Datasets[m.active].PRs
+	rows := m.githubDataset(m.active).PRs
 	if m.relatedKey != "" {
 		rows = m.relatedPRs(m.relatedKey)
 	}

@@ -143,15 +143,19 @@ func (m *Model) autoMessage(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			busy = busy || loading
 		}
 		if m.source != nil && m.snapshot.User != "" && !busy {
-			order := []model.View{m.active}
+			visible := m.active
+			if visible == model.SharedReviews {
+				visible = model.Reviews
+			}
+			order := []model.View{visible}
 			for v := model.Open; v < model.ViewCount; v++ {
-				if v != m.active {
+				if v != visible {
 					order = append(order, v)
 				}
 			}
 			for _, v := range order {
 				interval := background
-				if provider == "github" && v == m.active {
+				if provider == "github" && (v == visible || m.active == model.SharedReviews && v == model.TeamReviews) {
 					interval = active
 				}
 				if m.auto.github[v].due(now, interval) {

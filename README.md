@@ -185,7 +185,10 @@ bare til å bekrefte dialoger/tekstfelt. AI og chat har også flervalg, koblinge
 relasjoner, snooze og lokalt arkiv. Typene kan inngå i kjedede handlinger.
 
 GitHub-fanene er egne åpne PR-er uten drafts, egne drafts, direkte reviewforespørsler
-og teamforespørsler. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
+og teamforespørsler. Sist ligger **Shared Review Requests**, som samler direkte og teamrettede
+reviewforespørsler med PR-lenke i en valgt Mattermost-kanal eller en melding sendt fra appen.
+Hver PR vises én gang. Visningen følger de lastede reviewlistene og oppdateres når meldinger
+eller reviewforespørsler endres. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
 Delvise resultater beholder cache og tidspunkt for siste fulle synk. UNKNOWN betyr
 at GitHub ikke har gitt en kjent status; det er ikke bevis på at sjekker har bestått.
 

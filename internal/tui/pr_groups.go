@@ -13,7 +13,7 @@ const dependabotGroup = "Dependabot"
 // Review requests from Dependabot share one group. Other PRs appear once,
 // under their first Jira key, or the issue being viewed in related views.
 func (m Model) prGroupKey(p model.PullRequest) string {
-	if (m.active == model.Reviews || m.active == model.TeamReviews) &&
+	if m.active.IsReview() &&
 		(strings.EqualFold(p.Author, "dependabot") || strings.EqualFold(p.Author, "dependabot[bot]")) {
 		return dependabotGroup
 	}

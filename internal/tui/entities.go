@@ -287,7 +287,7 @@ func (m *Model) currentReferences() []model.TaskReference {
 		var refs []model.TaskReference
 		for _, p := range m.selectedPRs() {
 			r := prRef(p)
-			if m.active == model.Reviews || m.active == model.TeamReviews {
+			if m.active.IsReview() {
 				r.Role = "review"
 			}
 			refs = append(refs, r)

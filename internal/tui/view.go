@@ -104,9 +104,9 @@ func (m Model) View() tea.View {
 	}
 	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [vg GitHub] · vt Jira"))
 	tabs := []string{}
-	for v := model.Open; v < model.ViewCount; v++ {
+	for v := model.Open; v <= model.SharedReviews; v++ {
 		label := v.String()
-		if m.loading[v] {
+		if m.githubLoading(v) {
 			label += " ↻"
 		}
 		if v == m.active {
@@ -116,27 +116,23 @@ func (m Model) View() tea.View {
 		}
 		tabs = append(tabs, label)
 	}
-	if m.width < 95 {
-		tabs = nil
-		for v := model.Open; v < model.ViewCount; v++ {
-			label := v.String()
-			if v == m.active {
-				label = "[" + label + "] " + v.String()
-			}
-			tabs = append(tabs, label)
-		}
+	// Scroll the tab strip so the active tab remains visible in narrow terminals.
+	start := 0
+	for start < int(m.active) && ansi.StringWidth(strings.Join(tabs[start:int(m.active)+1], "  ")) > m.width {
+		start++
 	}
+	tabs = tabs[start:]
 	lines = append(lines, strings.Join(tabs, "  "))
 	lines = append(lines, m.snoozeLines()...)
 	if m.relatedKey != "" {
 		lines = append(lines, " Relaterte PR-er: "+m.relatedKey+" · lastede GitHub-visninger · Esc tilbake")
 	}
 	sync := "never"
-	if at := m.snapshot.Datasets[m.active].SyncedAt; !at.IsZero() {
+	if at := m.githubDataset(m.active).SyncedAt; !at.IsZero() {
 		sync = syncAge(at)
 	}
 	state := "ready"
-	if m.loading[m.active] {
+	if m.githubLoading(m.active) {
 		state = "refreshing…"
 	}
 	if m.booting {
@@ -195,7 +191,7 @@ func (m Model) View() tea.View {
 			lines = append(lines, warning.Render(clean(result)))
 		}
 	}
-	for _, message := range []string{m.warnings[m.active], m.notice} {
+	for _, message := range []string{m.githubWarning(m.active), m.notice} {
 		if message != "" {
 			lines = append(lines, warning.Render(clean(message)))
 		}
@@ -260,7 +256,7 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 			value = c.name
 		}
 		value = cell(value, c.width)
-		if c.name == "REVIEW" && !header && (m.active == model.Reviews || m.active == model.TeamReviews) {
+		if c.name == "REVIEW" && !header && m.active.IsReview() {
 			value = lipgloss.NewStyle().Foreground(lipgloss.Color(m.reviewColor(p))).Render(value)
 		} else if c.isStatus && !header && !selected {
 			value = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(value)

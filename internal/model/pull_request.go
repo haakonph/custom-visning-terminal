@@ -17,8 +17,15 @@ const (
 	ViewCount
 )
 
+// SharedReviews is derived from personal and team requests; it is not cached separately.
+const SharedReviews View = ViewCount
+
+func (v View) IsReview() bool {
+	return v == Reviews || v == TeamReviews || v == SharedReviews
+}
+
 func (v View) String() string {
-	return [...]string{"My Open PRs", "My Draft PRs", "My Review Requests", "Team Review Requests"}[v]
+	return [...]string{"My Open PRs", "My Draft PRs", "My Review Requests", "Team Review Requests", "Shared Review Requests"}[v]
 }
 
 type Status string

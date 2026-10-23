@@ -51,7 +51,7 @@ func (m Model) taskReferences() []model.TaskReference {
 		return nil
 	}
 	role := ""
-	if m.active == model.Reviews || m.active == model.TeamReviews {
+	if m.active.IsReview() {
 		role = "review"
 	}
 	var refs []model.TaskReference
