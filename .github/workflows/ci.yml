@@ -71,7 +71,7 @@ jobs:
           sha256sum custom-visning_Darwin_arm64.tar.gz > checksums.txt
       - name: Upload macOS arm64 download
         id: download
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: custom-visning-Darwin-arm64-${{ github.sha }}
           path: |
