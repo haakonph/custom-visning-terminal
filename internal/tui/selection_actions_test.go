@@ -150,7 +150,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 			},
 		})
 	}
-	for _, keys := range []string{"ee", "ev\n", "evj\n", "evjj\n"} {
+	for _, keys := range []string{"ee", "ev\n", "evcode\n", "evegendefinert\n"} {
 		actions = append(actions, selectionAction{
 			"editor " + keys, func(t *testing.T, m Model, want []model.PullRequest) {
 				manager, err := local.New(t.TempDir(), local.Defaults())
@@ -180,7 +180,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 					urls = append(urls, url)
 				}
 				assertActionURLs(t, urls, want)
-				expectedEditor := map[string]string{"ee": "intellij", "ev\n": "intellij", "evj\n": "vscode", "evjj\n": "custom"}[keys]
+				expectedEditor := map[string]string{"ee": "intellij", "ev\n": "intellij", "evcode\n": "vscode", "evegendefinert\n": "custom"}[keys]
 				if m.local.editor != expectedEditor {
 					t.Fatalf("editor = %q, want %q", m.local.editor, expectedEditor)
 				}

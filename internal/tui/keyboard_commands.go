@@ -161,6 +161,7 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 		case "v":
 			if m.local != nil && m.visibleProvider() == "github" {
 				m.local.editorChoice = 0
+				m.local.editorQuery = ""
 				m.local.choosing = true
 				return m, nil
 			}

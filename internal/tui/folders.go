@@ -239,6 +239,12 @@ func (m Model) folderRepositories() []string {
 func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	f := &m.folders
 	k := key.String()
+	if f.picking && !f.searching && (k != "/" || f.query != "") {
+		if pickerQuery(key, &f.query) {
+			f.selected = 0
+			return m, nil
+		}
+	}
 	if f.searching {
 		switch k {
 		case "enter":
@@ -446,6 +452,9 @@ func (m Model) foldersView() tea.View {
 		hint = "j/k velg · / søk · Enter opprett · Esc avbryt"
 		if f.openAfterCreate {
 			hint = "j/k velg · / søk · Enter åpne i editor · Esc avbryt"
+		}
+		if f.picking {
+			hint = strings.Replace(hint, "j/k velg · / søk", "Skriv for å søke · ↑/↓ velg", 1)
 		}
 	}
 	if f.repositoryView {

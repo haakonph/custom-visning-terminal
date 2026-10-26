@@ -27,6 +27,7 @@ type localState struct {
 	removePending              []model.PullRequest
 	removing                   bool
 	editorChoice               int
+	editorQuery                string
 	results                    []string
 	warmed                     map[string]time.Time
 	warming                    bool

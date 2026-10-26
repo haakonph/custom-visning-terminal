@@ -362,6 +362,14 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return true, nil
 		}
 		if s.choosing {
+			if !s.channelSearching && (key != "/" || s.input.Value() != "") {
+				query := s.input.Value()
+				if pickerQuery(msg, &query) {
+					s.input.SetValue(query)
+					s.channelRow = 0
+					return true, nil
+				}
+			}
 			if s.channelSearching {
 				switch key {
 				case "esc":
@@ -687,7 +695,7 @@ func (m Model) mmReaderView() tea.View {
 			}
 			lines = append(lines, line)
 		}
-		lines = append(lines, "j/k ↑↓ velg · / søk · Enter overvåk/avslutt overvåking · Esc tilbake")
+		lines = append(lines, "Skriv for å søke · ↑/↓ velg · Enter overvåk/avslutt overvåking · Esc tilbake")
 	} else {
 		ps := s.posts()
 		if len(ps) == 0 {

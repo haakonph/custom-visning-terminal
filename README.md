@@ -690,7 +690,10 @@ Trykk `rt` fra GitHub for relaterte Jira-saker, eller `rg` fra Jira for relatert
 Når flere treff vises, bruker valglisten en tabell med type, nøkkel, bruker og
 tittel. Bruker er PR-forfatteren i GitHub, ansvarlig i Jira og meldingsforfatteren
 i Mattermost. Manglende bruker vises som `—`. I smale terminalvinduer prioriteres
-bruker og tittel. Søk med `/`, marker med Space og gå til valgt treff med Enter.
+bruker og tittel. Skriv direkte for å søke, velg med ↑/↓, marker med Space og gå
+til valgt treff med Enter. Backspace sletter siste tegn; Esc tømmer søket før
+listen lukkes. Tab bytter til handlingene `a/e/r/t` og navigasjon med `j/k`.
+Repository-, kanal- og editorvalg støtter også søk ved skriving.
 
 - Fra GitHub: Jira-nøkler (for eksempel `TEAM-123`) hentes fra PR-tittel, beskrivelse og branchnavn. Jira viser alle refererte saker i et eget JQL-søk, uavhengig av hurtigfiltrene.
 - Fra Jira: viser relaterte PR-er fra alle fire lastede GitHub-visninger, uten duplikater. Dette er ikke et søk i alle organisasjonens PR-er.
