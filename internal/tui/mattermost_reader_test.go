@@ -115,6 +115,7 @@ func TestMattermostLinkNavigationWithoutGitHub(t *testing.T) {
 	if opened != "https://github.com/acme/api/pull/1" {
 		t.Fatal(opened)
 	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	m, _ = sequence(m, "rg")
 	if !m.mmReader.active || m.sequenceNotice == "" {
 		t.Fatal("GitHub must be optional")

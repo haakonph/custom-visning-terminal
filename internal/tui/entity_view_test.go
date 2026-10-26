@@ -76,7 +76,7 @@ func TestEntityTableSearchSelectionAndScroll(t *testing.T) {
 	next, _ := m.showEntities("Relatert: jira", "related", refs, nil)
 	m = next.(Model)
 	for i := 0; i < 9; i++ {
-		m, _ = update(m, key('j'))
+		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	view := ansi.Strip(m.entityView().Content)

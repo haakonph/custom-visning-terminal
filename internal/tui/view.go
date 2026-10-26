@@ -146,7 +146,11 @@ func (m Model) View() tea.View {
 		lines = append(lines, m.input.View())
 	}
 	if m.local != nil && m.local.choosing {
-		lines = append(lines, fmt.Sprintf(" Editor: %s · j/k velg · Enter åpne · Esc avbryt", []string{"IntelliJ IDEA", "VS Code", "egendefinert"}[m.local.editorChoice]))
+		choice := "Ingen treff"
+		if choices := m.local.editorChoices(); len(choices) > 0 {
+			choice = choices[min(m.local.editorChoice, len(choices)-1)]
+		}
+		lines = append(lines, fmt.Sprintf(" Editor: %s · Søk: %s · Skriv for å søke · ↑/↓ velg · Enter åpne · Esc avbryt", choice, clean(m.local.editorQuery)))
 	}
 	if m.help {
 		lines = append(lines, strings.Split(helpText, "\n")...)

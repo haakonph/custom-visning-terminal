@@ -152,6 +152,34 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.dialog.selected = 0
 		return m, nil, true
 	}
+	if d := m.dialog; d != nil && d.typeToSearch() {
+		if k == "tab" {
+			d.commands = !d.commands
+			return m, nil, true
+		}
+		if !d.commands {
+			switch k {
+			case "esc":
+				if d.query != "" {
+					d.query, d.selected = "", 0
+					return m, nil, true
+				}
+			case "/":
+				if d.query != "" {
+					d.query += "/"
+					d.selected = 0
+					return m, nil, true
+				}
+			case "space", " ", "enter":
+				// Keep selection, confirmation and explicit search available.
+			default:
+				if pickerQuery(key, &d.query) {
+					d.selected = 0
+					return m, nil, true
+				}
+			}
+		}
+	}
 	if !m.keyboardNavigation() {
 		return m, nil, false
 	}

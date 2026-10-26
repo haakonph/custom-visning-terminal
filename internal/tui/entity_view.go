@@ -15,6 +15,12 @@ func (m Model) entityView() tea.View {
 	}
 	rows := d.filtered()
 	lines := []string{d.title, "j/k velg · Space marker · Shift+↑/↓ utvid · / søk · Enter velg · Esc avbryt"}
+	if d.typeToSearch() {
+		lines[1] = "Skriv for å søke · ↑/↓ velg · Space marker · Shift+↑/↓ utvid · Enter velg · Tab handlinger · Esc tøm/avbryt"
+		if d.commands {
+			lines[1] = "j/k velg · Space marker · a/e/r/t handling · / søk · Enter velg · Tab søk · Esc avbryt"
+		}
+	}
 	if d.searching {
 		lines = append(lines, "/ "+clean(d.query)+"▏")
 	} else if d.query != "" {

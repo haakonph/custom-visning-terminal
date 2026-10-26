@@ -29,6 +29,7 @@ type entityDialog struct {
 	selected           int
 	chosen             map[string]model.TaskReference
 	searching          bool
+	commands           bool
 }
 
 func newEntities() *entityState {

@@ -24,7 +24,8 @@ vl              Lokale mapper: Alle / Favoritter / Skjulte
 aw / ee         Jira: opprett / åpne arbeidsmappe; velg repo med skrivetilgang
 ro/rg/rt/ra/rc  Relaterte elementer av valgt type
                 Flere treff vises i en søkbar valgliste
-                Velg og fortsett med r/e/a/t, eller Enter for å gå dit
+                Skriv for å søke, ↑/↓ velg, Enter går til treffet
+                Tab bytter til handlinger med r/e/a/t og navigasjon med j/k
 to/tg/tt/ta/tc  Koble til valgte mål av typen; Enter lagrer lokalt
                 Space og Shift+↑/↓ velger flere kilder og mål
 ee/en           Editor (IntelliJ) / nettleser

@@ -168,14 +168,23 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if key, ok := msg.(tea.KeyPressMsg); ok && m.local != nil && m.local.choosing {
+		if pickerQuery(key, &m.local.editorQuery) {
+			m.local.editorChoice = 0
+			return m, nil
+		}
+		choices := m.local.editorChoices()
 		switch key.String() {
-		case "j", "down":
-			m.local.editorChoice = min(2, m.local.editorChoice+1)
-		case "k", "up":
+		case "down":
+			m.local.editorChoice = min(max(0, len(choices)-1), m.local.editorChoice+1)
+		case "up":
 			m.local.editorChoice = max(0, m.local.editorChoice-1)
 		case "enter":
+			if len(choices) == 0 {
+				return m, nil
+			}
 			m.local.choosing = false
-			return m, m.openLocal([]string{"intellij", "vscode", "custom"}[m.local.editorChoice])
+			editor := map[string]string{"IntelliJ IDEA": "intellij", "VS Code": "vscode", "egendefinert": "custom"}[choices[m.local.editorChoice]]
+			return m, m.openLocal(editor)
 		case "esc":
 			m.local.choosing = false
 		}

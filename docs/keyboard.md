@@ -45,7 +45,11 @@ Detaljer og tittelredigering gjelder ett aktivt element.
 | `a` | `a` + eventuelle ting … + handling | Utfør handling på valget/relasjonen |
 
 Ved kobling vises lastede elementer og lagrede referanser av valgt type.
-Velg med j/k, Space eller Shift+piltaster, og bekreft med Enter. Alle valgte
+Skriv direkte for å søke i valglisten. Velg med ↑/↓, Space eller
+Shift+piltaster, og bekreft med Enter. Backspace sletter siste tegn; Esc tømmer
+søket før listen lukkes. Tab bytter mellom søk og handlinger (a/e/r/t og j/k).
+Repository-, kanal- og editorvalg støtter også søk ved skriving og piltaster.
+Alle valgte
 kilder kobles til alle valgte mål, uten selvkoblinger eller duplikater. Koblingene
 er lokale og toveis, og lagres i `links.sqlite` i konfigurasjonsmappen
 (`CUSTOM_VISNING_LINKS` kan overstyre plasseringen). En oppgave får også
@@ -54,7 +58,7 @@ Jira-nøkler, PR-lenker i meldinger og AI-sesjonenes Jira-/repo-/branchdata bruk
 som naturlige relasjoner. Gamle oppgaver får en stabil intern ID ved behov.
 
 Ett relatert treff åpnes direkte; flere treff vises i en søkbar valgliste.
-Fra listen kan man markere flere og fortsette med `a`, `e`, `r` eller `t`.
+Fra listen kan man markere flere, trykke Tab og fortsette med `a`, `e`, `r` eller `t`.
 Enter går til aktivt treff. Hver ting i en sekvens følger én relasjon; en handling
 utvides aldri til et helt nettverk av indirekte sammenkoblede oppgaver.
 
@@ -142,7 +146,7 @@ Følgende utvider mønsteret for funksjoner som allerede fantes:
 | `av` / `aw` / `ab` | Merk kanal lest / slutt å overvåke / tøm lokal chatkonto og lagret sesjon |
 | `ah` / `a↓` / `a↑` | Eldre chatmeldinger / rull en halv side ned/opp |
 | `el` | Vis en liste over eksterne lenker i valgte elementer |
-| `ev` | Velg editor med j/k + Enter: IntelliJ, VS Code eller egendefinert |
+| `ev` | Skriv for å søke etter editor; ↑/↓ + Enter velger IntelliJ, VS Code eller egendefinert |
 | `z` + valgfritt tall + `m` / `D` | Utsett til kl. 06 etter antall kalenderdager; uten tall brukes 1 |
 | `Ctrl+C` | Avslutt og kanseller bakgrunnsarbeid |
 | `Enter` | Bekreft valg/tekst i dialoger; ikke en snarvei i hovedlisten |
