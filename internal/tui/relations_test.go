@@ -65,7 +65,7 @@ func (m *Model) legacyRelatedReferenceKinds(origins []model.TaskReference, kinds
 			for _, s := range m.copilot.sessions {
 				if s.ID == r.Key {
 					text += " " + s.Jira + " " + s.Branch
-					for _, d := range m.snapshot.Datasets {
+					for _, d := range m.prs.Snapshot().Datasets {
 						for _, p := range d.PRs {
 							if s.Repository == p.Repository && s.Branch != "" && s.Branch == p.HeadRef {
 								edge(r, prRef(p))
@@ -76,7 +76,7 @@ func (m *Model) legacyRelatedReferenceKinds(origins []model.TaskReference, kinds
 			}
 		}
 		if r.Provider == "github" {
-			for _, d := range m.snapshot.Datasets {
+			for _, d := range m.prs.Snapshot().Datasets {
 				for _, p := range d.PRs {
 					if p.URL == r.URL {
 						text += " " + p.Body + " " + p.HeadRef
@@ -132,11 +132,11 @@ func BenchmarkRelationCalculation(b *testing.B) {
 			m.mmReader.data.Server = "https://chat.example"
 			for i := 0; i < n; i++ {
 				pr := model.PullRequest{URL: fmt.Sprintf("https://github.com/acme/api/pull/%d", i+1), Repository: "acme/api", Number: i + 1, Title: fmt.Sprintf("APP-%d work", i/20), HeadRef: fmt.Sprintf("branch-%d", i)}
-				m.snapshot.Datasets[0].PRs = append(m.snapshot.Datasets[0].PRs, pr)
+				m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs = append(snapshot.Datasets[0].PRs, pr) })
 				m.copilot.sessions = append(m.copilot.sessions, model.CopilotSession{ID: fmt.Sprint(i), Name: "session", Repository: pr.Repository, Branch: pr.HeadRef})
 				m.mmReader.data.Posts = append(m.mmReader.data.Posts, model.MattermostPost{ID: fmt.Sprint(i), Message: "See " + pr.URL})
 			}
-			origins := []model.TaskReference{prRef(m.snapshot.Datasets[0].PRs[0])}
+			origins := []model.TaskReference{prRef(m.prs.Snapshot().Datasets[0].PRs[0])}
 			b.Run("Legacy", func(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
@@ -187,14 +187,14 @@ func TestRelationIndexTracksDataChanges(t *testing.T) {
 		}
 	}
 	compare()
-	m.snapshot.Datasets[0].PRs[0].Body = "APP-2"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs[0].Body = "APP-2" })
 	compare()
 	m.copilot.sessions[0].Jira = ""
 	m.copilot.sessions[0].Branch = "unrelated"
 	compare()
 	m.tasks.items[0].References = nil
 	compare()
-	m.entities.data.Links = []model.EntityLink{{Left: copilotRef(m.copilot.sessions[0]), Right: prRef(m.snapshot.Datasets[0].PRs[1])}}
+	m.entities.data.Links = []model.EntityLink{{Left: copilotRef(m.copilot.sessions[0]), Right: prRef(m.prs.Snapshot().Datasets[0].PRs[1])}}
 	compare()
 	m.entities.data.Links = nil
 	compare()

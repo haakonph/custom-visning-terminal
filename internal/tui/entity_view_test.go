@@ -20,7 +20,7 @@ func TestEntityTableUsers(t *testing.T) {
 		ref  model.TaskReference
 		want string
 	}{
-		{prRef(m.snapshot.Datasets[0].PRs[0]), "alice"},
+		{prRef(m.prs.Snapshot().Datasets[0].PRs[0]), "alice"},
 		{model.TaskReference{Provider: "jira", Key: "ABC-1"}, "bob"},
 		{model.TaskReference{Provider: "mattermost", Key: "post-1"}, "carol"},
 		{model.TaskReference{Provider: "mattermost", Key: "post-2"}, "user-id"},
@@ -80,7 +80,7 @@ func TestRelatedAIStatuses(t *testing.T) {
 
 func TestEntityTableLayout(t *testing.T) {
 	m := ready(t)
-	r := prRef(m.snapshot.Datasets[0].PRs[0])
+	r := prRef(m.prs.Snapshot().Datasets[0].PRs[0])
 	r.Title = "修正 pålogging\n" + strings.Repeat("lang tittel ", 30)
 	for _, width := range []int{1, 12, 32, 49, 50, 79, 80, 120} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {

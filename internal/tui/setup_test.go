@@ -10,20 +10,20 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
 	"github.com/zalando/go-keyring"
 )
 
 func TestStartupSetupOffersMissingIntegrationsAndCanBeSkipped(t *testing.T) {
 	isolateSetup(t)
 	m := ready(t)
-	m.source = nil
+	m.useSource(nil)
 	m = m.WithStartupSetup()
 	if m.setup.provider != "startup" || len(m.setup.missing) != 3 || !strings.Contains(m.View().Content, "Vil du fullføre") {
 		t.Fatalf("missing startup prompt: %+v", m.setup)
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.setup.provider != "" || !m.tasks.active || m.booting {
+	if m.setup.provider != "" || !(m.page == pageTasks) || m.booting {
 		t.Fatal("skip did not open usable local tasks")
 	}
 	// Skipping lasts for this run; a later startup offers setup again.
@@ -47,7 +47,7 @@ func TestStartupSetupSelectsHelpAndPreservesUnderlyingView(t *testing.T) {
 		t.Fatal("selected setup help did not open")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.setup.provider != "" || m.selected != 1 || m.tasks.active {
+	if m.setup.provider != "" || m.selected != 1 || (m.page == pageTasks) {
 		t.Fatal("setup lost underlying GitHub selection")
 	}
 }
@@ -62,7 +62,7 @@ func TestStartupSetupCompleteAndCopilotOnlyDoNotPrompt(t *testing.T) {
 		t.Fatal("complete setup prompted")
 	}
 	m = ready(t)
-	m.copilotActive = true
+	m.setPageFlag(pageCopilot, true)
 	m = m.WithStartupSetup()
 	if m.setup.provider != "" {
 		t.Fatal("Copilot-only startup prompted for unrelated integrations")
@@ -118,8 +118,8 @@ func TestMissingProvidersOpenSetupAndPreserveCurrentSelection(t *testing.T) {
 			m := ready(t)
 			m.selected = 1
 			if tc.provider == "github" {
-				m.source = nil
-				m.tasks.active = true
+				m.useSource(nil)
+				m.setPageFlag(pageTasks, true)
 			}
 			before := m.baseProvider()
 			m, cmd := sequence(m, tc.keys)
@@ -156,7 +156,7 @@ func TestMattermostSetupInSettingsWorksWithoutRestart(t *testing.T) {
 		t.Fatal("settings did not return to setup")
 	}
 	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil || m.mmReader == nil || !m.mmReader.active || m.setup.provider != "" {
+	if cmd == nil || m.mmReader == nil || !(m.page == pageChat) || m.setup.provider != "" {
 		t.Fatal("setup required restart")
 	}
 	m, _ = update(m, mmResult{data: m.mmReader.data, err: mm.ErrSession})
@@ -235,7 +235,7 @@ func TestSetupScrollingNavigationAndHelp(t *testing.T) {
 		t.Fatal("keyboard help did not return")
 	}
 	m, _ = sequence(m, "vo")
-	if !m.tasks.active || m.setup.provider != "" {
+	if !(m.page == pageTasks) || m.setup.provider != "" {
 		t.Fatal("cannot leave setup for tasks")
 	}
 }
@@ -257,17 +257,17 @@ func TestWebhookAndEditorActionsExplainMissingSetup(t *testing.T) {
 func TestFirstMattermostSetupPreservesPreviousProviderWithoutGitHub(t *testing.T) {
 	isolateSetup(t)
 	m := ready(t)
-	m.source = nil
-	m.tasks.active = true
+	m.useSource(nil)
+	m.setPageFlag(pageTasks, true)
 	if err := mm.SaveConfig(mm.Config{Server: "https://chat.example.org", Username: "alice"}); err != nil {
 		t.Fatal(err)
 	}
 	m, cmd := sequence(m, "vc")
-	if cmd == nil || m.mmReader == nil || !m.mmReader.active || m.previousProvider != "task" {
+	if cmd == nil || m.mmReader == nil || !(m.page == pageChat) || m.previousProvider != "task" {
 		t.Fatal("first setup lost previous provider")
 	}
 	m, _ = sequence(m, "vr")
-	if !m.tasks.active || m.mmReader.active {
+	if !(m.page == pageTasks) || (m.page == pageChat) {
 		t.Fatal("could not return to tasks")
 	}
 }

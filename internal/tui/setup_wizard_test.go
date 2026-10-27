@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
 )
 
 func TestWizardMaskedSecretsAndSequentialFields(t *testing.T) {
@@ -136,7 +136,7 @@ func TestMattermostWizardDefaultsToLogin(t *testing.T) {
 		t.Fatal("setup did not prepare reader")
 	}
 	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil || m.setup.provider != "" || !m.mmReader.active {
+	if cmd == nil || m.setup.provider != "" || !(m.page == pageChat) {
 		t.Fatal("setup did not open Mattermost")
 	}
 	m, _ = update(m, mmResult{data: m.mmReader.data, err: mm.ErrSession})

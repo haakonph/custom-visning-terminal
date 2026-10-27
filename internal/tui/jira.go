@@ -11,8 +11,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
+	"github.com/haakonph/custom-visning-terminal/internal/syncstate"
 )
 
 type jiraState struct {
@@ -41,6 +42,7 @@ type jiraState struct {
 	help                  bool
 }
 type jiraCachedResult struct {
+	token      syncstate.Token
 	generation int
 	query      string
 	cached     jira.Cached
@@ -48,6 +50,7 @@ type jiraCachedResult struct {
 }
 
 type jiraResult struct {
+	token      syncstate.Token
 	generation int
 	query      string
 	rows       []jira.Issue
@@ -58,6 +61,14 @@ type jiraResult struct {
 var filterNames = []string{"Project", "Status", "Assignee (username)", "Priority", "Issue type", "Sprint", "Epic key", "Label"}
 
 func (m Model) WithJira(client *jira.Client, direct bool) Model {
+	m.jiraSession.Configure(m.ctx)
+	m.jiraAction = nil
+	clear(m.jiraChosen)
+	m.auto.jira = map[string]*refreshJob{}
+	if m.auto.jiraCancel != nil {
+		m.auto.jiraCancel()
+		m.auto.jiraCancel = nil
+	}
 	input := textinput.New()
 	input.CharLimit = 8192
 	path := jira.ConfigPath()
@@ -78,7 +89,7 @@ func (m Model) WithJira(client *jira.Client, direct bool) Model {
 		state.notice = "Kunne ikke lese Jira-konfigurasjonen; rett filen før du lagrer søk"
 	}
 	m.jira = state
-	m.jiraActive = direct
+	m.setPageFlag(pageJira, direct)
 	return m
 }
 func (j *jiraState) currentQuery() string {
@@ -97,9 +108,9 @@ func (m *Model) refreshJira() tea.Cmd {
 		m.auto.jiraCancel()
 		m.auto.jiraCancel = nil
 		for _, job := range m.auto.jira {
-			if job.busy {
-				job.busy = false
-				job.started = time.Now()
+			if job.Busy {
+				job.Busy = false
+				job.Started = time.Now()
 			}
 		}
 	}
@@ -114,7 +125,7 @@ func (m *Model) refreshJira() tea.Cmd {
 		job = &refreshJob{}
 		m.auto.jira[query] = job
 	}
-	job.started = time.Now()
+	job.Started = time.Now()
 	loadCache := query != j.query
 	if loadCache {
 		j.rows = nil
@@ -125,7 +136,8 @@ func (m *Model) refreshJira() tea.Cmd {
 	if j.cancel != nil {
 		j.cancel()
 	}
-	requestCtx, cancel := context.WithCancel(m.ctx)
+	requestCtx, cancel := context.WithCancel(m.jiraSession.Context(m.ctx))
+	token := m.jiraSession.Begin("query:" + query)
 	j.cancel = cancel
 	j.generation++
 	generation := j.generation
@@ -135,14 +147,14 @@ func (m *Model) refreshJira() tea.Cmd {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()
 		rows, err := client.Search(ctx, query)
-		return jiraResult{generation, query, rows, err, time.Now()}
+		return jiraResult{token: token, generation: generation, query: query, rows: rows, err: err, at: time.Now()}
 	}
 	if !loadCache {
 		return search
 	}
 	return tea.Batch(func() tea.Msg {
 		cached, err := client.LoadCache(query)
-		return jiraCachedResult{generation, query, cached, err}
+		return jiraCachedResult{token: token, generation: generation, query: query, cached: cached, err: err}
 	}, search)
 }
 func (j *jiraState) filtered() []jira.Issue {
@@ -183,7 +195,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 			j.notice = "Kunne ikke åpne Jira i nettleseren"
 		}
 	case jiraResult:
-		if msg.generation != j.generation {
+		if msg.generation != j.generation || (msg.token.Sequence != 0 && !m.jiraSession.Accept("query:"+msg.query, msg.token)) {
 			return m, nil
 		}
 		j.loading = false
@@ -337,23 +349,18 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			return m, m.refreshJira()
 		case "/":
-			return m, j.edit("local", "/ ", "")
+			return m.searchJira()
+
 		case ":":
 			return m, j.edit("jql", "JQL: ", j.currentQuery())
 		case "s":
 			return m, j.edit("name", "Lagre søk som: ", "")
 		case "f":
-			if j.active >= 4 || j.custom != "" {
-				j.notice = "Hurtigfiltre gjelder standardfanene; bruk vj for å endre lagret JQL"
-				return m, nil
-			}
-			j.filterBackup = j.filters
-			j.filterIndex = 0
-			return m, j.edit("filter", filterNames[0]+": ", j.filters.Project)
+			return m.editJiraFilters()
+
 		case "esc":
-			j.input.SetValue("")
-			j.input.Prompt = ""
-			j.selected = 0
+			return m.backJira()
+
 		case "x":
 			j.filters = jira.Filters{}
 			j.custom = ""
@@ -476,4 +483,31 @@ func (m Model) jiraView() tea.View {
 	view.AltScreen = true
 	view.WindowTitle = "custom-visning · Jira"
 	return view
+}
+
+func (m Model) searchJira() (tea.Model, tea.Cmd) {
+	j := m.jira
+
+	return m, j.edit("local", "/ ", "")
+}
+
+func (m Model) backJira() (tea.Model, tea.Cmd) {
+	j := m.jira
+
+	j.input.SetValue("")
+	j.input.Prompt = ""
+	j.selected = 0
+	return m, nil
+}
+
+func (m Model) editJiraFilters() (tea.Model, tea.Cmd) {
+	j := m.jira
+
+	if j.active >= 4 || j.custom != "" {
+		j.notice = "Hurtigfiltre gjelder standardfanene; bruk vj for å endre lagret JQL"
+		return m, nil
+	}
+	j.filterBackup = j.filters
+	j.filterIndex = 0
+	return m, j.edit("filter", filterNames[0]+": ", j.filters.Project)
 }

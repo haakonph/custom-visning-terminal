@@ -2,10 +2,15 @@ package tui
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"context"
 	"fmt"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/app"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/localstate"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
+	"github.com/haakonph/custom-visning-terminal/internal/tasks"
 	"net/url"
 	"strings"
 )
@@ -17,7 +22,7 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 	}
 	if m.mattermost != nil && m.mattermost.active {
 		if prefix == "a" && k == "s" {
-			_, cmd := m.mattermostMessage(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+			_, cmd := m.sendMattermostDraft()
 			return m, cmd
 		}
 		return m.unavailable()
@@ -88,7 +93,7 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 				m = next.(Model)
 			}
 			if m.visibleProvider() == "task" && len(m.tasks.visibleTasks()) > 0 {
-				return m.updateTasks(tea.KeyPressMsg{Code: 'E', Text: "E"})
+				return m.editTaskTitle()
 			}
 		case "x":
 			if m.visibleProvider() == "jira" {
@@ -112,7 +117,8 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 			}
 		case "h":
 			if m.visibleProvider() == "mattermost" {
-				return m.dispatchKey("H")
+				_, cmd := m.loadChatHistory()
+				return m, cmd
 			}
 		case "v":
 			if m.visibleProvider() == "mattermost" {
@@ -126,11 +132,13 @@ func (m Model) executeSequence(prefix, k string) (tea.Model, tea.Cmd) {
 				return m.beginRemoveLocal(refs)
 			}
 			if m.visibleProvider() == "mattermost" {
-				return m.dispatchKey("-")
+				_, cmd := m.stopWatchingChat()
+				return m, cmd
 			}
 		case "b":
 			if m.visibleProvider() == "mattermost" {
-				return m.dispatchKey("D")
+				_, cmd := m.requestClearChat()
+				return m, cmd
 			}
 		case "down", "up":
 			if m.visibleProvider() == "mattermost" {
@@ -271,12 +279,12 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 			m.rememberProvider("copilot")
 			m.snoozes.active = false
 			m.detail = nil
-			m.tasks.active = false
-			m.jiraActive = false
-			m.copilotActive = true
+			m.setPageFlag(pageTasks, false)
+			m.setPageFlag(pageJira, false)
+			m.setPageFlag(pageCopilot, true)
 			m.copilot.diagnosticsOpen = true
 			if m.mmReader != nil {
-				m.mmReader.active = false
+				m.setPageFlag(pageChat, false)
 			}
 			m.dialog = nil
 			return m, nil
@@ -288,15 +296,15 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 			m.snoozes.active = false
 			m.detail = nil
 			m.jira.detail = nil
-			m.tasks.active = false
-			m.copilotActive = false
-			m.jiraActive = true
+			m.setPageFlag(pageTasks, false)
+			m.setPageFlag(pageCopilot, false)
+			m.setPageFlag(pageJira, true)
 			m.dialog = nil
 			if m.mmReader != nil {
-				m.mmReader.active = false
+				m.setPageFlag(pageChat, false)
 			}
 			if k == "f" {
-				return m.updateJira(tea.KeyPressMsg{Code: 'f', Text: "f"})
+				return m.editJiraFilters()
 			}
 			return m, m.jira.edit("jql", "JQL: ", m.jira.currentQuery())
 		}
@@ -305,13 +313,14 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		if m.mmReader != nil {
 			m.rememberProvider("mattermost")
 			m.snoozes.active = false
-			m.tasks.active = false
-			m.jiraActive = false
-			m.copilotActive = false
+			m.setPageFlag(pageTasks, false)
+			m.setPageFlag(pageJira, false)
+			m.setPageFlag(pageCopilot, false)
 			m.detail = nil
-			m.mmReader.active = true
+			m.setPageFlag(pageChat, true)
 			m.dialog = nil
-			return m.dispatchKey("+")
+			_, cmd := m.chooseChatChannels()
+			return m, cmd
 		}
 		return m.viewProvider("c")
 	}
@@ -327,40 +336,40 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 			return m.WithSetupProblem("mattermost", "Kunne ikke klargjøre Mattermost: "+err.Error()), nil
 		}
 		if m.mmReader != nil {
-			m.mmReader.active = false
+			m.setPageFlag(pageChat, false)
 			mmCmd = m.mmStart()
 		}
 	}
-	if (kind == "jira" && m.jira == nil) || (kind == "copilot" && m.copilot == nil) || (kind == "mattermost" && m.mmReader == nil) || (kind == "github" && m.source == nil) {
+	if (kind == "jira" && m.jira == nil) || (kind == "copilot" && m.copilot == nil) || (kind == "mattermost" && m.mmReader == nil) || (kind == "github" && m.prs.Source() == nil) {
 		return m.WithSetup(kind), nil
 	}
 	m.rememberProvider(kind)
 	m.dialog = nil
 	m.detail = nil
-	m.tasks.active = false
-	m.jiraActive = false
-	m.copilotActive = false
+	m.setPageFlag(pageTasks, false)
+	m.setPageFlag(pageJira, false)
+	m.setPageFlag(pageCopilot, false)
 	m.snoozes.active = false
 	if m.mmReader != nil {
-		m.mmReader.active = false
+		m.setPageFlag(pageChat, false)
 	}
 	switch kind {
 	case "task":
-		m.tasks.active = true
+		m.setPageFlag(pageTasks, true)
 		m.tasks.archived = false
 		m.tasks.selectVisible()
 		return m, nil
 	case "jira":
-		m.jiraActive = true
+		m.setPageFlag(pageJira, true)
 		m.jira.detail = nil
 		if m.jira.query == "" {
 			return m, m.refreshJira()
 		}
 	case "copilot":
-		m.copilotActive = true
+		m.setPageFlag(pageCopilot, true)
 		return m, m.refreshCopilot()
 	case "mattermost":
-		m.mmReader.active = true
+		m.setPageFlag(pageChat, true)
 		return m, mmCmd
 	case "github":
 		m.relatedKey = ""
@@ -377,9 +386,10 @@ func (m Model) refreshVisible() (tea.Model, tea.Cmd) {
 	case "copilot":
 		return m, m.refreshCopilot()
 	case "mattermost":
-		return m.dispatchKey("R")
+		_, cmd := m.refreshChat()
+		return m, cmd
 	case "github":
-		if m.snapshot.User == "" && !m.booting {
+		if m.prs.Snapshot().User == "" && !m.booting {
 			m.booting = true
 			return m, m.bootstrap()
 		}
@@ -388,13 +398,21 @@ func (m Model) refreshVisible() (tea.Model, tea.Cmd) {
 		m.snoozes.at = m.snoozes.now()
 		return m, nil
 	case "task":
-		fresh := newTasks()
-		if fresh.loadFailed {
-			m.sequenceNotice = fresh.notice
-			return m, nil
-		}
-		m.tasks.items = fresh.items
-		m.tasks.selectVisible()
+		var result localstate.Result
+		store := storage.LocalStore{Path: m.tasks.path}
+		m.enqueueLocal(func() (err error) { result, err = store.LoadLocalState(context.Background()); return err }, func(m *Model, err error) {
+			if err != nil {
+				m.sequenceNotice = "Kunne ikke laste lokale data: " + err.Error()
+				return
+			}
+			m.tasks.items = result.Tasks
+			m.tasks.saved = tasks.Clone(result.Tasks)
+			m.entities.data = result.Relations
+			m.snoozes.entries = result.Snoozes
+			m.snoozes.visibilityVersion++
+			m.snoozes.indexContexts()
+			m.tasks.selectVisible()
+		})
 		return m, nil
 	}
 	return m.unavailable()
@@ -415,17 +433,17 @@ func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
 		title = refs[0].Title
 	}
 	m.rememberProvider("task")
-	m.jiraActive = false
-	m.copilotActive = false
+	m.setPageFlag(pageJira, false)
+	m.setPageFlag(pageCopilot, false)
 	if m.mmReader != nil {
-		m.mmReader.active = false
+		m.setPageFlag(pageChat, false)
 	}
 	m.snoozes.active = false
 	m.detail = nil
 	m.tasks.items = append(m.tasks.items, model.Task{Title: title, References: append([]model.TaskReference(nil), refs...)})
 	m.tasks.selected = len(m.tasks.items) - 1
 	m.tasks.row = 0
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.archived = false
 	m.tasks.query = ""
 	m.tasks.details = false
@@ -434,7 +452,7 @@ func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if len(refs) == 0 {
-		return m.updateTasks(tea.KeyPressMsg{Code: 'E', Text: "E"})
+		return m.editTaskTitle()
 	}
 	return m, nil
 }
@@ -463,7 +481,7 @@ func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 			repository, _, _ := strings.Cut(r.Key, "#")
 			p := model.PullRequest{Repository: repository, Title: r.Title, URL: r.URL}
 			found := false
-			for _, d := range m.snapshot.Datasets {
+			for _, d := range m.prs.Snapshot().Datasets {
 				for _, candidate := range d.PRs {
 					if candidate.URL == r.URL {
 						p = candidate
@@ -506,12 +524,12 @@ func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool,
 		}
 		if allPR {
 			original := m.chosen
-			m.chosen = map[string]model.PullRequest{}
+			m.chosen = map[string]struct{}{}
 			for _, r := range refs {
-				for _, d := range m.snapshot.Datasets {
+				for _, d := range m.prs.Snapshot().Datasets {
 					for _, p := range d.PRs {
 						if p.URL == r.URL {
-							m.chosen[p.Key()] = p
+							m.chosen[p.Key()] = struct{}{}
 						}
 					}
 				}
@@ -672,56 +690,16 @@ func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 		return m.unavailable()
 	}
 	restore := (m.dialog != nil && (m.dialog.mode == "archive" || m.dialog.restore)) || (m.visibleProvider() == "task" && m.tasks.archived)
-	state := m.entities.data
-	state.Archived = append([]model.TaskReference(nil), state.Archived...)
-	tasks := cloneTasks(m.tasks.items)
-	for _, r := range refs {
-		if r.Provider == "task" {
-			for i := range tasks {
-				if tasks[i].ID == r.Key {
-					tasks[i].Archived = !restore
-				}
-			}
-		} else {
-			var kept []model.TaskReference
-			for _, existing := range state.Archived {
-				if refID(existing) != refID(r) {
-					kept = append(kept, existing)
-				}
-			}
-			if !restore {
-				kept = append(kept, r)
-			}
-			state.Archived = kept
-		}
-	}
-	taskChanged := false
-	for _, r := range refs {
-		if r.Provider == "task" {
-			taskChanged = true
-		}
-	}
+	state, tasks, taskChanged := app.ArchiveReferences(m.entities.data, m.tasks.items, refs, !restore)
 	if taskChanged && m.tasks.loadFailed {
 		m.sequenceNotice = "Oppgaver kunne ikke leses; lagring er sperret"
 		return m, nil
 	}
-	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
-	var partial bool
 	m.sequenceNotice = "Lagrer arkiv…"
-	m.enqueueLocal(func() (err error) {
-		partial, err = writeLocalState(path, before, state, taskPath, tasks, taskChanged)
-		return err
-	}, func(m *Model, err error) {
+	m.queueLocalEdit(state, tasks, taskChanged, func(m *Model, err error) {
 		if err != nil {
-			if partial {
-				m.entities.data = state
-			}
 			m.sequenceNotice = "Kunne ikke lagre arkiv: " + err.Error()
 			return
-		}
-		m.entities.data = state
-		if taskChanged {
-			m.tasks.items = tasks
 		}
 		m.clearChosen()
 		m.dialog = nil
@@ -761,65 +739,21 @@ func (m Model) deleteReferences(refs []model.TaskReference) (tea.Model, tea.Cmd)
 	if len(refs) == 0 {
 		return m.unavailable()
 	}
-	remove := map[string]bool{}
-	for _, r := range refs {
-		remove[refID(r)] = true
-	}
-	tasks := cloneTasks(m.tasks.items)
 	owner := ""
-	referenceMode := m.visibleProvider() == "task" && m.tasks.details
-	if referenceMode {
+	if m.visibleProvider() == "task" && m.tasks.details {
 		if len(m.tasks.visibleTasks()) == 0 {
 			return m.unavailable()
 		}
-		task := &tasks[m.tasks.selected]
-		owner = refID(taskRef(*task))
-		var kept []model.TaskReference
-		for _, r := range task.References {
-			if !remove[refID(r)] {
-				kept = append(kept, r)
-			}
-		}
-		task.References = kept
+		owner = m.tasks.items[m.tasks.selected].ID
 		m.tasks.row = 0
-	} else {
-		var kept []model.Task
-		for _, t := range tasks {
-			if !remove[refID(taskRef(t))] {
-				kept = append(kept, t)
-			}
-		}
-		tasks = kept
 	}
-	state := m.entities.data
-	state.Links = nil
-	for _, edge := range m.entities.data.Links {
-		left, right := refID(edge.Left), refID(edge.Right)
-		discard := false
-		if referenceMode {
-			discard = (left == owner && remove[right]) || (right == owner && remove[left])
-		} else {
-			discard = remove[left] || remove[right]
-		}
-		if !discard {
-			state.Links = append(state.Links, edge)
-		}
-	}
-	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
-	var partial bool
+	state, tasks := app.DeleteReferences(m.entities.data, m.tasks.items, refs, owner)
 	m.sequenceNotice = "Lagrer sletting…"
-	m.enqueueLocal(func() (err error) {
-		partial, err = writeLocalState(path, before, state, taskPath, tasks, true)
-		return err
-	}, func(m *Model, err error) {
+	m.queueLocalEdit(state, tasks, true, func(m *Model, err error) {
 		if err != nil {
-			if partial {
-				m.entities.data = state
-			}
 			m.sequenceNotice = "Kunne ikke slette: " + err.Error()
 			return
 		}
-		m.entities.data, m.tasks.items = state, tasks
 		m.clearChosen()
 		m.tasks.selectVisible()
 		m.sequenceNotice = "Slettet lokalt"

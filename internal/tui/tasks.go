@@ -1,17 +1,19 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/haakonph/custom-visning-terminal/internal/config"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
+	"github.com/haakonph/custom-visning-terminal/internal/tasks"
 )
 
 type taskState struct {
@@ -19,7 +21,7 @@ type taskState struct {
 
 	snoozes            *snoozeState
 	items              []model.Task
-	active             bool
+	saved              []model.Task
 	archived           bool
 	selected, row      int
 	input              textinput.Model
@@ -34,24 +36,17 @@ func newTasks() taskState {
 	t := taskState{input: textinput.New()}
 	t.input.Prompt = "Tittel: "
 	t.input.CharLimit = 256
-	t.path = os.Getenv("CUSTOM_VISNING_TASKS")
-	if t.path == "" {
-		if dir, err := os.UserConfigDir(); err == nil {
-			t.path = filepath.Join(dir, "custom-visning", "tasks.json")
-		}
-	}
-	err := storage.Load(t.path, &t.items)
+	t.path = config.LocalPath()
+	err := storage.LoadLocal(t.path, config.TaskPath(), &t.items)
 	if errors.Is(err, os.ErrNotExist) {
 		return t
-	}
-	if err == nil {
-		err = storage.Migrate(t.path, t.items)
 	}
 	if err != nil {
 		t.items = nil
 		t.loadFailed = true
 		t.notice = "Kunne ikke lese oppgaver; rett oppgavefilen og start på nytt før du lagrer"
 	}
+	t.saved = tasks.Clone(t.items)
 	return t
 }
 
@@ -59,15 +54,30 @@ func (t *taskState) save() error {
 	if t.loadFailed {
 		return errors.New("oppgaver kunne ikke leses")
 	}
-	items, path := cloneTasks(t.items), t.path
-	if t.io == nil { // Standalone stores, outside the terminal program.
-		return storage.Save(path, items)
+	if err := tasks.EnsureIDs(t.items); err != nil {
+		return err
+	}
+	changes, err := tasks.Changes(t.saved, t.items)
+	if err != nil {
+		return err
+	}
+	store := storage.TaskStore{Path: t.path}
+	if t.io == nil {
+		result, err := store.ApplyTaskChanges(context.Background(), changes)
+		if err == nil {
+			t.items = result
+			t.saved = tasks.Clone(result)
+		}
+		return err
 	}
 	t.notice = "Lagrer oppgaver…"
-	t.io.enqueue(func() error { return storage.Save(path, items) }, func(m *Model, err error) {
+	var result []model.Task
+	t.io.enqueue(func() (err error) { result, err = store.ApplyTaskChanges(context.Background(), changes); return err }, func(m *Model, err error) {
 		if err != nil {
 			m.tasks.notice = "Kunne ikke lagre oppgaver; endringene finnes kun i minnet: " + err.Error()
 		} else {
+			m.tasks.items = result
+			m.tasks.saved = tasks.Clone(result)
 			m.tasks.notice = "Oppgaver lagret lokalt"
 		}
 	})
@@ -75,7 +85,7 @@ func (t *taskState) save() error {
 }
 
 func (m Model) taskReference() (model.TaskReference, bool) {
-	if m.jiraActive {
+	if m.page == pageJira {
 		rows := m.jira.filtered()
 		if m.jira.selected < 0 || m.jira.selected >= len(rows) {
 			return model.TaskReference{}, false
@@ -101,12 +111,12 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 	}
 	t := &m.tasks
 	if t.loadFailed {
-		t.active = true
+		m.setPageFlag(pageTasks, true)
 		return m, nil
 	}
 	refs := m.taskReferences()
 	if len(refs) == 0 {
-		t.active = true
+		m.setPageFlag(pageTasks, true)
 		t.notice = "Velg en Jira-sak eller PR først, eller trykk n for en tom oppgave"
 		return m, nil
 	}
@@ -119,7 +129,7 @@ func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
 	for _, ref := range refs {
 		t.items[t.selected].Add(ref)
 	}
-	t.active = true
+	m.setPageFlag(pageTasks, true)
 	t.archived = false
 	t.items[t.selected].Archived = false
 	t.save()
@@ -182,28 +192,20 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, m.quit()
 	case "esc":
-		if t.details {
-			t.details = false
-		} else if t.query != "" {
-			t.query = ""
-		} else {
-			t.active = false
-		}
+		return m.backTasks()
+
 	case "T":
-		t.active = false
+		m.setPageFlag(pageTasks, false)
 	case "g", "J":
-		t.active = false
+		m.setPageFlag(pageTasks, false)
 		return m.switchProvider(k == "J")
 	case "right":
 		t.details = true
 	case "left":
 		t.details = false
 	case "/":
-		t.searching = true
-		t.details = false
-		t.input.Prompt = "/ "
-		t.input.SetValue(t.query)
-		return m, t.input.Focus()
+		return m.searchTasks()
+
 	case "tab", "shift+tab":
 		delta := 1
 		if k == "shift+tab" {
@@ -222,13 +224,8 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		t.save()
 		fallthrough
 	case "E":
-		if len(t.items) > 0 && !t.loadFailed {
-			t.editing = true
-			t.input.Prompt = "Tittel: "
-			t.input.SetWidth(max(1, m.width-10))
-			t.input.SetValue(t.items[t.selected].Title)
-			return m, t.input.Focus()
-		}
+		return m.editTaskTitle()
+
 	case "j", "down":
 		if !t.details {
 			t.moveTask(1, false)
@@ -450,7 +447,7 @@ func (m Model) tasksView() tea.View {
 // Prefer loaded provider data while retaining the saved reference when offline.
 func (m Model) liveReference(ref model.TaskReference) model.TaskReference {
 	if ref.Provider == "github" {
-		for _, data := range m.snapshot.Datasets {
+		for _, data := range m.prs.Snapshot().Datasets {
 			for _, p := range data.PRs {
 				if p.URL == ref.URL {
 					ref.Title = p.Title + " · review: " + string(p.Review) + " · CI: " + string(p.CI)
@@ -468,4 +465,40 @@ func (m Model) liveReference(ref model.TaskReference) model.TaskReference {
 		}
 	}
 	return ref
+}
+
+func (m Model) backTasks() (tea.Model, tea.Cmd) {
+	t := &m.tasks
+
+	if t.details {
+		t.details = false
+	} else if t.query != "" {
+		t.query = ""
+	} else {
+		m.setPageFlag(pageTasks, false)
+	}
+	return m, nil
+}
+
+func (m Model) searchTasks() (tea.Model, tea.Cmd) {
+	t := &m.tasks
+
+	t.searching = true
+	t.details = false
+	t.input.Prompt = "/ "
+	t.input.SetValue(t.query)
+	return m, t.input.Focus()
+}
+
+func (m Model) editTaskTitle() (tea.Model, tea.Cmd) {
+	t := &m.tasks
+
+	if len(t.items) > 0 && !t.loadFailed {
+		t.editing = true
+		t.input.Prompt = "Tittel: "
+		t.input.SetWidth(max(1, m.width-10))
+		t.input.SetValue(t.items[t.selected].Title)
+		return m, t.input.Focus()
+	}
+	return m, nil
 }

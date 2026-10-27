@@ -1,5 +1,5 @@
-// Package mattermost sends Markdown messages through incoming webhooks.
-package mattermost
+// Package conversations sends Markdown messages through incoming webhooks.
+package conversations
 
 import (
 	"bytes"

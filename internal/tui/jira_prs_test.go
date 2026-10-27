@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -32,8 +32,8 @@ func TestJiraPRAggregatePriority(t *testing.T) {
 			ready.Title = "APP-1"
 			tt.pr.URL = "https://github.example/other"
 			tt.pr.HeadRef = "feature/APP-1"
-			m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{ready, tt.pr}
-			m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{tt.pr}
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs = []model.PullRequest{ready, tt.pr} })
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{tt.pr} })
 			got := m.jiraPRSummary("APP-1")
 			if got.count != 2 || got.countLabel() != "2" || got.status != tt.want {
 				t.Fatalf("got %+v", got)
@@ -48,9 +48,11 @@ func TestJiraPRAggregatePriority(t *testing.T) {
 func TestJiraPRSummaryFollowsSelectionAndFits(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
-	m.source = &fakeSource{}
+	m.useSource(&fakeSource{})
 	m.jira.rows = []jira.Issue{{Key: "APP-1", Title: "First"}, {Key: "APP-2", Title: "Second"}}
-	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.example/1", Title: "APP-1", CI: model.Fail}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.example/1", Title: "APP-1", CI: model.Fail}}
+	})
 	for _, width := range []int{40, 80, 120} {
 		m.width = width
 		m.height = 24
@@ -76,7 +78,7 @@ func TestJiraPRSummaryFollowsSelectionAndFits(t *testing.T) {
 			t.Fatal("missing detail summary")
 		}
 	}
-	m.source = nil
+	m.useSource(nil)
 	if got := m.jiraPRSummary("APP-9"); got.status != "Ukjent" || got.countLabel() != "?" {
 		t.Fatal(got)
 	}

@@ -1,4 +1,4 @@
-package mattermost
+package conversations
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func TestValidationAndCancellation(t *testing.T) {
 			t.Errorf("accepted %q", endpoint)
 		}
 	}
-	c, err := New("https://mattermost.example/hooks/secret")
+	c, err := New("https://conversations.example/hooks/secret")
 	if err != nil {
 		t.Fatal(err)
 	}

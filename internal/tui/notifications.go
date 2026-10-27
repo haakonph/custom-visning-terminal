@@ -84,7 +84,7 @@ func (m *Model) notifyPullRequests(msg refreshMsg) tea.Cmd {
 	if msg.err != nil || !msg.result.Complete {
 		return nil
 	}
-	events := m.notifications.observe(m.snapshot.User, msg.result.PRs)
+	events := m.notifications.observe(m.prs.Snapshot().User, msg.result.PRs)
 	if len(events) == 0 {
 		return nil
 	}

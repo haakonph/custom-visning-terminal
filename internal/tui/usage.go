@@ -15,11 +15,11 @@ func (m Model) WithUsage(recorder *usage.Recorder, notice string) Model {
 	return m
 }
 
-// Update observes only real key messages. Internal compatibility dispatch and
-// background refreshes must never count as user activity.
+// Update observes only real key messages. Named internal actions and
+// background refreshes never count as additional user activity.
 func (m Model) observedUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, isKey := msg.(tea.KeyPressMsg)
-	if m.usage == nil || !isKey || m.internalKey {
+	if m.usage == nil || !isKey {
 		return m.update(msg)
 	}
 	before := m.usageScreen()
@@ -77,15 +77,15 @@ func (m Model) usageScreen() string {
 		return "github.details"
 	case m.local != nil && m.local.choosing:
 		return "editor.choose"
-	case m.tasks.active && m.tasks.details:
+	case (m.page == pageTasks) && m.tasks.details:
 		return "task.details"
-	case m.jiraActive && m.jira != nil && m.jira.detail != nil:
+	case (m.page == pageJira) && m.jira != nil && m.jira.detail != nil:
 		return "jira.details"
-	case m.copilotActive && m.copilot != nil && m.copilot.diagnosticsOpen:
+	case (m.page == pageCopilot) && m.copilot != nil && m.copilot.diagnosticsOpen:
 		return "copilot.diagnostics"
-	case m.copilotActive && m.copilot != nil && m.copilot.detail != nil:
+	case (m.page == pageCopilot) && m.copilot != nil && m.copilot.detail != nil:
 		return "copilot.details"
-	case m.mmReader != nil && m.mmReader.active:
+	case m.mmReader != nil && (m.page == pageChat):
 		switch {
 		case m.mmReader.mode != "":
 			return "mattermost.login"

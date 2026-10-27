@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/syncstate"
 )
 
 type detailState struct {
@@ -18,7 +19,7 @@ type detailState struct {
 	lineAge     string
 
 	synced  time.Time
-	pr      model.PullRequest
+	id      string
 	data    model.PRDetails
 	loading bool
 	err     error
@@ -26,6 +27,7 @@ type detailState struct {
 	request uint64
 }
 type detailMsg struct {
+	token            syncstate.Token
 	autoMergeVersion uint64
 	request          uint64
 	data             model.PRDetails
@@ -39,46 +41,48 @@ func (m *Model) loadDetails() tea.Cmd {
 	if m.detail.request == 0 {
 		m.auto.detail = refreshJob{}
 	}
-	source, ok := m.source.(model.DetailSource)
+	source, ok := m.prs.Source().(model.DetailSource)
 	if !ok {
 		m.detail.err = fmt.Errorf("Detaljer støttes ikke av denne datakilden")
-		m.auto.detail.complete(time.Now(), true)
+		m.auto.detail.Complete(time.Now(), true)
 		return nil
 	}
 	m.detailSequence++
 	m.detail.request = m.detailSequence
 	m.detail.loading = true
-	m.auto.detail.started = time.Now()
+	m.auto.detail.Started = time.Now()
 	m.detail.err = nil
-	request, pr, parent := m.detail.request, m.detail.pr, m.ctx
-	autoMergeVersion := m.autoMergeVersion
+	request, pr, parent := m.detail.request, m.detailPR(), m.prs.Context()
+	autoMergeVersion := m.prs.Revision()
+	token := m.prs.Begin("details")
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		data, err := source.Details(ctx, pr)
-		return detailMsg{request: request, data: data, err: err, autoMergeVersion: autoMergeVersion}
+		return detailMsg{token: token, request: request, data: data, err: err, autoMergeVersion: autoMergeVersion}
 	}
 }
 func (m Model) detailLines() []string {
 	d := m.detail
+	pr := m.detailPR()
 	age := syncAge(d.synced)
 	if d.lines != nil && d.lineWidth == m.width && d.lineAge == age && d.lineLoading == d.loading {
 		return d.lines
 	}
-	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(d.pr.Repository), d.pr.Number, d.pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", "Oppdatert: " + syncAge(d.synced), ""}
+	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(pr.Repository), pr.Number, pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", "Oppdatert: " + syncAge(d.synced), ""}
 	auto := ""
-	if label := autoMergeLabel(d.pr); label != "" {
+	if label := autoMergeLabel(pr); label != "" {
 		auto = "Automerge: " + label + " · "
 	}
-	lines = append(lines, "Jira: "+strings.Join(d.pr.JiraKeys(m.jiraPattern), ", "), auto+"Queue: "+queueLabel(d.pr), "a+ automerge på (merge when ready) · a- av")
-	if d.pr.Mergeability == model.Conflicting {
+	lines = append(lines, "Jira: "+strings.Join(pr.JiraKeys(m.jiraPattern), ", "), auto+"Queue: "+queueLabel(pr), "a+ automerge på (merge when ready) · a- av")
+	if pr.Mergeability == model.Conflicting {
 		lines = append(lines, "CONFLICT: PR-en har mergekonflikter som må løses før den kan merges.")
 	}
-	lines = append(lines, reviewSummaryLabel(d.pr))
-	if d.pr.OpenComments != nil {
-		lines = append(lines, fmt.Sprintf("Åpne kommentarer: %d (uløste reviewtråder)", *d.pr.OpenComments))
+	lines = append(lines, reviewSummaryLabel(pr))
+	if pr.OpenComments != nil {
+		lines = append(lines, fmt.Sprintf("Åpne kommentarer: %d (uløste reviewtråder)", *pr.OpenComments))
 	}
-	if d.pr.ReviewSummary != nil && d.pr.ReviewSummary.Fallback {
+	if pr.ReviewSummary != nil && pr.ReviewSummary.Fallback {
 		lines = append(lines, "Vurderingene gjelder denne PR-en. GitHubs regler avgjør om den kan merges.")
 	}
 	if d.loading {
@@ -167,4 +171,12 @@ func retainDetailSections(old, next model.PRDetails) model.PRDetails {
 		}
 	}
 	return next
+}
+
+func (m Model) detailPR() model.PullRequest {
+	if m.detail == nil {
+		return model.PullRequest{}
+	}
+	p, _ := m.prs.Lookup(m.detail.id)
+	return p
 }

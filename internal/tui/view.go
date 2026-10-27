@@ -85,20 +85,20 @@ func (m Model) View() tea.View {
 	if m.visibleProvider() == "jira" && m.jira.detail != nil {
 		return m.jiraDetailView()
 	}
-	if m.mmReader != nil && m.mmReader.active {
+	if m.mmReader != nil && (m.page == pageChat) {
 		return m.mmReaderView()
 	}
-	if m.tasks.active {
+	if m.page == pageTasks {
 		return m.tasksView()
 	}
-	if m.copilotActive {
+	if m.page == pageCopilot {
 		return m.copilotView()
 	}
-	if m.jiraActive {
+	if m.page == pageJira {
 		return m.jiraView()
 	}
 	lines := []string{}
-	user := m.snapshot.User
+	user := m.prs.Snapshot().User
 	if user == "" {
 		user = "authenticating…"
 	}

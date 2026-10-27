@@ -27,7 +27,7 @@ func (m Model) beginRemoveLocal(refs []model.TaskReference) (tea.Model, tea.Cmd)
 	seen := map[string]bool{}
 	for _, ref := range refs {
 		found := false
-		for _, dataset := range m.snapshot.Datasets {
+		for _, dataset := range m.prs.Snapshot().Datasets {
 			for _, p := range dataset.PRs {
 				if p.URL == ref.URL {
 					found = true

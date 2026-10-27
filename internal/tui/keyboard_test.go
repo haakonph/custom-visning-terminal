@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -32,8 +32,8 @@ func TestChainedJiraActionBeforeAndAfterLoading(t *testing.T) {
 			m := ready(t)
 			client, _ := jira.New("https://jira.example/context", "secret")
 			m = m.WithJira(client, false)
-			m.snapshot.Datasets[model.Open].PRs[0].Title = "APP-1 APP-2"
-			m.snapshot.Datasets[model.Open].PRs[1].Title = "APP-2"
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs[0].Title = "APP-1 APP-2" })
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs[1].Title = "APP-2" })
 			m, _ = update(m, key(' '))
 			m, _ = update(m, key('j'))
 			m, _ = update(m, key(' '))
@@ -72,7 +72,7 @@ func TestChainedJiraActionBeforeAndAfterLoading(t *testing.T) {
 				t.Fatal("QA not scheduled")
 			}
 			m, _ = update(m, apply())
-			if m.jiraActive || m.jiraAction != nil || len(gets) != 2 || len(posts) != 2 || !strings.Contains(m.sequenceNotice, "APP-1, APP-2") {
+			if (m.page == pageJira) || m.jiraAction != nil || len(gets) != 2 || len(posts) != 2 || !strings.Contains(m.sequenceNotice, "APP-1, APP-2") {
 				t.Fatalf("wrong targets/state: %v %v %s", gets, posts, m.sequenceNotice)
 			}
 		})
@@ -82,7 +82,7 @@ func TestSequenceCancellationAndStaleJiraResult(t *testing.T) {
 	m := ready(t)
 	client, _ := jira.New("https://jira.example", "secret")
 	m = m.WithJira(client, false)
-	m.snapshot.Datasets[0].PRs[0].Title = "APP-1"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs[0].Title = "APP-1" })
 	m, _ = sequence(m, "atf")
 	request := m.jiraAction
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -156,7 +156,7 @@ func TestTaskArchiveRestoreAndDetailsDoNotDelete(t *testing.T) {
 	m := New(context.Background(), nil, nil)
 	m.entities.path = t.TempDir() + "/links.sqlite"
 	defer m.cancel()
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.items = []model.Task{{Title: "Keep", References: []model.TaskReference{{Key: "APP-1"}}}}
 	m, _ = sequence(m, "d")
 	if len(m.tasks.items[0].References) != 1 || !m.tasks.details {
@@ -176,7 +176,7 @@ func TestTaskArchiveRestoreAndDetailsDoNotDelete(t *testing.T) {
 
 func TestTaskShortcutsUseVisibleProvider(t *testing.T) {
 	m := jiraModel(t)
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.items = []model.Task{{Title: "First"}, {Title: "Second"}}
 	m, _ = sequence(m, "ld")
 	if m.tasks.selected != 1 || !m.tasks.details || m.jira.detail != nil || m.jira.active != 0 {

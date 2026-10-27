@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/haakonph/custom-visning-terminal/internal/app"
+	"github.com/haakonph/custom-visning-terminal/internal/bootstrap"
 )
 
 var version = "dev"
@@ -33,7 +33,7 @@ func main() {
 		}
 		return
 	}
-	if err := app.RunProviders(ctx, os.Stderr, *startJira, *startCopilot, version); err != nil {
+	if err := bootstrap.RunProviders(ctx, os.Stderr, *startJira, *startCopilot, version); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

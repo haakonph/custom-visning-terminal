@@ -198,11 +198,11 @@ func (m Model) reviewLabel(p model.PullRequest) string {
 
 // Current opinions identify the viewer independently of the branch protection decision.
 func (m Model) ownReview(p model.PullRequest) string {
-	if p.ReviewSummary == nil || m.snapshot.User == "" {
+	if p.ReviewSummary == nil || m.prs.Snapshot().User == "" {
 		return ""
 	}
 	for login, state := range p.ReviewSummary.Reviewers {
-		if strings.EqualFold(login, m.snapshot.User) {
+		if strings.EqualFold(login, m.prs.Snapshot().User) {
 			switch state {
 			case "APPROVED":
 				return string(model.Approved)

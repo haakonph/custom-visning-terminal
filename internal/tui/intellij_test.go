@@ -12,7 +12,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 

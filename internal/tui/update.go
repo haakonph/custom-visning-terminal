@@ -10,8 +10,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/pullrequests"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
 
@@ -30,7 +31,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if cached, ok := msg.(jiraCachedResult); ok {
-		if j := m.jira; j != nil && j.loading && j.generation == cached.generation && j.query == cached.query && cached.err == nil {
+		if j := m.jira; j != nil && j.loading && j.generation == cached.generation && j.query == cached.query && (cached.token.Sequence == 0 || m.jiraSession.Accept("query:"+cached.query, cached.token)) && cached.err == nil {
 			j.rows, j.synced = cached.cached.Issues, cached.cached.SyncedAt
 			j.clamp()
 		}
@@ -51,6 +52,28 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, cmd, handled := m.autoMessage(msg); handled {
 		return next, cmd
 	}
+	switch msg.(type) {
+	case bootMsg, refreshMsg, cacheMsg:
+		return m.updateGitHubResult(msg)
+	case detailMsg:
+		return m.updateDetails(msg.(detailMsg))
+	case jiraResult:
+		if m.jira != nil {
+			return m.updateJira(msg)
+		}
+		return m, nil
+	case copilotResult, copilotTick, copilotOpenMsg:
+		return m.updateCopilot(msg)
+	case mmResult, mmTick:
+		_, cmd := m.mmMessage(msg)
+		return m, cmd
+	case mattermostSent:
+		_, cmd := m.mattermostMessage(msg)
+		return m, cmd
+	case autoMergeMsg, copilotReviewRequested, jiraActionMsg:
+		next, cmd, _ := m.updateKeyboard(msg)
+		return next, cmd
+	}
 	if r, ok := msg.(setupValidated); ok {
 		return m.finishSetupValidation(r)
 	}
@@ -67,10 +90,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _, ok := msg.(tea.KeyPressMsg); ok && m.sequence == "" && m.jiraAction == nil {
 		m.sequenceNotice = ""
 	}
-	if next, cmd, handled := m.updateKeyboard(msg); !m.internalKey && handled {
+	if next, cmd, handled := m.updateKeyboard(msg); handled {
 		return next, cmd
 	}
-	m.internalKey = false
 	if handled, cmd := m.localMessage(msg); handled {
 		return m, cmd
 	}
@@ -91,36 +113,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	}
-	if result, ok := msg.(detailMsg); ok {
-		var cmd tea.Cmd
-		if m.detail != nil && m.detail.request == result.request {
-			m.detail.loading = false
-			if result.autoMergeVersion != m.autoMergeVersion {
-				return m, m.loadDetails()
-			}
-			if result.err == nil {
-				m.detail.data = retainDetailSections(m.detail.data, result.data)
-				if pr := result.data.PullRequest; pr != nil && pr.Key() == m.detail.pr.Key() {
-					m.detail.pr = *pr
-					for v, dataset := range m.snapshot.Datasets {
-						rows := append([]model.PullRequest(nil), dataset.PRs...)
-						for i := range rows {
-							if rows[i].Key() == pr.Key() {
-								rows[i] = *pr
-							}
-						}
-						m.snapshot.Datasets[v].PRs = rows
-					}
-					cmd = m.persist()
-				}
-				if len(result.data.Warnings) == 0 {
-					m.detail.synced = time.Now()
-				}
-			}
-			m.detail.err = result.err
-		}
-		return m, cmd
-	}
+
 	if m.detail != nil {
 		if result, ok := msg.(openMsg); ok {
 			m.detail.err = result.err
@@ -153,7 +146,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSettings(msg)
 		}
 	}
-	if m.help && !m.tasks.active && !m.jiraActive && !m.copilotActive {
+	if m.help && !(m.page == pageTasks) && !(m.page == pageJira) && !(m.page == pageCopilot) {
 		if key, ok := msg.(tea.KeyPressMsg); ok {
 			switch key.String() {
 			case "esc", "?":
@@ -180,7 +173,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _, ok := msg.(copilotTick); ok {
 		return m.updateCopilot(msg)
 	}
-	if m.copilotActive {
+	if m.page == pageCopilot {
 		switch msg.(type) {
 		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, detailMsg, copilotTick, copilotResult, copilotOpenMsg, mmTick, mmResult:
 		default:
@@ -211,10 +204,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if key, ok := msg.(tea.KeyPressMsg); ok && m.tasks.active {
+	if key, ok := msg.(tea.KeyPressMsg); ok && (m.page == pageTasks) {
 		return m.updateTasks(key)
 	}
-	if m.tasks.active && (m.tasks.editing || m.tasks.searching) {
+	if (m.page == pageTasks) && (m.tasks.editing || m.tasks.searching) {
 		switch msg.(type) {
 		case tea.WindowSizeMsg, bootMsg, refreshMsg, cacheMsg, jiraResult, openMsg:
 		default:
@@ -227,7 +220,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	}
-	if result, ok := msg.(openMsg); ok && m.tasks.active {
+	if result, ok := msg.(openMsg); ok && (m.page == pageTasks) {
 		if result.err != nil {
 			m.tasks.notice = "Kunne ikke åpne referansen: " + result.err.Error()
 		}
@@ -236,7 +229,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if _, ok := msg.(jiraResult); ok {
 		return m.updateJira(msg)
 	}
-	if m.jiraActive {
+	if m.page == pageJira {
 		switch msg.(type) {
 		case tea.KeyPressMsg:
 			return m.updateJira(msg)
@@ -258,86 +251,6 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.jira.input.SetWidth(max(1, m.width-4))
 		}
 		m.clamp()
-	case bootMsg:
-		m.booting = false
-		if msg.err != nil {
-			m.notice = msg.err.Error()
-			return m, nil
-		}
-		m.snapshot = msg.snapshot
-		m.notice = msg.warning
-		cmds := []tea.Cmd{}
-		for view := model.Open; view < model.ViewCount; view++ {
-			cmds = append(cmds, m.refresh(view))
-		}
-		cmds = append(cmds, m.refreshLocal())
-		return m, tea.Batch(cmds...)
-	case refreshMsg:
-		current := m.snapshot.Datasets[msg.view].PRs
-		if !msg.prepared || !sameRows(msg.baseRows, current) {
-			if !msg.prepared {
-				msg.freshRows = msg.result.PRs
-			}
-			return m, func() tea.Msg {
-				msg.baseRows, msg.prepared = current, true
-				if msg.err == nil && msg.result.Complete {
-					msg.result.PRs = append([]model.PullRequest(nil), msg.result.PRs...)
-					model.Sort(msg.result.PRs)
-				} else {
-					msg.result.PRs = model.Merge(current, msg.freshRows)
-				}
-				return msg
-			}
-		}
-		m.loading[msg.view] = false
-		if msg.autoMergeVersion != m.autoMergeVersion {
-			return m, m.refresh(msg.view)
-		}
-		warnings := append([]string{}, msg.result.Warnings...)
-		if msg.err != nil {
-			warnings = append(warnings, msg.err.Error())
-		}
-		m.warnings[msg.view] = strings.Join(warnings, "; ")
-		selectedURL := ""
-		if rows := m.filtered(); m.selected < len(rows) {
-			selectedURL = rows[m.selected].URL
-		}
-		data := &m.snapshot.Datasets[msg.view]
-		if msg.err == nil && msg.result.Complete {
-			data.PRs = msg.result.PRs
-			data.SyncedAt = msg.at
-			if m.detail != nil {
-				for _, pr := range data.PRs {
-					if pr.Key() == m.detail.pr.Key() {
-						m.detail.pr = pr
-						break
-					}
-				}
-			}
-		} else {
-			data.PRs = msg.result.PRs
-			if m.warnings[msg.view] == "" {
-				m.warnings[msg.view] = "Partial results; cached rows retained"
-			}
-		}
-		if msg.view == m.active || m.active == model.SharedReviews || m.relatedKey != "" {
-			for i, p := range m.filtered() {
-				if p.URL == selectedURL {
-					m.selected = i
-					break
-				}
-			}
-			m.clamp()
-		}
-		return m, tea.Batch(m.persist(), m.refreshLocal(), m.notifyPullRequests(msg))
-	case cacheMsg:
-		m.saving = false
-		if msg.err != nil {
-			m.notice = "Cache write failed; data is available in memory"
-		}
-		if m.dirty {
-			return m, m.persist()
-		}
 	case openMsg:
 		if msg.err != nil {
 			m.notice = "Could not open browser; URL: " + msg.err.Error()
@@ -374,13 +287,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if _, ok := m.chosen[p.Key()]; ok {
 					delete(m.chosen, p.Key())
 				} else {
-					m.chosen[p.Key()] = p
+					m.chosen[p.Key()] = struct{}{}
 				}
 			}
 		case "d":
 			rows := m.filtered()
 			if len(rows) > 0 {
-				m.detail = &detailState{pr: rows[m.selected]}
+				m.detail = &detailState{id: rows[m.selected].Key()}
 				return m, m.loadDetails()
 			}
 		case "j", "down":
@@ -416,7 +329,7 @@ func (m Model) filterGitHubRows() []model.PullRequest {
 	}
 	visible := make([]model.PullRequest, 0, len(rows))
 	for _, p := range rows {
-		if m.active == model.TeamReviews && m.relatedKey == "" && strings.EqualFold(p.Author, m.snapshot.User) {
+		if m.active == model.TeamReviews && m.relatedKey == "" && strings.EqualFold(p.Author, m.prs.Snapshot().User) {
 			continue
 		}
 		if !m.snoozes.hidden(snooze.Identity("github", p.URL)) && !m.entities.archived("github", p.URL) {
@@ -469,4 +382,122 @@ func launchBrowser(ctx context.Context, link string) error {
 		return fmt.Errorf("%s", link)
 	}
 	return nil
+}
+
+func (m Model) updateDetails(result detailMsg) (tea.Model, tea.Cmd) {
+
+	var cmd tea.Cmd
+	if m.detail != nil && m.detail.request == result.request && (result.token.Sequence == 0 || m.prs.Current(result.token)) {
+		m.detail.loading = false
+		if result.autoMergeVersion != m.prs.Revision() {
+			return m, m.loadDetails()
+		}
+		if result.err == nil {
+			m.detail.data = retainDetailSections(m.detail.data, result.data)
+			if pr := result.data.PullRequest; pr != nil && pr.Key() == m.detailPR().Key() {
+				if result.token.Sequence == 0 {
+					m.prs.Upsert(*pr)
+				} else {
+					m.prs.Observe(*pr, result.token)
+				}
+				m.detail.data.PullRequest = nil
+				cmd = m.persist()
+			}
+			if len(result.data.Warnings) == 0 {
+				m.detail.synced = time.Now()
+			}
+		}
+		m.detail.err = result.err
+	}
+	return m, cmd
+
+}
+
+func (m Model) updateGitHubResult(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case bootMsg:
+		if msg.token.Sequence != 0 && !m.prs.Accept("bootstrap", msg.token) {
+			return m, nil
+		}
+		m.booting = false
+		if msg.err != nil {
+			m.notice = msg.err.Error()
+			return m, nil
+		}
+		m.prs.Restore(msg.snapshot)
+		m.notice = msg.warning
+		cmds := []tea.Cmd{}
+		for view := model.Open; view < model.ViewCount; view++ {
+			cmds = append(cmds, m.refresh(view))
+		}
+		cmds = append(cmds, m.refreshLocal())
+		return m, tea.Batch(cmds...)
+	case refreshMsg:
+		if msg.token.Sequence != 0 && !m.prs.Match(pullrequests.ListResource(msg.view), msg.token) {
+			return m, nil
+		}
+		current := m.prs.Snapshot().Datasets[msg.view].PRs
+		if !msg.prepared || !sameRows(msg.baseRows, current) {
+			if !msg.prepared {
+				msg.freshRows = msg.result.PRs
+			}
+			return m, func() tea.Msg {
+				msg.baseRows, msg.prepared = current, true
+				if msg.err == nil && msg.result.Complete {
+					msg.result.PRs = append([]model.PullRequest(nil), msg.result.PRs...)
+					model.Sort(msg.result.PRs)
+				} else {
+					msg.result.PRs = model.Merge(current, msg.freshRows)
+				}
+				return msg
+			}
+		}
+		m.loading[msg.view] = false
+		if msg.autoMergeVersion != m.prs.Revision() {
+			return m, m.refresh(msg.view)
+		}
+		warnings := append([]string{}, msg.result.Warnings...)
+		if msg.err != nil {
+			warnings = append(warnings, msg.err.Error())
+		}
+		m.warnings[msg.view] = strings.Join(warnings, "; ")
+		selectedURL := ""
+		if rows := m.filtered(); m.selected < len(rows) {
+			selectedURL = rows[m.selected].URL
+		}
+		token := msg.token
+		if token.Sequence == 0 {
+			token = m.prs.Begin(pullrequests.ListResource(msg.view))
+		}
+		observed := msg.result
+		if msg.err != nil || !msg.result.Complete {
+			observed.PRs = msg.freshRows
+		}
+		if !m.prs.ApplyList(msg.view, observed, msg.err, msg.at, token) {
+			return m, m.refresh(msg.view)
+		}
+		if (msg.err != nil || !msg.result.Complete) && m.warnings[msg.view] == "" {
+			m.warnings[msg.view] = "Partial results; cached rows retained"
+		}
+		if msg.view == m.active || m.active == model.SharedReviews || m.relatedKey != "" {
+			for i, p := range m.filtered() {
+				if p.URL == selectedURL {
+					m.selected = i
+					break
+				}
+			}
+			m.clamp()
+		}
+		return m, tea.Batch(m.persist(), m.refreshLocal(), m.notifyPullRequests(msg))
+	case cacheMsg:
+		m.saving = false
+		if msg.err != nil && (msg.generation == 0 || msg.generation == m.prs.Generation()) {
+			m.notice = "Cache write failed; data is available in memory"
+		}
+		if m.dirty {
+			return m, m.persist()
+		}
+
+	}
+	return m, nil
 }

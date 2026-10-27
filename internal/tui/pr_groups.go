@@ -131,7 +131,7 @@ func (m Model) prLayout(rows []model.PullRequest) *prGroupLayout {
 		counts[m.prGroupKey(p)]++
 	}
 	var known []model.PullRequest
-	for _, dataset := range m.snapshot.Datasets {
+	for _, dataset := range m.prs.Snapshot().Datasets {
 		known = append(known, dataset.PRs...)
 	}
 	known = append(known, rows...)

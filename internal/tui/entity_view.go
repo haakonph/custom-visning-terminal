@@ -58,7 +58,7 @@ func (m Model) entityView() tea.View {
 func (m Model) referenceUser(r model.TaskReference) string {
 	switch r.Provider {
 	case "github":
-		for _, dataset := range m.snapshot.Datasets {
+		for _, dataset := range m.prs.Snapshot().Datasets {
 			for _, pr := range dataset.PRs {
 				if pr.URL == r.URL && pr.Author != "" {
 					return pr.Author

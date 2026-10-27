@@ -116,7 +116,8 @@ func TestPRInfoPrioritizesConflicts(t *testing.T) {
 				}
 			}
 			m.width = 60
-			m.detail = &detailState{pr: p}
+			m.prs.Upsert(p)
+			m.detail = &detailState{id: p.Key()}
 			details := strings.Join(m.detailLines(), "\n")
 			if strings.Contains(details, "CONFLICT:") != (tc.merge == model.Conflicting) {
 				t.Fatalf("incorrect conflict explanation: %s", details)
@@ -131,14 +132,18 @@ func TestPRInfoPrioritizesConflicts(t *testing.T) {
 func TestTeamReviewHidesCachedOwnPRs(t *testing.T) {
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m.snapshot.User = "alice"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.User = "alice" })
 	m.active = model.TeamReviews
-	m.snapshot.Datasets[model.TeamReviews].PRs = []model.PullRequest{{Author: "Alice", URL: "https://github.com/acme/repo/pull/1"}, {Author: "bob", URL: "https://github.com/acme/repo/pull/2"}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.TeamReviews].PRs = []model.PullRequest{{Author: "Alice", URL: "https://github.com/acme/repo/pull/1"}, {Author: "bob", URL: "https://github.com/acme/repo/pull/2"}}
+	})
 	if rows := m.filtered(); len(rows) != 1 || rows[0].Author != "bob" {
 		t.Fatal(rows)
 	}
 	m.active = model.Open
-	m.snapshot.Datasets[model.Open].PRs = m.snapshot.Datasets[model.TeamReviews].PRs
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.Open].PRs = snapshot.Datasets[model.TeamReviews].PRs
+	})
 	if len(m.filtered()) != 2 {
 		t.Fatal("own PR hidden outside Team Review")
 	}
@@ -149,7 +154,8 @@ func TestReviewSummaryRendering(t *testing.T) {
 	defer m.cancel()
 	m.width = 180
 	p := model.PullRequest{Title: "Stacked PR", Review: model.ChangesRequested, ReviewSummary: &model.ReviewSummary{Approved: 2, Changes: 1, Pending: 1, PendingTeams: 1, Complete: true, Fallback: true}}
-	m.detail = &detailState{pr: p}
+	m.prs.Upsert(p)
+	m.detail = &detailState{id: p.Key()}
 	text := strings.Join(m.detailLines(), "\n")
 	for _, want := range []string{"Review: CHANGES (vurderinger)", "2 godkjent · 1 endringer · 1 venter", "1 team venter", "GitHubs regler avgjør"} {
 		if !strings.Contains(text, want) {
@@ -248,7 +254,7 @@ func TestCopilotReviewPendingLabel(t *testing.T) {
 func TestReviewRequestAgeAndReviewerColors(t *testing.T) {
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m.snapshot.User = "Alice"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.User = "Alice" })
 	m.mattermost = &mattermostState{sent: map[string]time.Time{}}
 	p := model.PullRequest{URL: "https://github.com/acme/repo/pull/1", Review: model.Approved}
 	for _, view := range []model.View{model.Reviews, model.TeamReviews} {
@@ -305,7 +311,7 @@ func TestReviewRequestAgeAndReviewerColors(t *testing.T) {
 
 func TestLocalAIStatusAndLatestRelatedSession(t *testing.T) {
 	m := unifiedModel(t)
-	p := m.snapshot.Datasets[0].PRs[0]
+	p := m.prs.Snapshot().Datasets[0].PRs[0]
 	at := time.Now().Add(-90 * time.Minute).UTC().Format(time.RFC3339Nano)
 	m.copilot.sessions = []model.CopilotSession{
 		{ID: "branch", Repository: p.Repository, Branch: p.HeadRef, Status: "active", LastActivity: time.Now().Add(-2 * time.Hour).Format(time.RFC3339Nano)},
@@ -359,7 +365,7 @@ func TestLocalAIAge(t *testing.T) {
 
 func TestGitHubAIColumnPlacementAndWidth(t *testing.T) {
 	m := unifiedModel(t)
-	p := m.snapshot.Datasets[0].PRs[0]
+	p := m.prs.Snapshot().Datasets[0].PRs[0]
 	m.copilot.sessions[0].Status = "waiting"
 	m.copilot.sessions[0].LastActivity = time.Now().Add(-90 * time.Minute).Format(time.RFC3339Nano)
 	for _, width := range []int{60, 100, 119, 120, 140, 160, 200} {
@@ -380,10 +386,10 @@ func TestGitHubAIColumnPlacementAndWidth(t *testing.T) {
 
 func TestLocalAIRefreshContinuesOutsideAIView(t *testing.T) {
 	m := unifiedModel(t)
-	if m.copilotActive {
+	if m.page == pageCopilot {
 		t.Fatal("expected GitHub view")
 	}
-	m.source = nil
+	m.useSource(nil)
 	if cmd := m.initProviders(); cmd == nil || !m.copilot.loading {
 		t.Fatal("AI data not loaded at startup")
 	}

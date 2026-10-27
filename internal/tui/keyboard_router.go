@@ -40,30 +40,14 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return next, cmd, true
 	}
 	if result, ok := msg.(copilotReviewRequested); ok {
-		m.reviewRequestBusy = false
-		for _, url := range result.urls {
-			for v, dataset := range m.snapshot.Datasets {
-				rows := append([]model.PullRequest(nil), dataset.PRs...)
-				for i := range rows {
-					p := &rows[i]
-					if p.URL == url && !copilotReviewPending(*p) {
-						p.RequestedReviewers = append(append([]string(nil), p.RequestedReviewers...), "copilot-pull-request-reviewer[bot]")
-					}
-				}
-				m.snapshot.Datasets[v].PRs = rows
-			}
-			if m.detail != nil && m.detail.pr.URL == url && !copilotReviewPending(m.detail.pr) {
-				m.detail.pr.RequestedReviewers = append(m.detail.pr.RequestedReviewers, "copilot-pull-request-reviewer[bot]")
-			}
+		if !m.prs.ApplyReview(result.result) {
+			return m, nil, true
 		}
-		m.sequenceNotice = fmt.Sprintf("Ny Copilot-review forespurt for %d PR-er; au henter status", result.count)
-		if result.err != nil {
-			m.sequenceNotice = result.err.Error()
+		m.sequenceNotice = fmt.Sprintf("Ny Copilot-review forespurt for %d PR-er; au henter status", len(result.result.URLs))
+		if result.result.Err != nil {
+			m.sequenceNotice = result.result.Err.Error()
 		}
-		return m, nil, true
-	}
-	if m.internalKey {
-		return m, nil, false
+		return m, m.persist(), true
 	}
 	if result, ok := msg.(jiraActionMsg); ok {
 		next, cmd := m.finishJiraAction(result)
@@ -292,7 +276,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			s.input.Prompt = "/ "
 			return m, s.input.Focus(), true
 		}
-		next, cmd := m.dispatchKey("/")
+		next, cmd := m.searchVisible()
 		return next, cmd, true
 	case "esc":
 		if m.dialog != nil {
@@ -307,12 +291,12 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			m.jira.detail = nil
 			return m, nil, true
 		}
-		if m.tasks.active && m.tasks.details {
+		if (m.page == pageTasks) && m.tasks.details {
 			m.tasks.details = false
 			return m, nil, true
 		}
 		if m.visibleProvider() == "copilot" && (m.copilot.detail != nil || m.copilot.diagnosticsOpen) {
-			next, cmd := m.dispatchKey("esc")
+			next, cmd := m.backVisible()
 			return next, cmd, true
 		}
 		if m.hasChosen() {
@@ -323,7 +307,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			next, cmd := m.viewProvider("r")
 			return next, cmd, true
 		}
-		next, cmd := m.dispatchKey("esc")
+		next, cmd := m.backVisible()
 		return next, cmd, true
 	case "z":
 		next, cmd := m.beginSnooze()
@@ -347,37 +331,6 @@ func (m *Model) clearChosen() {
 func (m Model) hasChosen() bool {
 	return len(m.chosen)+len(m.jiraChosen)+len(m.extraChosen) > 0 || (m.dialog != nil && len(m.dialog.chosen) > 0)
 }
-func (m Model) dispatchKey(k string) (tea.Model, tea.Cmd) {
-	code := rune(0)
-	switch k {
-	case "enter":
-		code = tea.KeyEnter
-	case "esc":
-		code = tea.KeyEscape
-	default:
-		if len([]rune(k)) == 1 {
-			code = []rune(k)[0]
-		}
-	}
-	key := tea.KeyPressMsg{Code: code, Text: k}
-	if m.snoozes != nil && m.snoozes.active {
-		_, cmd := m.snoozeMessage(key)
-		return m, cmd
-	}
-	switch m.visibleProvider() {
-	case "task":
-		return m.updateTasks(key)
-	case "copilot":
-		return m.updateCopilot(key)
-	case "jira":
-		return m.updateJira(key)
-	case "mattermost":
-		_, cmd := m.mmMessage(key)
-		return m, cmd
-	}
-	m.internalKey = true
-	return m.Update(key)
-}
 func (m Model) scrollDetails(k string) (tea.Model, tea.Cmd, bool) {
 	delta := 1
 	if k == "k" || k == "up" {
@@ -391,8 +344,10 @@ func (m Model) scrollDetails(k string) (tea.Model, tea.Cmd, bool) {
 		m.jira.detailOffset = max(0, min(m.jira.detailOffset+delta, max(0, len(m.jiraDetailLines())-max(1, m.height-1))))
 		return m, nil, true
 	}
-	next, cmd := m.dispatchKey(k)
-	return next, cmd, true
+	if m.visibleProvider() == "copilot" {
+		m.copilot.offset = max(0, m.copilot.offset+delta)
+	}
+	return m, nil, true
 }
 func (m Model) changeTab(delta int) (tea.Model, tea.Cmd) {
 	switch m.visibleProvider() {
@@ -434,7 +389,7 @@ func (m Model) showDetails() (tea.Model, tea.Cmd) {
 		m.tasks.details = true
 		return m, nil
 	case "copilot":
-		return m.updateCopilot(tea.KeyPressMsg{Code: tea.KeyEnter})
+		return m.openCopilotDetails()
 	case "jira":
 		rows := m.jira.filtered()
 		if len(rows) > 0 {
@@ -450,9 +405,9 @@ func (m Model) showDetails() (tea.Model, tea.Cmd) {
 		}
 		return m.unavailable()
 	case "mattermost":
-		return m.dispatchKey("d")
+		return m.openVisibleDetails()
 	case "github":
-		return m.dispatchKey("d")
+		return m.openVisibleDetails()
 	}
 	return m.unavailable()
 }

@@ -19,7 +19,7 @@ func (q *Queries) ClearTasks(ctx context.Context) error {
 }
 
 const insertTasks = `-- name: InsertTasks :exec
-INSERT INTO tasks (position, stable_id, title, archived) VALUES (?1, ?2, ?3, ?4)
+INSERT INTO tasks (position, stable_id, title, archived, revision) VALUES (?1, ?2, ?3, ?4, ?5)
 `
 
 type InsertTasksParams struct {
@@ -27,6 +27,7 @@ type InsertTasksParams struct {
 	StableID string
 	Title    string
 	Archived int64
+	Revision int64
 }
 
 func (q *Queries) InsertTasks(ctx context.Context, arg InsertTasksParams) error {
@@ -35,12 +36,13 @@ func (q *Queries) InsertTasks(ctx context.Context, arg InsertTasksParams) error 
 		arg.StableID,
 		arg.Title,
 		arg.Archived,
+		arg.Revision,
 	)
 	return err
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT position, stable_id, title, archived FROM tasks ORDER BY position
+SELECT position, stable_id, title, archived, revision FROM tasks ORDER BY position
 `
 
 func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
@@ -57,6 +59,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 			&i.StableID,
 			&i.Title,
 			&i.Archived,
+			&i.Revision,
 		); err != nil {
 			return nil, err
 		}

@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
 )
 
 func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
 	client := testCopilot(t)
 	m := ready(t).WithCopilot(client, false)
 	m, cmd := sequence(m, "va")
-	if !m.copilotActive || cmd == nil {
+	if !(m.page == pageCopilot) || cmd == nil {
 		t.Fatal("Copilot not opened")
 	}
 	m, cmd = update(m, copilotResult{sessions: []copilot.Session{{ID: "s1", Name: "Fix login", Repository: "acme/api"}, {ID: "s2", Name: "Review", Jira: "TEST-12"}}})
@@ -42,7 +42,7 @@ func TestCopilotNavigationFilteringAndRetention(t *testing.T) {
 		t.Fatal("escape did not reset")
 	}
 	m, _ = sequence(m, "vg")
-	if m.copilotActive {
+	if m.page == pageCopilot {
 		t.Fatal("GitHub switch failed")
 	}
 }
@@ -54,7 +54,7 @@ func TestStandaloneCopilotAndSafeRendering(t *testing.T) {
 		t.Fatal("standalone init")
 	}
 	m, _ = sequence(m, "vg")
-	if !m.copilotActive || m.setup.provider == "" {
+	if !(m.page == pageCopilot) || m.setup.provider == "" {
 		t.Fatal("missing provider feedback")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})

@@ -9,7 +9,8 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/syncstate"
 )
 
 type copilotState struct {
@@ -34,6 +35,7 @@ type copilotState struct {
 	ideNotice                           string
 }
 type copilotResult struct {
+	token       syncstate.Token
 	sessions    []copilot.Session
 	detail      *copilot.Detail
 	diagnostics copilot.Diagnostics
@@ -41,17 +43,21 @@ type copilotResult struct {
 	err         error
 }
 type copilotTick struct{}
-type copilotOpenMsg struct{ err error }
+type copilotOpenMsg struct {
+	err   error
+	token syncstate.Token
+}
 
 func (m Model) WithCopilot(client *copilot.Service, active bool) Model {
+	m.copilotSession.Configure(m.ctx)
 	input := textinput.New()
 	input.Prompt = "/ "
 	input.Placeholder = "session, repository, Jira, model, status"
 	input.CharLimit = 256
 	m.copilot = &copilotState{entities: m.entities, snoozes: m.snoozes, client: client, input: input, openIDE: openIntelliJ}
-	m.copilotActive = active
+	m.setPageFlag(pageCopilot, active)
 	if active {
-		m.jiraActive = false
+		m.setPageFlag(pageJira, false)
 		m.booting = false
 	}
 	return m
@@ -61,8 +67,8 @@ func (m Model) switchCopilot() (tea.Model, tea.Cmd) {
 		m.notice = "Copilot is not configured"
 		return m, nil
 	}
-	m.copilotActive = true
-	m.jiraActive = false
+	m.setPageFlag(pageCopilot, true)
+	m.setPageFlag(pageJira, false)
 	return m, m.refreshCopilot()
 }
 func (m *Model) refreshCopilot() tea.Cmd {
@@ -71,14 +77,15 @@ func (m *Model) refreshCopilot() tea.Cmd {
 		return nil
 	}
 	c.loading = true
-	client, ctx := c.client, m.ctx
+	client, ctx := c.client, m.copilotSession.Context(m.ctx)
+	token := m.copilotSession.Begin("refresh")
 	id := ""
 	if c.detail != nil && m.visibleProvider() == "copilot" {
 		id = c.detail.Session.ID
 	}
 	return func() tea.Msg {
 		sessions, err := client.Sessions(ctx)
-		result := copilotResult{sessions: sessions, id: id, err: err}
+		result := copilotResult{token: token, sessions: sessions, id: id, err: err}
 		if err == nil {
 			result.diagnostics, result.err = client.Diagnostics(ctx)
 		}
@@ -111,6 +118,9 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case copilotOpenMsg:
+		if msg.token.Sequence != 0 && !m.copilotSession.Match("open", msg.token) {
+			return m, nil
+		}
 		c.openingIDE = false
 		if msg.err != nil {
 			c.ideNotice = msg.err.Error()
@@ -121,6 +131,9 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		c.timerPending = false
 		return m, m.refreshCopilot()
 	case copilotResult:
+		if msg.token.Sequence != 0 && !m.copilotSession.Accept("refresh", msg.token) {
+			return m, nil
+		}
 		c.loading = false
 		if msg.err != nil {
 			c.notice = msg.err.Error() + " · Previous data retained"
@@ -177,7 +190,7 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, m.quit()
 		case "g":
-			if m.source == nil {
+			if m.prs.Source() == nil {
 				c.notice = "GitHub er ikke konfigurert. Start appen med GitHub-token for å bytte."
 				return m, nil
 			}
@@ -205,21 +218,20 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			c.openingIDE = true
 			c.ideNotice = "Åpner prosjektet i IntelliJ…"
-			opener, ctx := c.openIDE, m.ctx
-			return m, func() tea.Msg { return copilotOpenMsg{err: opener(ctx, session)} }
+			opener, ctx := c.openIDE, m.copilotSession.Context(m.ctx)
+			token := m.copilotSession.Begin("open")
+			return m, func() tea.Msg { return copilotOpenMsg{err: opener(ctx, session), token: token} }
 		case "R":
 			return m, m.refreshCopilot()
 		case "D":
 			c.diagnosticsOpen = !c.diagnosticsOpen
 			c.offset = 0
 		case "/":
-			c.filtering = true
-			return m, c.input.Focus()
+			return m.searchCopilot()
+
 		case "esc":
-			c.detail = nil
-			c.diagnosticsOpen = false
-			c.offset = 0
-			c.input.SetValue("")
+			return m.backCopilot()
+
 		case "j", "down":
 			if c.detail != nil || c.diagnosticsOpen {
 				c.offset++
@@ -233,15 +245,8 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 				c.selected = max(0, c.selected-1)
 			}
 		case "enter":
-			rows := c.rows()
-			if len(rows) == 0 || c.loading {
-				return m, nil
-			}
-			s := rows[c.selected]
-			c.detail = &copilot.Detail{Session: s}
-			c.offset = 0
-			c.diagnosticsOpen = false
-			return m, m.refreshCopilot()
+			return m.openCopilotDetails()
+
 		}
 	default:
 		if c.filtering {
@@ -382,4 +387,35 @@ func (m Model) copilotDetailLines() []string {
 	}
 	c.formattedDetail, c.formattedWidth, c.formattedLines = c.detail, m.width, wrapped
 	return wrapped
+}
+
+func (m Model) searchCopilot() (tea.Model, tea.Cmd) {
+	c := m.copilot
+
+	c.filtering = true
+	return m, c.input.Focus()
+}
+
+func (m Model) backCopilot() (tea.Model, tea.Cmd) {
+	c := m.copilot
+
+	c.detail = nil
+	c.diagnosticsOpen = false
+	c.offset = 0
+	c.input.SetValue("")
+	return m, nil
+}
+
+func (m Model) openCopilotDetails() (tea.Model, tea.Cmd) {
+	c := m.copilot
+
+	rows := c.rows()
+	if len(rows) == 0 || c.loading {
+		return m, nil
+	}
+	s := rows[c.selected]
+	c.detail = &copilot.Detail{Session: s}
+	c.offset = 0
+	c.diagnosticsOpen = false
+	return m, m.refreshCopilot()
 }

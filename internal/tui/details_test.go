@@ -13,7 +13,8 @@ import (
 func TestDetailTreeAndStaleResult(t *testing.T) {
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m.detail = &detailState{request: 2, pr: model.PullRequest{Title: "Example"}, data: model.PRDetails{
+	m.prs.Upsert(model.PullRequest{Title: "Example"})
+	m.detail = &detailState{request: 2, id: "", data: model.PRDetails{
 		Files:    []model.ChangedFile{{Path: "src/app/a.go", Status: "modified"}, {Path: "src/app/b.go", Status: "added"}},
 		Comments: []model.PRComment{{Author: "alice", Body: "line one\nline two"}},
 		Checks:   []model.ActionCheck{{Name: "test", Status: "completed", Conclusion: "success"}},
@@ -41,16 +42,16 @@ func TestDetailsFromMattermostPRRoundTrip(t *testing.T) {
 	m := readerModel(t)
 	m, _ = sequence(m, "rg")
 	m, _ = update(m, key('d'))
-	if m.detail == nil || m.detail.pr.Number != 1 || !strings.Contains(m.View().Content, "Endrede filer") {
+	if m.detail == nil || m.detailPR().Number != 1 || !strings.Contains(m.View().Content, "Endrede filer") {
 		t.Fatal("linked PR did not open GitHub details")
 	}
 	data := m.mmReader.data
 	m, _ = update(m, mmResult{data: data, authenticated: true})
-	if m.detail == nil || m.mmReader.active {
+	if m.detail == nil || (m.page == pageChat) {
 		t.Fatal("Mattermost background refresh displaced details")
 	}
 	m, _ = update(m, key('M'))
-	if m.mmReader.active {
+	if m.page == pageChat {
 		t.Fatal("detail view leaked navigation keys")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -64,24 +65,25 @@ func TestDetailRefreshCompletesCopilotReview(t *testing.T) {
 	m := ready(t)
 	p := m.filtered()[0]
 	p.RequestedReviewers = []string{"copilot-pull-request-reviewer[bot]"}
-	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{p}
-	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{p}
-	m.detail = &detailState{request: 2, pr: p}
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs = []model.PullRequest{p} })
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{p} })
+	m.prs.Upsert(p)
+	m.detail = &detailState{request: 2, id: p.Key()}
 	fresh := p
 	fresh.RequestedReviewers = nil
 	fresh.CopilotReview = &model.CopilotReview{ID: "completed", Recommendation: "Approval", Comments: 2}
 	m, _ = update(m, detailMsg{request: 1, data: model.PRDetails{PullRequest: &fresh}})
-	if !copilotReviewPending(m.detail.pr) {
+	if !copilotReviewPending(m.detailPR()) {
 		t.Fatal("stale response changed status")
 	}
 	m, _ = update(m, detailMsg{request: 2, data: model.PRDetails{PullRequest: &fresh}})
-	for _, pr := range []model.PullRequest{m.detail.pr, m.snapshot.Datasets[model.Open].PRs[0], m.snapshot.Datasets[model.Reviews].PRs[0]} {
+	for _, pr := range []model.PullRequest{m.detailPR(), m.prs.Snapshot().Datasets[model.Open].PRs[0], m.prs.Snapshot().Datasets[model.Reviews].PRs[0]} {
 		if got := copilotReviewLabel(pr); got != "🟢 2" {
 			t.Fatalf("completed review still shows %q", got)
 		}
 	}
 	m, _ = update(m, detailMsg{request: 2, data: model.PRDetails{Warnings: []string{"Status: offline"}}})
-	if got := copilotReviewLabel(m.detail.pr); got != "🟢 2" {
+	if got := copilotReviewLabel(m.detailPR()); got != "🟢 2" {
 		t.Fatalf("status lost after failure: %q", got)
 	}
 }
@@ -90,12 +92,13 @@ func TestDetailStatusDoesNotUndoAutoMerge(t *testing.T) {
 	m := ready(t)
 	p := m.filtered()[0]
 	p.AutoMerge = "ON"
-	m.autoMergeVersion = 1
-	m.detail = &detailState{request: 2, pr: p}
+	m.prs.InvalidateReads()
+	m.prs.Upsert(p)
+	m.detail = &detailState{request: 2, id: p.Key()}
 	stale := p
 	stale.AutoMerge = "OFF"
 	m, _ = update(m, detailMsg{request: 2, data: model.PRDetails{PullRequest: &stale}})
-	if m.detail.pr.AutoMerge != "ON" {
+	if m.detailPR().AutoMerge != "ON" {
 		t.Fatal("stale detail status undid automerge")
 	}
 }

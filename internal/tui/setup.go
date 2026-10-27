@@ -21,7 +21,7 @@ type setupState struct {
 // Readiness here means local configuration; network authentication stays asynchronous.
 func (m Model) WithStartupSetup() Model {
 	// Copilot-only startup deliberately works without the other integrations.
-	if m.copilotActive {
+	if m.page == pageCopilot {
 		return m
 	}
 	var missing []string
@@ -29,7 +29,7 @@ func (m Model) WithStartupSetup() Model {
 		provider string
 		missing  bool
 	}{
-		{"github", m.source == nil},
+		{"github", m.prs.Source() == nil},
 		{"jira", m.jira == nil},
 		{"mattermost", m.mmReader == nil},
 	} {
@@ -54,8 +54,8 @@ func (m Model) WithStartupSetup() Model {
 	m.setup.missing = missing
 	m.setup.selected = selected
 	m.revealStartupSelection()
-	if m.source == nil && !m.jiraActive && (m.mmReader == nil || !m.mmReader.active) {
-		m.tasks.active = true
+	if m.prs.Source() == nil && !(m.page == pageJira) && (m.mmReader == nil || !(m.page == pageChat)) {
+		m.setPageFlag(pageTasks, true)
 	}
 	return m
 }
@@ -63,7 +63,7 @@ func (m Model) WithStartupSetup() Model {
 // WithSetup opens guidance without discarding the current provider or selection.
 func (m Model) WithSetup(provider string) Model {
 	m.setup = setupState{provider: provider}
-	if m.source == nil {
+	if m.prs.Source() == nil {
 		m.booting = false
 	}
 	return m
@@ -266,7 +266,7 @@ func (m Model) updateSetup(k string) (tea.Model, tea.Cmd) {
 	case "pgup":
 		m.setup.offset = max(0, m.setup.offset-max(1, m.height-2))
 	case "esc":
-		if m.source != nil || m.jiraActive || m.copilotActive || m.tasks.active || (m.mmReader != nil && m.mmReader.active) {
+		if m.prs.Source() != nil || (m.page == pageJira) || (m.page == pageCopilot) || (m.page == pageTasks) || (m.mmReader != nil && (m.page == pageChat)) {
 			m.setup = setupState{}
 		}
 	case "enter":

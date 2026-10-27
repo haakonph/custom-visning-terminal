@@ -1,18 +1,22 @@
 package tui
 
 import (
+	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/haakonph/custom-visning-terminal/internal/app"
+	"github.com/haakonph/custom-visning-terminal/internal/config"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
+	taskdomain "github.com/haakonph/custom-visning-terminal/internal/tasks"
 )
 
 type snoozeState struct {
@@ -39,14 +43,15 @@ type snoozeState struct {
 
 func newSnooze() *snoozeState {
 	s := &snoozeState{now: time.Now, at: time.Now()}
-	path := os.Getenv("CUSTOM_VISNING_SNOOZE")
-	if path == "" {
-		if dir, err := os.UserConfigDir(); err == nil {
-			path = filepath.Join(dir, "custom-visning", "snooze.json")
-		}
-	}
+	path := config.LocalPath()
 	s.store = snooze.Store{Path: path}
-	s.entries, s.loadErr = s.store.Load()
+	s.loadErr = storage.LoadLocal(path, config.SnoozePath(), &s.entries)
+	if errors.Is(s.loadErr, os.ErrNotExist) {
+		s.loadErr = nil
+	}
+	if s.entries == nil {
+		s.entries = map[string]snooze.Entry{}
+	}
 	s.indexContexts()
 	if s.loadErr != nil {
 		s.notice = "Kunne ikke lese snooze: " + s.loadErr.Error()
@@ -122,7 +127,7 @@ func (m *Model) snoozeTarget() (snooze.Entry, bool) {
 		}
 		return snooze.Entry{}, false
 	}
-	if m.tasks.active {
+	if m.page == pageTasks {
 		t := &m.tasks
 		if len(t.visibleTasks()) == 0 || t.loadFailed {
 			return snooze.Entry{}, false
@@ -168,10 +173,11 @@ func (s *snoozeState) commitEntries(batch []snooze.Entry, remove bool) error {
 			entries[entry.ID] = entry
 		}
 	}
-	if err := s.store.Save(entries); err != nil {
+	result, err := (storage.LocalStore{Path: s.store.Path}).CommitLocal(context.Background(), app.LocalChanges{Snoozes: snooze.Changes(s.entries, entries)})
+	if err != nil {
 		return err
 	}
-	s.entries = entries
+	s.entries = result.Snoozes
 	s.visibilityVersion++
 	s.indexContexts()
 	return nil
@@ -306,7 +312,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			entry := s.target
 			entry.Until = at
 			var tasks []model.Task
-			if !s.active && m.tasks.active && len(m.tasks.items) > 0 && m.tasks.items[m.tasks.selected].ID == "" {
+			if !s.active && (m.page == pageTasks) && len(m.tasks.items) > 0 && m.tasks.items[m.tasks.selected].ID == "" {
 				tasks = cloneTasks(m.tasks.items)
 				tasks[m.tasks.selected].ID = strings.TrimPrefix(entry.ID, "task:")
 			}
@@ -333,7 +339,8 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 						}
 					}
 					if e.Kind == "github" {
-						for key, p := range m.chosen {
+						for key := range m.chosen {
+							p, _ := m.prs.Lookup(key)
 							if p.URL == e.URL {
 								delete(m.chosen, key)
 							}
@@ -395,7 +402,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		return true, nil
 	}
-	if m.copilotActive || (m.local != nil && m.local.choosing) || (m.tasks.active && (m.tasks.editing || m.tasks.searching)) || (!m.tasks.active && (m.filtering || (m.jiraActive && m.jira.mode != ""))) {
+	if (m.page == pageCopilot) || (m.local != nil && m.local.choosing) || ((m.page == pageTasks) && (m.tasks.editing || m.tasks.searching)) || (!(m.page == pageTasks) && (m.filtering || ((m.page == pageJira) && m.jira.mode != ""))) {
 		return false, nil
 	}
 	switch k {
@@ -408,7 +415,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.notice = "Kunne ikke lese snooze: " + s.loadErr.Error()
 			return true, nil
 		}
-		if !m.tasks.active {
+		if !(m.page == pageTasks) {
 			s.targets = nil
 			for _, ref := range m.taskReferences() {
 				s.targets = append(s.targets, snooze.Entry{ID: snooze.Identity(ref.Provider, ref.URL), Kind: ref.Provider, Title: ref.Title, URL: ref.URL})
@@ -482,27 +489,19 @@ func (m *Model) queueSnoozeTasks(batch []snooze.Entry, remove bool, tasks []mode
 			entries[e.ID] = e
 		}
 	}
-	store := s.store
+	changes := app.LocalChanges{Snoozes: snooze.Changes(s.entries, entries)}
+	if tasks != nil {
+		if err := taskdomain.EnsureIDs(tasks); err != nil {
+			finish(m, err)
+			return
+		}
+		var err error
+		changes.Tasks, err = taskdomain.Changes(m.tasks.saved, tasks)
+		if err != nil {
+			finish(m, err)
+			return
+		}
+	}
 	s.notice = "Lagrer utsettelse…"
-	taskPath := m.tasks.path
-	taskSaved := false
-	m.enqueueLocal(func() error {
-		if tasks != nil {
-			if err := storage.Save(taskPath, tasks); err != nil {
-				return err
-			}
-			taskSaved = true
-		}
-		return store.Save(entries)
-	}, func(m *Model, err error) {
-		if taskSaved {
-			m.tasks.items = tasks
-		}
-		if err == nil {
-			m.snoozes.entries = entries
-			m.snoozes.visibilityVersion++
-			m.snoozes.indexContexts()
-		}
-		finish(m, err)
-	})
+	m.commitLocal(changes, tasks != nil, finish)
 }

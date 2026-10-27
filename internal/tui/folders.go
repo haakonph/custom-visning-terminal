@@ -53,7 +53,7 @@ func (m *Model) loadWritableRepositories() tea.Cmd {
 	if m.folders.repoLoading {
 		return nil
 	}
-	source, ok := m.source.(writableRepositorySource)
+	source, ok := m.prs.Source().(writableRepositorySource)
 	if !ok {
 		m.folders.notice = "GitHub må være konfigurert. Åpne vg og vh for oppsett."
 		return nil
@@ -133,7 +133,7 @@ func (m *Model) startIssueFolder(refs []model.TaskReference) tea.Cmd {
 		m.sequenceNotice = "Velg én Jira-oppgave for å opprette en mappe."
 		return nil
 	}
-	_, ok := m.source.(writableRepositorySource)
+	_, ok := m.prs.Source().(writableRepositorySource)
 	if !ok {
 		m.sequenceNotice = "GitHub må være konfigurert for å hente repoer med skrivetilgang."
 		return nil
@@ -305,7 +305,7 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.openWritableRepository()
 		}
 		if f.picking && !f.repoLoading && !f.busy && count > 0 {
-			source, ok := m.source.(writableRepositorySource)
+			source, ok := m.prs.Source().(writableRepositorySource)
 			if !ok {
 				return m, nil
 			}

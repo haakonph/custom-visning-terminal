@@ -47,7 +47,7 @@ func TestRemoveWorktreeConfirmation(t *testing.T) {
 func TestRemoveSelectionAndFailure(t *testing.T) {
 	m := localModel(t)
 	p, q := m.filtered()[0], m.filtered()[1]
-	m.chosen[p.Key()], m.chosen[q.Key()] = p, q
+	m.chosen[p.Key()], m.chosen[q.Key()] = struct{}{}, struct{}{}
 	m, _ = sequence(m, "aw")
 	if len(m.local.removePending) != 2 {
 		t.Fatal("selection ignored")

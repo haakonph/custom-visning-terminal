@@ -10,7 +10,7 @@ import (
 
 func TestSharedReviewsCombineOnlyMessagedRequests(t *testing.T) {
 	m := ready(t)
-	m.snapshot.User = "alice"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.User = "alice" })
 	m.active = model.SharedReviews
 	at := time.Now().Add(-time.Hour)
 	personal := model.PullRequest{URL: "https://github.com/acme/api/pull/1", Repository: "acme/api", Title: "Personal", Author: "bob"}
@@ -18,9 +18,13 @@ func TestSharedReviewsCombineOnlyMessagedRequests(t *testing.T) {
 	unshared := model.PullRequest{URL: "https://github.com/acme/api/pull/3", Author: "bob"}
 	own := model.PullRequest{URL: "https://github.com/acme/api/pull/4", Author: "Alice"}
 	unrelated := model.PullRequest{URL: "https://github.com/acme/api/pull/5", Author: "bob"}
-	m.snapshot.Datasets[model.Reviews] = model.Dataset{PRs: []model.PullRequest{personal, unshared}, SyncedAt: at}
-	m.snapshot.Datasets[model.TeamReviews] = model.Dataset{PRs: []model.PullRequest{personal, team, own}, SyncedAt: at.Add(-time.Minute)}
-	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{unrelated}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.Reviews] = model.Dataset{PRs: []model.PullRequest{personal, unshared}, SyncedAt: at}
+	})
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.TeamReviews] = model.Dataset{PRs: []model.PullRequest{personal, team, own}, SyncedAt: at.Add(-time.Minute)}
+	})
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs = []model.PullRequest{unrelated} })
 	m.mmReader = &mattermostReader{reviewRequests: map[string]time.Time{personal.URL: at, own.URL: at, unrelated.URL: at}}
 	m.mattermost = &mattermostState{sent: map[string]time.Time{team.URL: at}}
 	rows := m.filtered()
@@ -39,7 +43,7 @@ func TestSharedReviewsCombineOnlyMessagedRequests(t *testing.T) {
 	if rows := m.filtered(); len(rows) != 1 || rows[0].URL != team.URL {
 		t.Fatalf("removed message: %+v", rows)
 	}
-	m.snapshot.Datasets[model.TeamReviews].PRs = nil
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.TeamReviews].PRs = nil })
 	if len(m.filtered()) != 0 {
 		t.Fatal("removed request retained")
 	}
@@ -78,9 +82,9 @@ func TestSharedReviewsRefreshesBothSources(t *testing.T) {
 	now := time.Now()
 	m.auto.options = defaultRefreshOptions()
 	for v := model.Open; v < model.ViewCount; v++ {
-		m.auto.github[v] = refreshJob{finished: now}
+		m.auto.github[v] = refreshJob{Finished: now}
 	}
-	m.auto.github[model.TeamReviews].finished = now.Add(-time.Minute)
+	m.auto.github[model.TeamReviews].Finished = now.Add(-time.Minute)
 	m, _ = update(m, refreshTick(now))
 	if !m.loading[model.TeamReviews] {
 		t.Fatal("team list must refresh at the active interval")

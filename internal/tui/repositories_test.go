@@ -11,7 +11,7 @@ import (
 
 func TestRepositoryViewWithoutLocalSetup(t *testing.T) {
 	m := ready(t)
-	m.source = &folderSource{}
+	m.useSource(&folderSource{})
 	var cmd tea.Cmd
 	m, cmd = sequence(m, "vp")
 	if cmd == nil || !m.folders.repositoryView || m.local != nil {
@@ -46,7 +46,7 @@ func TestRepositoryViewWithoutLocalSetup(t *testing.T) {
 
 func TestRepositoryViewIgnoresLateResultsAndClampsSelection(t *testing.T) {
 	m := ready(t)
-	m.source = &folderSource{}
+	m.useSource(&folderSource{})
 	m, cmd := sequence(m, "vp")
 	result := cmd()
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -85,7 +85,7 @@ func TestRepositoryViewMissingGitHubAndSearchIsolation(t *testing.T) {
 
 func TestRepositoryViewSwitchCancelsPendingLoad(t *testing.T) {
 	m := ready(t)
-	m.source = &folderSource{}
+	m.useSource(&folderSource{})
 	m, cmd := sequence(m, "vp")
 	old := cmd()
 	m, _ = sequence(m, "vg")
@@ -105,7 +105,7 @@ func TestRepositoryViewSwitchCancelsPendingLoad(t *testing.T) {
 
 func TestRepositoryShortNamesPreserveIdentity(t *testing.T) {
 	m := ready(t)
-	m.source = &folderSource{}
+	m.useSource(&folderSource{})
 	m, cmd := sequence(m, "vp")
 	m, _ = update(m, cmd())
 	content := m.View().Content
@@ -123,7 +123,7 @@ func TestRepositoryListsUseGitViewNameRules(t *testing.T) {
 	m := ready(t)
 	m.githubHiddenPrefixes = []string{"skatteetaten-ghe"}
 	source := &folderSource{repositories: []string{"skatteetaten-ghe/glsk-api", "other/glsk-api"}}
-	m.source = source
+	m.useSource(source)
 	m, cmd := sequence(m, "vp")
 	m, _ = update(m, cmd())
 	content := m.View().Content

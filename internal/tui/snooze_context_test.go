@@ -37,13 +37,13 @@ func TestSnoozeImplicitOne(t *testing.T) {
 func contextModel(t *testing.T) Model {
 	t.Helper()
 	m := unifiedModel(t)
-	m.snoozes.store.Path = t.TempDir() + "/snooze.sqlite"
+	// Snooze shares the existing local database.
 	// A second task shares a PR but must remain active when the first is paused.
 	m.tasks.items = append(m.tasks.items, model.Task{ID: "shared", Title: "Other work", References: []model.TaskReference{m.tasks.items[0].References[0]}})
 	if err := m.tasks.save(); err != nil {
 		t.Fatal(err)
 	}
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.selected = 0
 	return m
 }
@@ -132,15 +132,15 @@ func TestContextSnoozeNewRelationsWriteFailureAndExpiry(t *testing.T) {
 	m.snoozes.now = func() time.Time { return now }
 	m = press(m, "zzh")
 	newPR := model.PullRequest{URL: "https://github.com/acme/api/pull/999", Repository: "acme/api", Number: 999, Title: "APP-1 Follow-up"}
-	m.snapshot.Datasets[0].PRs = append(m.snapshot.Datasets[0].PRs, newPR)
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs = append(snapshot.Datasets[0].PRs, newPR) })
 	id := snooze.Identity("github", newPR.URL)
-	path := m.snoozes.store.Path
-	m.snoozes.store.Path = t.TempDir()
+	path := m.tasks.path
+	m.tasks.path = t.TempDir()
 	m, _ = update(m, snoozeTick{})
 	if m.snoozes.hidden(id) {
 		t.Fatal("failed write hid new member")
 	}
-	m.snoozes.store.Path = path
+	m.tasks.path = path
 	m, _ = update(m, snoozeTick{})
 	if !m.snoozes.hidden(id) {
 		t.Fatal("new related PR escaped context snooze")
@@ -167,7 +167,7 @@ func TestContextSnoozeNewRelationsWriteFailureAndExpiry(t *testing.T) {
 
 func TestContextSnoozeWriteFailureLeavesAllVisible(t *testing.T) {
 	m := contextModel(t)
-	m.snoozes.store.Path = t.TempDir()
+	m.tasks.path = t.TempDir()
 	m = press(m, "zzh")
 	if !m.snoozes.input || len(m.snoozes.entries) != 0 || len(m.tasks.visibleTasks()) != 2 {
 		t.Fatal("failed group save changed visibility")

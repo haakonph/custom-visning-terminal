@@ -212,6 +212,12 @@ CREATE TABLE local_folders (
     hidden INTEGER NOT NULL DEFAULT 0 CHECK (hidden IN (0, 1))
 );
 
+CREATE TABLE local_imports (
+    kind TEXT PRIMARY KEY,
+    source_path TEXT NOT NULL,
+    fingerprint TEXT NOT NULL
+);
+
 CREATE TABLE local_repositories (
     identity TEXT NOT NULL,
     path TEXT NOT NULL,
@@ -301,7 +307,7 @@ CREATE TABLE tasks (
     position INTEGER PRIMARY KEY,
     stable_id TEXT NOT NULL,
     title TEXT NOT NULL
-, archived INTEGER NOT NULL DEFAULT 0);
+, archived INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE usage_metrics (
     day TEXT NOT NULL,
@@ -333,3 +339,5 @@ CREATE INDEX mattermost_mentions_url ON mattermost_pr_mentions(pr_url);
 CREATE INDEX mattermost_posts_channel ON mattermost_posts(server,user_id,channel_id,created_at);
 
 CREATE INDEX snooze_deadline ON snoozes(until_at);
+
+CREATE UNIQUE INDEX tasks_stable_id ON tasks(stable_id);
