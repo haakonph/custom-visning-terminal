@@ -520,7 +520,7 @@ func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool,
 				m.chosen = original
 				return m.unavailable()
 			}
-			cmd := m.openLocal("intellij")
+			cmd := m.openLocal("")
 			m.chosen = original
 			if cmd == nil && m.notice != "" {
 				m.sequenceNotice = m.notice

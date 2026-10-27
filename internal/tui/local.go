@@ -161,6 +161,12 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 		return nil
 	}
 	l := m.local
+	if editor == "" {
+		editor = l.launcher.Editors.Default
+		if editor == "" {
+			editor = "intellij"
+		}
+	}
 	if l.running > 0 || len(l.preparing) > 0 {
 		m.notice = "An open operation is already running"
 		return nil
