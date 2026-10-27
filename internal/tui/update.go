@@ -20,6 +20,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.localIO != nil && m.localIO.active == result.job {
 			m.localIO.active = nil
 			if result.err != nil {
+				if m.localIO.quitting {
+					m.sequenceNotice = "Kunne ikke avslutte: lokal lagring feilet: " + result.err.Error()
+				}
 				m.localIO.quitting = false
 			}
 			result.job.finish(&m, result.err)

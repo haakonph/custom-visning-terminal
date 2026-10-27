@@ -745,6 +745,10 @@ func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model
 			taskChanged = true
 		}
 	}
+	if taskChanged && m.tasks.loadFailed {
+		m.sequenceNotice = "Oppgaver kunne ikke leses; lagring er sperret"
+		return m, nil
+	}
 	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
 	var partial bool
 	m.sequenceNotice = "Lagrer koblinger…"

@@ -701,6 +701,10 @@ func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 			taskChanged = true
 		}
 	}
+	if taskChanged && m.tasks.loadFailed {
+		m.sequenceNotice = "Oppgaver kunne ikke leses; lagring er sperret"
+		return m, nil
+	}
 	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
 	var partial bool
 	m.sequenceNotice = "Lagrer arkiv…"
@@ -743,6 +747,10 @@ func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 	return m, nil
 }
 func (m Model) deleteReferences(refs []model.TaskReference) (tea.Model, tea.Cmd) {
+	if m.tasks.loadFailed {
+		m.sequenceNotice = "Oppgaver kunne ikke leses; sletting er sperret"
+		return m, nil
+	}
 	if m.localBusy() {
 		return m, nil
 	}

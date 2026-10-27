@@ -331,3 +331,26 @@ func TestCopilotDetailScrollingUsesCachedLines(t *testing.T) {
 		t.Fatal("hidden details were reloaded")
 	}
 }
+
+func TestUnreadableTaskStoreCannotBeOverwrittenByLocalActions(t *testing.T) {
+	for _, action := range []string{"archive", "delete", "link"} {
+		t.Run(action, func(t *testing.T) {
+			m := ready(t)
+			m.tasks.loadFailed = true
+			task := model.TaskReference{Provider: "task", URL: "task://unreadable", Key: "unreadable"}
+			var next tea.Model
+			switch action {
+			case "archive":
+				next, _ = m.archiveReferences([]model.TaskReference{task})
+			case "delete":
+				next, _ = m.deleteReferences([]model.TaskReference{task})
+			case "link":
+				next, _ = m.linkReferences([]model.TaskReference{task}, []model.TaskReference{prRef(m.filtered()[0])})
+			}
+			m = next.(Model)
+			if m.localIO.busy() || m.sequenceNotice == "" {
+				t.Fatal("unreadable task history could be overwritten")
+			}
+		})
+	}
+}
