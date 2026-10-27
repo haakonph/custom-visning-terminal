@@ -8,7 +8,9 @@ import (
 )
 
 type viewCache struct {
-	groups *prGroupLayout
+	groups     *prGroupLayout
+	aiValid    bool
+	aiSessions map[string]*model.CopilotSession
 
 	sources       [model.ViewCount][]model.PullRequest
 	archived      []model.TaskReference
@@ -58,6 +60,7 @@ func (m *Model) invalidateViews(msg tea.Msg) {
 	if m.views != nil {
 		m.views.githubValid = false
 		m.views.groups = nil
+		m.views.aiValid = false
 	}
 	if m.detail != nil {
 		m.detail.lines = nil

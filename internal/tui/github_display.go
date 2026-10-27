@@ -243,18 +243,19 @@ func (m Model) reviewRequestedAt(url string) time.Time {
 
 // localAILabel uses the same relations as ra, including explicit local links.
 func (m Model) localAILabel(p model.PullRequest) string {
-	if m.copilot == nil {
+	if m.copilot == nil || len(m.copilot.sessions) == 0 {
 		return ""
 	}
-	related := map[string]bool{}
-	for _, ref := range m.relatedReferences([]model.TaskReference{prRef(p)}, "copilot") {
-		related[ref.Key] = true
+	sessions := m.aiLookup
+	if sessions == nil {
+		m.syncRelations()
+		sessions = m.indexAISessions()
 	}
 	var latest *model.CopilotSession
 	var latestAt time.Time
-	for i := range m.copilot.sessions {
-		s := &m.copilot.sessions[i]
-		if !related[s.ID] {
+	for _, ref := range m.relations.Related([]model.TaskReference{prRef(p)}, "copilot") {
+		s := sessions[ref.Key]
+		if s == nil {
 			continue
 		}
 		at, _ := time.Parse(time.RFC3339Nano, s.LastActivity)

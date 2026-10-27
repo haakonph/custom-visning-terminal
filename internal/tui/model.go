@@ -25,6 +25,8 @@ type Model struct {
 	localIO        *localIOState
 	views          *viewCache
 	relations      *relations.Index
+	// Set only on the View copy; row rendering reuses the prepared session index.
+	aiLookup map[string]*model.CopilotSession
 
 	folders          folderState
 	usage            *usage.Recorder

@@ -156,6 +156,9 @@ func (m Model) View() tea.View {
 		lines = append(lines, strings.Split(helpText, "\n")...)
 	} else {
 		rows := m.filtered()
+		if m.width-3 >= 120 && len(rows) > 0 && m.copilot != nil && len(m.copilot.sessions) > 0 {
+			m.prepareAILookup()
+		}
 		rowModel := m
 		rowModel.width = max(1, m.width-3)
 		lines = append(lines, "   "+rowModel.row(model.PullRequest{}, true, false))
@@ -233,7 +236,11 @@ func (m Model) row(p model.PullRequest, header, selected bool) string {
 	if m.width >= 100 {
 		columns = []column{{"REPOSITORY", repository, 18, false}, {"PR", number, 6, false}, {"JIRA", jira, 14, false}, {"TITLE", title, 1, false}, {"REVIEW", m.reviewLabel(p), 9, true}, {"CI", string(p.CI), 7, true}, {"INFO", prInfoLabel(p), 22, p.Mergeability == model.Conflicting}}
 		if m.width >= 120 {
-			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 7, false}, column{"AI", m.localAILabel(p), 8, false})
+			ai := ""
+			if !header {
+				ai = m.localAILabel(p)
+			}
+			columns = append(columns, column{"COPILOT", copilotReviewLabel(p), 7, false}, column{"AI", ai, 8, false})
 		}
 		if m.width >= 160 {
 			columns = append(columns, column{"AUTHOR", p.Author, 12, false}, column{"UPDATED", age(p.UpdatedAt), 7, false}, column{"LOCAL", m.localLabel(p), 18, false})
