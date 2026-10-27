@@ -142,7 +142,11 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if c.client != nil && !c.timerPending {
 			c.timerPending = true
-			return m, tea.Tick(3*time.Second, func(time.Time) tea.Msg { return copilotTick{} })
+			interval := time.Minute
+			if m.copilotActive {
+				interval = 3 * time.Second
+			}
+			return m, tea.Tick(interval, func(time.Time) tea.Msg { return copilotTick{} })
 		}
 	case tea.KeyPressMsg:
 		key := msg.String()
