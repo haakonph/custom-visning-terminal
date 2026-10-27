@@ -94,9 +94,22 @@ func (m Model) referenceUser(r model.TaskReference) string {
 
 func (m Model) entityTableRow(ref model.TaskReference, header, selected, chosen bool) string {
 	r := m.displayReference(ref)
+	aiRows := m.dialog != nil && allProvider(m.dialog.rows, "copilot")
+	heading := "BRUKER"
 	user := ""
 	if !header {
 		user = m.referenceUser(ref)
+	}
+	if aiRows {
+		heading, user = "STATUS", ""
+		if !header && m.copilot != nil {
+			for _, session := range m.copilot.sessions {
+				if session.ID == ref.Key {
+					user = session.Status
+					break
+				}
+			}
+		}
 	}
 	type column struct {
 		heading, value string
@@ -113,7 +126,7 @@ func (m Model) entityTableRow(ref model.TaskReference, header, selected, chosen 
 		columns = append(columns, column{"NØKKEL", r.Key, 16})
 		width -= 17
 	}
-	columns = append(columns, column{"BRUKER", user, userWidth}, column{"TITTEL", r.Title, max(1, width-userWidth-1)})
+	columns = append(columns, column{heading, user, userWidth}, column{"TITTEL", r.Title, max(1, width-userWidth-1)})
 	mark := "  "
 	if selected {
 		mark = "> "

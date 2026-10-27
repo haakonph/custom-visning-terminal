@@ -43,6 +43,41 @@ func TestEntityTableUsers(t *testing.T) {
 	}
 }
 
+func TestRelatedAIStatuses(t *testing.T) {
+	m := ready(t)
+	m.height = 12
+	m.copilot = &copilotState{sessions: []model.CopilotSession{
+		{ID: "ai-1", Name: "First session", Status: "working"},
+		{ID: "ai-2", Name: "Second session", Status: "idle"},
+	}}
+	refs := []model.TaskReference{copilotRef(m.copilot.sessions[0]), copilotRef(m.copilot.sessions[1])}
+	refs = append(refs, copilotRef(model.CopilotSession{ID: "unloaded", Name: "Unloaded session"}))
+	next, _ := m.showEntities("Relatert: copilot", "related", refs, nil)
+	m = next.(Model)
+	for _, width := range []int{32, 50, 80, 120} {
+		m.width = width
+		view := ansi.Strip(m.entityView().Content)
+		for _, want := range []string{"STATUS", "working", "idle"} {
+			if !strings.Contains(view, want) {
+				t.Fatalf("width %d: missing %q in %s", width, want, view)
+			}
+		}
+		for _, line := range strings.Split(view, "\n") {
+			if ansi.StringWidth(line) > width {
+				t.Fatalf("width %d: overflowing line %q", width, line)
+			}
+		}
+	}
+	m.copilot.sessions[0].Status = "finished"
+	if view := ansi.Strip(m.entityView().Content); !strings.Contains(view, "finished") || strings.Contains(view, "working") {
+		t.Fatalf("status did not follow loaded session: %s", view)
+	}
+	m.copilot = nil
+	if view := ansi.Strip(m.entityView().Content); strings.Contains(view, "finished") {
+		t.Fatalf("unconfigured AI retained status: %s", view)
+	}
+}
+
 func TestEntityTableLayout(t *testing.T) {
 	m := ready(t)
 	r := prRef(m.snapshot.Datasets[0].PRs[0])

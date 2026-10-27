@@ -704,6 +704,10 @@ til valgt treff med Enter. Backspace sletter siste tegn; Esc tømmer søket før
 listen lukkes. Tab bytter til handlingene `a/e/r/t` og navigasjon med `j/k`.
 Repository-, kanal- og editorvalg støtter også søk ved skriving.
 
+`ra` viser relaterte AI-sesjoner. Når flere treff vises, erstattes bruker-kolonnen
+med `STATUS`, med samme status som i AI-visningen. Status hentes fra lastede
+sesjoner og vises tom hvis sesjonen ikke er lastet.
+
 - Fra GitHub: Jira-nøkler (for eksempel `TEAM-123`) hentes fra PR-tittel, beskrivelse og branchnavn. Jira viser alle refererte saker i et eget JQL-søk, uavhengig av hurtigfiltrene.
 - Fra Jira: viser relaterte PR-er fra alle fire lastede GitHub-visninger, uten duplikater. Dette er ikke et søk i alle organisasjonens PR-er.
 - `en` åpner valgt PR eller sak i nettleseren. `Esc` i GitHub fjerner avgrensningen til en Jira-sak. I Jira velger du en vanlig fane for å forlate relasjonssøket.
