@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/relations"
 	"github.com/haakonph/custom-visning-terminal/internal/usage"
 )
 
@@ -17,8 +18,9 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
-	localIO *localIOState
-	views   *viewCache
+	localIO   *localIOState
+	views     *viewCache
+	relations *relations.Index
 
 	folders          folderState
 	usage            *usage.Recorder
@@ -110,7 +112,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	tasks.snoozes = s
 	io := &localIOState{}
 	tasks.io = io
-	m := Model{localIO: io, views: &viewCache{}, auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m := Model{relations: &relations.Index{}, localIO: io, views: &viewCache{}, auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadRefresh()
 	m.loadNotifications()
 	m.loadJiraPattern()
