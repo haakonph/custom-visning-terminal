@@ -1021,6 +1021,13 @@ rendering. A failed PR does not stop the remaining selection.
 
 ### Dependencies and headless IntelliJ
 
+Before builds or indexing, checkouts with `.gitmodules` run `git submodule sync
+--recursive` and `git submodule update --init --recursive --checkout`. This uses
+the submodule commits recorded by the current checkout, including the updated
+main commit for background preparation. A submodule failure stops preparation
+and is retried next time. Submodules are also initialized when `workspace.install`
+is false.
+
 Main checkouts and clean, current PR worktrees are prepared using their own
 root build files. Maven uses `./mvnw -B -DskipTests -Dmaven.gitcommitid.skip=true install` (or `mvn`), Gradle
 uses `./gradlew --no-daemon assemble -x test` (or `gradle`), and npm uses `npm ci`
