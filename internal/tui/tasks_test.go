@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -25,23 +25,25 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
 	m.active = model.Reviews
-	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Repository: "org/repo", Number: 1, Title: "Review this"}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Repository: "org/repo", Number: 1, Title: "Review this"}}
+	})
 	m, _ = sequence(m, "an")
-	if !m.tasks.active || len(m.tasks.items) != 1 || m.tasks.items[0].References[0].Role != "review" {
+	if !(m.page == pageTasks) || len(m.tasks.items) != 1 || m.tasks.items[0].References[0].Role != "review" {
 		t.Fatal("review PR should create a task")
 	}
-	m.tasks.active = false
+	m.setPageFlag(pageTasks, false)
 	m, _ = sequence(m, "to")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.tasks.items[0].References) != 1 {
 		t.Fatal("adding the same PR must not duplicate it")
 	}
-	m.tasks.active = false
+	m.setPageFlag(pageTasks, false)
 	m.jira = &jiraState{rows: []jira.Issue{{Key: "ABC-1", URL: "https://jira.example/browse/ABC-1", Title: "First issue"}, {Key: "ABC-2", URL: "https://jira.example/browse/ABC-2", Title: "Second issue"}}}
-	m.jiraActive = true
+	m.setPageFlag(pageJira, true)
 	m, _ = sequence(m, "to")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m.tasks.active = false
+	m.setPageFlag(pageTasks, false)
 	m.jira.selected = 1
 	m, _ = sequence(m, "to")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -52,7 +54,7 @@ func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
 	if reloaded.loadFailed || len(reloaded.items) != 1 || len(reloaded.items[0].References) != 3 {
 		t.Fatal("references should survive restart")
 	}
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.details = true
 	m = taskKey(taskKey(m, "a"), "d")
 	if len(m.tasks.items[0].References) != 2 {
@@ -87,7 +89,7 @@ func TestTasksTitleEditingDoesNotTriggerGlobalShortcuts(t *testing.T) {
 	m, _ = sequence(m, "an")
 	m.tasks.input.SetValue("Jira og PR")
 	m = taskKey(m, "g")
-	if !m.tasks.active || !m.tasks.editing {
+	if !(m.page == pageTasks) || !m.tasks.editing {
 		t.Fatal("typing g must not switch provider")
 	}
 	m, _ = func() (Model, tea.Cmd) {
@@ -104,14 +106,16 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_LINKS", filepath.Join(t.TempDir(), "links.sqlite"))
 	m := New(context.Background(), &fakeSource{}, nil)
 	defer m.cancel()
-	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "Old title"}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "Old title"}}
+	})
 	m, _ = sequence(m, "an")
 	m, _ = update(m, refreshMsg{view: model.Open, result: model.Result{Complete: true, PRs: []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "New title", Review: model.Approved}}}})
-	if !m.tasks.active || !strings.Contains(m.tasksView().Content, "New title") {
+	if !(m.page == pageTasks) || !strings.Contains(m.tasksView().Content, "New title") {
 		t.Fatal("background refresh should update task references without leaving the page")
 	}
 	m, _ = sequence(m, "vg")
-	if m.tasks.active {
+	if m.page == pageTasks {
 		t.Fatal("g should return to GitHub")
 	}
 	m, _ = sequence(m, "to")
@@ -126,7 +130,7 @@ func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 			t.Fatal("task page exceeds terminal height")
 		}
 	}
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.details = false
 	m, _ = sequence(m, "ad")
 	if len(m.tasks.items) != 0 {
@@ -140,7 +144,7 @@ func TestTaskListWithFifteenTasks(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	for i := 1; i <= 15; i++ {
 		m.tasks.items = append(m.tasks.items, model.Task{Title: fmt.Sprintf("Oppgave %02d", i), References: []model.TaskReference{{Provider: "github", URL: fmt.Sprintf("https://github.com/org/repo/pull/%d", i), Key: fmt.Sprintf("repo#%d", i), Title: "Endring"}}})
 	}
@@ -169,7 +173,7 @@ func TestTaskListWithFifteenTasks(t *testing.T) {
 		t.Fatal("opened wrong task reference")
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.tasks.details || !m.tasks.active {
+	if m.tasks.details || !(m.page == pageTasks) {
 		t.Fatal("Esc must return to the list")
 	}
 	m = taskKey(m, "/")
@@ -189,7 +193,7 @@ func TestTaskPanelsResizeAndEmptySearch(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
 	m := New(context.Background(), nil, nil)
 	defer m.cancel()
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m.tasks.items = []model.Task{{Title: "Oppgaven min", References: []model.TaskReference{{Title: "Referansen min"}}}}
 	for _, size := range [][2]int{{112, 24}, {90, 10}, {89, 10}, {40, 8}, {10, 2}} {
 		for _, details := range []bool{false, true} {

@@ -9,7 +9,7 @@ import (
 
 func (m Model) relatedPRs(key string) []model.PullRequest {
 	var rows []model.PullRequest
-	for _, dataset := range m.snapshot.Datasets {
+	for _, dataset := range m.prs.Snapshot().Datasets {
 		rows = model.Merge(rows, dataset.PRs)
 	}
 	var matched []model.PullRequest
@@ -22,8 +22,8 @@ func (m Model) relatedPRs(key string) []model.PullRequest {
 }
 
 func (m Model) navigateRelated() (tea.Model, tea.Cmd) {
-	if m.jiraActive {
-		if m.source == nil {
+	if m.page == pageJira {
+		if m.prs.Source() == nil {
 			m.jira.notice = "GitHub er ikke konfigurert"
 			return m, nil
 		}
@@ -36,7 +36,7 @@ func (m Model) navigateRelated() (tea.Model, tea.Cmd) {
 		m.input.SetValue("")
 		m.filtering = false
 		m.help = false
-		m.jiraActive = false
+		m.setPageFlag(pageJira, false)
 		return m, nil
 	}
 	if m.jira == nil {
@@ -62,6 +62,6 @@ func (m Model) navigateRelated() (tea.Model, tea.Cmd) {
 	m.jira.input.Prompt = ""
 	m.jira.mode = ""
 	m.jira.selected = 0
-	m.jiraActive = true
+	m.setPageFlag(pageJira, true)
 	return m, m.refreshJira()
 }

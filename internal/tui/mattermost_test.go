@@ -92,7 +92,7 @@ func TestComposeMattermostUsesSelectionAndFreshData(t *testing.T) {
 	m, _ = update(m, key(' '))
 	m, _ = update(m, key('j'))
 	m, _ = update(m, key(' '))
-	m.snapshot.Datasets[0].PRs[0].Title = "Fresh title"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs[0].Title = "Fresh title" })
 	m.input.SetValue("no visible matches")
 	cmd := m.composeMattermost()
 	if cmd == nil || !m.mattermost.sending {
@@ -152,7 +152,7 @@ func TestComposeReferencesSendsUncachedPRsSeparately(t *testing.T) {
 
 func TestReviewAgeTracksOnlySuccessfullySentLinksAndSurvivesRestart(t *testing.T) {
 	m := ready(t).WithMattermost(&fakeMessageSender{err: errors.New("offline")})
-	p := m.snapshot.Datasets[0].PRs[0]
+	p := m.prs.Snapshot().Datasets[0].PRs[0]
 	p.Review = model.Pending
 	if got := m.reviewLabel(p); got != string(model.Pending) {
 		t.Fatal(got)
@@ -195,7 +195,7 @@ func TestReviewAgeTracksOnlySuccessfullySentLinksAndSurvivesRestart(t *testing.T
 func TestReviewAgePartialSendPersistsOnlySuccessfulMessages(t *testing.T) {
 	sender := &fakeMessageSender{failAt: 2}
 	m := ready(t).WithMattermost(sender)
-	first, second := m.snapshot.Datasets[0].PRs[0], m.snapshot.Datasets[0].PRs[1]
+	first, second := m.prs.Snapshot().Datasets[0].PRs[0], m.prs.Snapshot().Datasets[0].PRs[1]
 	cmd := m.sendMattermost([]string{m.mattermostPRText(first), m.mattermostPRText(second)})
 	m, _ = update(m, cmd())
 	if m.mattermost.sent[first.URL].IsZero() || !m.mattermost.sent[second.URL].IsZero() {

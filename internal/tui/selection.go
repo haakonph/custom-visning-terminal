@@ -10,15 +10,10 @@ import (
 // Without a selection, commands act on the highlighted row.
 func (m Model) selectedPRs() []model.PullRequest {
 	rows := make([]model.PullRequest, 0, len(m.chosen))
-	for _, p := range m.chosen {
-		for _, d := range m.snapshot.Datasets {
-			for _, fresh := range d.PRs {
-				if fresh.Key() == p.Key() && !fresh.UpdatedAt.Before(p.UpdatedAt) {
-					p = fresh
-				}
-			}
+	for id := range m.chosen {
+		if p, ok := m.prs.Lookup(id); ok {
+			rows = append(rows, p)
 		}
-		rows = append(rows, p)
 	}
 	if len(rows) == 0 {
 		visible := m.filtered()
@@ -36,7 +31,7 @@ func (m Model) selectedPRs() []model.PullRequest {
 }
 
 func (m Model) taskReferences() []model.TaskReference {
-	if m.jiraActive {
+	if m.page == pageJira {
 		if len(m.jiraChosen) > 0 {
 			var refs []model.TaskReference
 			for _, issue := range m.jiraChosen {

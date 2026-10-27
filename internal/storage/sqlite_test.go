@@ -164,6 +164,7 @@ func TestDocumentDatabaseImportsIntoNormalizedTables(t *testing.T) {
 	if err := Migrate(path, loaded); err != nil {
 		t.Fatal(err)
 	}
+	original[0].Revision = 1
 	if err := Load(path, &loaded); err != nil || !reflect.DeepEqual(original, loaded) {
 		t.Fatal(loaded, err)
 	}
@@ -176,7 +177,7 @@ func TestDocumentDatabaseImportsIntoNormalizedTables(t *testing.T) {
 		t.Fatal("legacy document not retired", err)
 	}
 	var version int
-	if err := db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil || version != 18 {
+	if err := db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil || version != 19 {
 		t.Fatal(version, err)
 	}
 }
@@ -279,6 +280,7 @@ func TestJiraDocumentMigrationPreservesFieldsAndOrder(t *testing.T) {
 	if err := Migrate(path, loaded); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := Load(path, &loaded); err != nil || !reflect.DeepEqual(original, loaded) {
 		t.Fatal(loaded, err)
 	}

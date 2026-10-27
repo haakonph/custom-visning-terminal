@@ -63,7 +63,7 @@ func TestSnoozeBatchFailureRetainsSelectionAndEntries(t *testing.T) {
 	if err := os.WriteFile(blocked, []byte("not a directory"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	m.snoozes.store.Path = filepath.Join(blocked, "snooze.json")
+	m.tasks.path = filepath.Join(blocked, "local.sqlite")
 	m = press(m, "z2h")
 	if len(m.snoozes.entries) != 0 || len(m.chosen) != 2 || !m.snoozes.input {
 		t.Fatal("failed save changed state")

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
@@ -75,7 +75,7 @@ func TestFoldersNavigationPreferencesAndSearchOwnInput(t *testing.T) {
 func TestIssueFolderPickerCancellationAndPermissionRecheck(t *testing.T) {
 	m := localModel(t)
 	source := &folderSource{}
-	m.source = source
+	m.useSource(source)
 	refs := []model.TaskReference{{Provider: "jira", Key: "APP-12", Title: "Jira task"}}
 	cmd := m.startIssueFolder(refs)
 	if cmd == nil || !m.folders.picking {
@@ -124,7 +124,7 @@ func TestJiraFolderShortcutsAndMultipleSelection(t *testing.T) {
 			t.Fatal(err)
 		}
 		m = m.WithJira(client, true)
-		m.source = &folderSource{}
+		m.useSource(&folderSource{})
 		m.jira.rows = []jira.Issue{{Key: "APP-12", Title: "Task", URL: client.IssueURL("APP-12")}}
 		m.jira.query = m.jira.currentQuery()
 		next, cmd := sequence(m, shortcut)
@@ -133,7 +133,7 @@ func TestJiraFolderShortcutsAndMultipleSelection(t *testing.T) {
 		}
 	}
 	m := localModel(t)
-	m.source = &folderSource{}
+	m.useSource(&folderSource{})
 	refs := []model.TaskReference{{Provider: "jira", Key: "APP-12"}, {Provider: "jira", Key: "APP-13"}}
 	if cmd := m.startIssueFolder(refs); cmd != nil || m.folders.picking {
 		t.Fatal("multiple issues created one ambiguous folder")

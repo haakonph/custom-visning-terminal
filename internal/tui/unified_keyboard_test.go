@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
@@ -17,17 +17,17 @@ import (
 func unifiedModel(t *testing.T) Model {
 	t.Helper()
 	m := readerModel(t)
-	m.mmReader.active = false
+	m.setPageFlag(pageChat, false)
 	m.mmReader.entities = m.entities
 	m.mmReader.snoozes = m.snoozes
 	client, _ := jira.New("https://jira.example/context", "secret")
 	m = m.WithJira(client, false).WithCopilot(testCopilot(t), false)
-	m.snapshot.Datasets[0].PRs[0].Title = "APP-1 Fix"
-	m.snapshot.Datasets[0].PRs[0].HeadRef = "feature/APP-1"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs[0].Title = "APP-1 Fix" })
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs[0].HeadRef = "feature/APP-1" })
 	m.jira.rows = []jira.Issue{{Key: "APP-1", URL: client.IssueURL("APP-1"), Title: "Issue"}, {Key: "APP-2", URL: client.IssueURL("APP-2"), Title: "Other"}}
 	m.jira.query = m.jira.currentQuery()
 	m.copilot.sessions = []model.CopilotSession{{ID: "ai1", Name: "Session", Jira: "APP-1", Repository: "acme/api", Branch: "feature/APP-1"}, {ID: "ai2", Name: "Other session"}}
-	m.tasks.items = []model.Task{{ID: "task1", Title: "Work", References: []model.TaskReference{prRef(m.snapshot.Datasets[0].PRs[0]), jiraRef("APP-2", m)}}}
+	m.tasks.items = []model.Task{{ID: "task1", Title: "Work", References: []model.TaskReference{prRef(m.prs.Snapshot().Datasets[0].PRs[0]), jiraRef("APP-2", m)}}}
 	return m
 }
 func TestRemovedNavigationKeysAcrossAllProviders(t *testing.T) {
@@ -57,7 +57,7 @@ func TestAllFiveLinkTargetsPersistAndAreNavigable(t *testing.T) {
 	for _, thing := range []string{"o", "g", "t", "a", "c"} {
 		t.Run(thing, func(t *testing.T) {
 			m := unifiedModel(t)
-			origin := prRef(m.snapshot.Datasets[0].PRs[1])
+			origin := prRef(m.prs.Snapshot().Datasets[0].PRs[1])
 			m.selected = 1
 			m, _ = sequence(m, "t"+thing)
 			if m.dialog == nil || m.dialog.mode != "link" {
@@ -105,7 +105,7 @@ func TestAllProvidersSupportSelectionAndSnooze(t *testing.T) {
 	for _, page := range []string{"g", "t", "a", "c", "o"} {
 		t.Run(page, func(t *testing.T) {
 			m := unifiedModel(t)
-			m.snoozes.store.Path = t.TempDir() + "/snooze.sqlite"
+			// Snooze shares the existing local database.
 			m, _ = sequence(m, "v"+page)
 			m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 			count := len(m.currentReferences())
@@ -169,7 +169,7 @@ func TestLinkCancelAndWriteFailureNeverCreateEdges(t *testing.T) {
 	if err := os.WriteFile(blocked, []byte("blocked"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	m.entities.path = filepath.Join(blocked, "links.sqlite")
+	m.tasks.path = filepath.Join(blocked, "local.sqlite")
 	m, _ = sequence(m, "ta")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.entities.data.Links) != 0 || !strings.Contains(m.sequenceNotice, "Kunne ikke lagre") {
@@ -208,7 +208,7 @@ func TestEntityStorageRoundTrip(t *testing.T) {
 func TestContextSnapshotSurvivesBackgroundRefresh(t *testing.T) {
 	m := unifiedModel(t)
 	m, _ = sequence(m, "at")
-	m.snapshot.Datasets[0].PRs[0].Title = "APP-99 changed"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs[0].Title = "APP-99 changed" })
 	keys := m.actionJiraKeys()
 	if len(keys) != 1 || keys[0] != "APP-1" {
 		t.Fatal("pending command changed targets")
@@ -218,7 +218,7 @@ func TestBrowserPreflightsUnsupportedTargets(t *testing.T) {
 	m := unifiedModel(t)
 	calls := 0
 	m.open = func(context.Context, string) error { calls++; return nil }
-	refs := []model.TaskReference{prRef(m.snapshot.Datasets[0].PRs[0]), copilotRef(m.copilot.sessions[0])}
+	refs := []model.TaskReference{prRef(m.prs.Snapshot().Datasets[0].PRs[0]), copilotRef(m.copilot.sessions[0])}
 	next, cmd := m.openReferences(refs, false)
 	if cmd != nil || calls != 0 || !strings.Contains(next.(Model).sequenceNotice, "AI-sesjoner") {
 		t.Fatal("partial browser action before preflight")
@@ -227,7 +227,7 @@ func TestBrowserPreflightsUnsupportedTargets(t *testing.T) {
 
 func TestSnoozeAndSettingsOwnInputOverChat(t *testing.T) {
 	m := unifiedModel(t)
-	m.snoozes.store.Path = t.TempDir() + "/snooze.sqlite"
+	// Snooze shares the existing local database.
 	m, _ = sequence(m, "vcvs")
 	if !m.settings.active || !strings.Contains(m.View().Content, "INNSTILLINGER") {
 		t.Fatal("chat obscured settings")
@@ -304,7 +304,7 @@ func TestNaturalAIRelationWorksWithoutJiraConnection(t *testing.T) {
 	m.jira = nil
 	m.copilot.sessions[0].Repository = ""
 	m.copilot.sessions[0].Branch = ""
-	origin := prRef(m.snapshot.Datasets[0].PRs[0])
+	origin := prRef(m.prs.Snapshot().Datasets[0].PRs[0])
 	related := m.relatedReferences([]model.TaskReference{origin}, "copilot")
 	if len(related) != 1 || related[0].Key != "ai1" {
 		t.Fatal("Jira credentials required for local AI relationship")
@@ -337,7 +337,7 @@ func TestStoredAIReferenceWithoutProviderDoesNotRecurse(t *testing.T) {
 
 func TestDeferredSearchAndBulkRestoreRespectSelection(t *testing.T) {
 	m := unifiedModel(t)
-	m.snoozes.store.Path = t.TempDir() + "/snooze.sqlite"
+	// Snooze shares the existing local database.
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	m, _ = sequence(m, "z2hvz/")
 	if m.dialog == nil || !m.dialog.searching {
@@ -401,14 +401,14 @@ func TestSpecialViewCommandsRememberSourcePage(t *testing.T) {
 func TestOpenDetailsKeepActionTargetWhenListChanges(t *testing.T) {
 	m := unifiedModel(t)
 	m, _ = sequence(m, "d")
-	expected := m.detail.pr.URL
-	m.snapshot.Datasets[0].PRs = m.snapshot.Datasets[0].PRs[1:]
+	expected := m.detailPR().URL
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs = snapshot.Datasets[0].PRs[1:] })
 	refs := m.currentReferences()
 	if len(refs) != 1 || refs[0].URL != expected {
 		t.Fatal("detail command fell back to another PR")
 	}
 	m.detail = nil
-	m.jiraActive = true
+	m.setPageFlag(pageJira, true)
 	m, _ = sequence(m, "d")
 	key := m.jira.detail.Key
 	m.jira.rows = m.jira.rows[1:]

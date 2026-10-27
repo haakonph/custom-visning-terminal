@@ -194,6 +194,11 @@ erDiagram
         INTEGER favorite
         INTEGER hidden
     }
+    local_imports {
+        TEXT kind PK
+        TEXT source_path
+        TEXT fingerprint
+    }
     local_repositories {
         TEXT identity PK
         TEXT path
@@ -283,6 +288,7 @@ erDiagram
         TEXT stable_id
         TEXT title
         INTEGER archived
+        INTEGER revision
     }
     usage_metrics {
         TEXT day PK

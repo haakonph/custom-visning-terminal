@@ -1,5 +1,5 @@
-// Package app wires providers, persistence and the terminal program.
-package app
+// Package bootstrap wires providers, persistence and the terminal program.
+package bootstrap
 
 import (
 	"context"
@@ -10,13 +10,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haakonph/custom-visning-terminal/internal/accesslog"
-	"github.com/haakonph/custom-visning-terminal/internal/cache"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	"github.com/haakonph/custom-visning-terminal/internal/conversations"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/pullrequests/github"
 	"github.com/haakonph/custom-visning-terminal/internal/tui"
 	"github.com/haakonph/custom-visning-terminal/internal/usage"
 )
@@ -41,7 +40,7 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 			return fmt.Errorf("invalid JIRA_PATTERN: %w", err)
 		}
 	}
-	mmConfig, mmErr := mattermost.LoadConfig()
+	mmConfig, mmErr := conversations.LoadConfig()
 	if mmErr != nil {
 		return mmErr
 	}
@@ -93,33 +92,26 @@ func RunProviders(ctx context.Context, stderr io.Writer, startJira, startCopilot
 		baseURL = value
 	}
 	if startJira || baseURL != "" || os.Getenv("JIRA_TOKEN") != "" {
-		jiraClient, jiraErr = jira.New(baseURL, os.Getenv("JIRA_TOKEN"))
+		jiraClient, jiraErr = jira.Connect(ctx, baseURL, os.Getenv("JIRA_TOKEN"), false)
 	}
 
-	token, tokenErr := github.Token(ctx)
+	connection, tokenErr := github.Connect(ctx, "", false)
 	var source model.Source
 	var persistence tui.Cache
 	if tokenErr == nil {
-		client, err := github.New(token)
-		if err != nil {
-			return err
-		}
-		source = client
-		store, err := cache.Default(token)
-		if err != nil {
+		source, persistence = connection.Client, connection.Cache
+		if connection.CacheWarning != nil {
 			fmt.Fprintln(stderr, "Cache directory unavailable; running without disk cache")
-		} else {
-			persistence = store
 		}
 	}
 	if jiraErr != nil {
 		fmt.Fprintln(stderr, "Jira unavailable:", jiraErr)
 	}
 	dashboard := tui.New(ctx, source, persistence).WithVersion(version).WithJiraPattern(jiraPattern).WithCopilot(copilotClient, false)
-	if endpoint, err := mattermost.LoadWebhook(ctx); err != nil {
+	if endpoint, err := conversations.LoadWebhook(ctx); err != nil {
 		fmt.Fprintln(stderr, "Mattermost webhook unavailable:", err)
 	} else if endpoint != "" {
-		sender, err := mattermost.New(endpoint)
+		sender, err := conversations.New(endpoint)
 		if err != nil {
 			fmt.Fprintln(stderr, "Mattermost unavailable:", err)
 		} else {

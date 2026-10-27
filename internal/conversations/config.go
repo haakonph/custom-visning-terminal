@@ -1,4 +1,4 @@
-package mattermost
+package conversations
 
 import (
 	"os"

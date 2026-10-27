@@ -18,7 +18,7 @@ func (m *Model) relatedReferenceKinds(origins []model.TaskReference, kinds ...st
 		documents[i].Reference = r
 		positions[refID(r)] = i
 	}
-	for _, dataset := range m.snapshot.Datasets {
+	for _, dataset := range m.prs.Snapshot().Datasets {
 		for _, pr := range dataset.PRs {
 			if i, ok := positions[refID(prRef(pr))]; ok {
 				documents[i].Text += " " + pr.Body + " " + pr.HeadRef

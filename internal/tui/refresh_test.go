@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
@@ -14,9 +14,9 @@ func TestAutoRefreshPriorityCompletionAndBackoff(t *testing.T) {
 	m.auto.options = defaultRefreshOptions()
 	now := time.Now()
 	for v := model.Open; v < model.ViewCount; v++ {
-		m.auto.github[v].finished = now
+		m.auto.github[v].Finished = now
 	}
-	m.auto.github[m.active].finished = now.Add(-time.Minute)
+	m.auto.github[m.active].Finished = now.Add(-time.Minute)
 	m, _ = update(m, refreshTick(now))
 	if !m.loading[m.active] {
 		t.Fatal("active list not scheduled")
@@ -28,7 +28,7 @@ func TestAutoRefreshPriorityCompletionAndBackoff(t *testing.T) {
 		}
 	}
 	m, _ = update(m, refreshMsg{view: m.active, err: errors.New("offline")})
-	if m.auto.github[m.active].failures != 1 {
+	if m.auto.github[m.active].Failures != 1 {
 		t.Fatal("completion was not retained on model")
 	}
 	m, _ = update(m, refreshTick(now.Add(time.Minute)))
@@ -63,8 +63,8 @@ func TestJiraAutoRefreshDoesNotCancelSameQueryAndKeepsSelection(t *testing.T) {
 	}
 	// Jira-only startup must not depend on GitHub bootstrap finishing.
 	m.booting = true
-	m.auto.jira[m.jira.query].finished = time.Now().Add(-2 * time.Minute)
-	m.auto.jira[m.jira.query].started = time.Time{}
+	m.auto.jira[m.jira.query].Finished = time.Now().Add(-2 * time.Minute)
+	m.auto.jira[m.jira.query].Started = time.Time{}
 	m, _ = update(m, refreshTick(time.Now()))
 	if !m.jira.loading {
 		t.Fatal("Jira-only automatic refresh not scheduled")
@@ -77,9 +77,9 @@ func TestJiraBackgroundResultCannotOverwriteNewerForeground(t *testing.T) {
 	_ = m.refreshJira()
 	query := m.jira.query
 	old := time.Now().Add(-time.Minute)
-	m.auto.jira[query].started = time.Now()
+	m.auto.jira[query].Started = time.Now()
 	m, _ = update(m, jiraBackgroundResult{started: old, query: query, err: errors.New("old failure"), at: time.Now()})
-	if m.auto.jira[query].failures != 0 {
+	if m.auto.jira[query].Failures != 0 {
 		t.Fatal("stale background response changed polling state")
 	}
 }
@@ -108,9 +108,9 @@ func TestBackgroundGitHubWaitsForBackgroundInterval(t *testing.T) {
 	m := ready(t)
 	now := time.Now()
 	for v := model.Open; v < model.ViewCount; v++ {
-		m.auto.github[v].finished = now.Add(-2 * time.Minute)
+		m.auto.github[v].Finished = now.Add(-2 * time.Minute)
 	}
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m, _ = update(m, refreshTick(now))
 	for _, loading := range m.loading {
 		if loading {

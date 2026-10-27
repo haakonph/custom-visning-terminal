@@ -10,9 +10,9 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/pullrequests/github"
 )
 
 type setupWizard struct {
@@ -28,6 +28,7 @@ type setupWizard struct {
 type setupValidated struct {
 	wizard  *setupWizard
 	github  *github.Client
+	cache   Cache
 	jira    *jira.Client
 	webhook *mm.Client
 	err     error
@@ -171,21 +172,10 @@ func validateSetup(parent context.Context, w *setupWizard, provider string, v []
 	r := setupValidated{wizard: w}
 	switch provider {
 	case "github":
-		token := v[0]
-		if token == "" {
-			token, r.err = github.Token(ctx)
-		}
-		if r.err == nil {
-			r.github, r.err = github.New(token)
-		}
-		if r.err == nil {
-			_, r.err = r.github.User(ctx)
-		}
+		connection, err := github.Connect(ctx, v[0], true)
+		r.github, r.cache, r.err = connection.Client, connection.Cache, err
 	case "jira":
-		r.jira, r.err = jira.New(v[0], v[1])
-		if r.err == nil {
-			_, r.err = r.jira.Search(ctx, "assignee = currentUser() AND resolution = Unresolved")
-		}
+		r.jira, r.err = jira.Connect(ctx, v[0], v[1], true)
 	case "webhook":
 		r.webhook, r.err = mm.New(v[0])
 		if r.err == nil {
@@ -210,7 +200,7 @@ func (m Model) finishSetupValidation(r setupValidated) (tea.Model, tea.Cmd) {
 		m = m.WithMattermost(r.webhook)
 	}
 	if r.github != nil {
-		m.source = r.github
+		m.configureGitHub(r.github, r.cache)
 	}
 	if r.jira != nil {
 		m = m.WithJira(r.jira, false)

@@ -2,13 +2,13 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/syncstate"
 )
 
 type jiraActionState struct {
@@ -20,6 +20,7 @@ type jiraActionState struct {
 	loading, running bool
 }
 type jiraActionMsg struct {
+	token       syncstate.Token
 	request     *jiraActionState
 	transitions map[string][]jira.Transition
 	err         error
@@ -52,33 +53,20 @@ func (m Model) startJiraAction(operation string) (tea.Model, tea.Cmd) {
 	}
 	state := &jiraActionState{keys: keys, loading: operation == "f", running: operation != "f"}
 	m.jiraAction = state
-	client, parent := m.jira.client, m.ctx
+	client, parent := m.jira.client, m.jiraSession.Context(m.ctx)
+	token := m.jiraSession.Begin("action")
 	return m, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
-		result := jiraActionMsg{request: state, transitions: map[string][]jira.Transition{}, done: operation != "f"}
-		for _, key := range keys {
-			if operation == "f" {
-				result.transitions[key], result.err = client.Transitions(ctx, key)
-			} else {
-				result.err = client.Assign(ctx, key, operation == "m")
-			}
-			if result.err != nil {
-				result.err = fmt.Errorf("%s: %w (tidligere saker kan være oppdatert)", key, result.err)
-				break
-			}
-		}
+		result := jiraActionMsg{token: token, request: state, transitions: map[string][]jira.Transition{}, done: operation != "f"}
+		outcome := jira.PrepareWorkflow(ctx, client, keys, operation)
+		result.transitions, result.err = outcome.Transitions, outcome.Err
 		return result
 	}
 }
-func transitionName(t jira.Transition) string {
-	if t.To.Name != "" {
-		return t.To.Name
-	}
-	return t.Name
-}
+func transitionName(t jira.Transition) string { return jira.TransitionName(t) }
 func (m Model) finishJiraAction(result jiraActionMsg) (tea.Model, tea.Cmd) {
-	if m.jiraAction != result.request {
+	if m.jiraAction != result.request || (result.token.Sequence != 0 && !m.jiraSession.Match("action", result.token)) {
 		return m, nil
 	}
 	state := m.jiraAction
@@ -88,35 +76,18 @@ func (m Model) finishJiraAction(result jiraActionMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if result.done {
+		m.jiraSession.Mutate()
+		m.jira.loading = false
 		m.jiraAction = nil
 		m.sequenceNotice = "Jira oppdatert: " + strings.Join(state.keys, ", ")
-		if m.jiraActive {
+		if m.page == pageJira {
 			return m, m.refreshJira()
 		}
 		return m, nil
 	}
 	state.loading = false
 	state.transitions = result.transitions
-	seen := map[string]bool{}
-	for _, transition := range result.transitions[state.keys[0]] {
-		name := transitionName(transition)
-		common := name != "" && !seen[name]
-		for _, key := range state.keys {
-			count := 0
-			for _, t := range result.transitions[key] {
-				if transitionName(t) == name {
-					count++
-				}
-			}
-			if count != 1 {
-				common = false
-			}
-		}
-		if common {
-			state.choices = append(state.choices, name)
-			seen[name] = true
-		}
-	}
+	state.choices = jira.CommonTransitions(state.keys, state.transitions)
 	if len(state.choices) == 0 {
 		m.jiraAction = nil
 		m.sequenceNotice = "Ingen entydige felles overganger tilgjengelig for valgte Jira-saker."
@@ -127,15 +98,7 @@ func (m Model) finishJiraAction(result jiraActionMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-func statusMatches(name, shortcut string) bool {
-	aliases := map[string][]string{"q": {"qa", "quality assurance", "klar for qa", "ready for qa"}, "u": {"under arbeid", "in progress"}, "a": {"avklaring", "clarification", "needs clarification"}, "f": {"ferdig", "done", "closed"}}
-	for _, alias := range aliases[shortcut] {
-		if strings.EqualFold(strings.TrimSpace(name), alias) {
-			return true
-		}
-	}
-	return false
-}
+func statusMatches(name, shortcut string) bool { return jira.StatusMatches(name, shortcut) }
 func (m Model) jiraActionKey(k string) (tea.Model, tea.Cmd) {
 	state := m.jiraAction
 	if k == "ctrl+c" {
@@ -181,25 +144,17 @@ func (m Model) jiraActionKey(k string) (tea.Model, tea.Cmd) {
 	}
 	state.running = true
 	m.sequenceNotice = ""
-	client, parent := m.jira.client, m.ctx
+	client, parent := m.jira.client, m.jiraSession.Context(m.ctx)
+	token := m.jiraSession.Begin("action")
 	return m, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
-		result := jiraActionMsg{request: state, done: true}
-		for _, key := range state.keys {
-			for _, t := range state.transitions[key] {
-				if transitionName(t) == choice {
-					if err := client.Transition(ctx, key, t.ID); err != nil {
-						result.err = fmt.Errorf("%s: %w (tidligere saker kan være oppdatert)", key, err)
-						return result
-					}
-					break
-				}
-			}
-		}
+		result := jiraActionMsg{token: token, request: state, done: true}
+		result.err = jira.ExecuteTransitions(ctx, client, state.keys, state.transitions, choice).Err
 		return result
 	}
 }
+
 func (m Model) openJiraKeys(keys []string) (tea.Model, tea.Cmd) {
 	if m.jira == nil || len(keys) == 0 {
 		return m.unavailable()

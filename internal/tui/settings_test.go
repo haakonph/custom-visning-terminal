@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	appconfig "github.com/haakonph/custom-visning-terminal/internal/config"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
@@ -69,7 +69,7 @@ func TestSettingsSaveReloadAndReset(t *testing.T) {
 	for _, jiraActive := range []bool{false, true} {
 		m := jiraModel(t)
 		defer m.cancel()
-		m.jiraActive = jiraActive
+		m.setPageFlag(pageJira, jiraActive)
 		query := jira.Query{Name: "Mine", JQL: "assignee = currentUser()"}
 		if err := jira.SaveConfig(jira.ConfigPath(), jira.Config{Queries: []jira.Query{query}}); err != nil {
 			t.Fatal(err)
@@ -94,7 +94,7 @@ func TestSettingsSaveReloadAndReset(t *testing.T) {
 			t.Fatal("reset failed")
 		}
 		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-		if m.settings.active || m.jiraActive != jiraActive {
+		if m.settings.active || (m.page == pageJira) != jiraActive {
 			t.Fatal("return changed provider")
 		}
 	}
@@ -189,14 +189,14 @@ func TestSettingsFromCopilotAndTypingComma(t *testing.T) {
 	m := jiraModel(t)
 	defer m.cancel()
 	m.copilot = &copilotState{}
-	m.copilotActive = true
+	m.setPageFlag(pageCopilot, true)
 	m, _ = sequence(m, "vs")
 	if !m.settings.active {
 		t.Fatal("settings unavailable in Copilot")
 	}
 	m.settings.active = false
-	m.copilotActive = false
-	m.jiraActive = false
+	m.setPageFlag(pageCopilot, false)
+	m.setPageFlag(pageJira, false)
 	m.filtering = true
 	m.input.Focus()
 	m, _ = update(m, key(','))

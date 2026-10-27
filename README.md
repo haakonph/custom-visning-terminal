@@ -426,7 +426,7 @@ AI-data lastes ved oppstart og oppdateres også mens GitHub-visningen er åpen.
 
 Når review er `PENDING` og en melding med PR-lenken er sendt fra appen til
 Mattermost, viser REVIEW-kolonnen tiden siden siste vellykkede sending
-(`now`, `5m`, `2h`, `3d`). Sendetidene lagres lokalt i `links.sqlite` og beholdes
+(`now`, `5m`, `2h`, `3d`). Sendetidene lagres i det felles lokale lageret (normalt `tasks.sqlite`) og beholdes
 etter omstart. Andre review-statuser vises som før.
 
 Ufullstendige søk, feil på en senere side, utilgjengelige team eller ufullstendig
@@ -744,7 +744,10 @@ Jira-nøkkel. Endringer i oppgaven endrer ikke Jira eller GitHub.
   deretter nullstilles et eventuelt søk, og til slutt tilbake til provider-visningen.
 
 Oppgavene lagres atomisk i `custom-visning/tasks.sqlite` under operativsystemets
-konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS`). Filen er lokal for
+konfigurasjonsmappe (kan overstyres med `CUSTOM_VISNING_TASKS` eller
+`CUSTOM_VISNING_LOCAL`). Samme database lagrer koblinger, arkiv og snooze.
+Samtidige endringer i forskjellige oppgaver bevares; konflikt i samme oppgave
+vises uten lydløs overskriving. Filen er lokal for
 OS-brukeren og deles mellom appens GitHub/Jira-kontoer; den inneholder titler og
 lenker, ingen tokens. Ta vare på filen som brukerdata, ikke som cache.
 
@@ -1189,12 +1192,13 @@ JSON; hele domenedatasett lagres ikke lenger som JSON-dokumenter. SQL-viewen
 `overview_items` gir en felles projeksjon for databaseinspeksjon; appen får ingen
 ny felles visning.
 
-Eksisterende lagringsgrenser beholdes: GitHub-cache er isolert etter konto/token,
-Jira-cache etter server/token/spørring, mens lokale brukerdata er separate fra
-cache. Tabellene ligger derfor i eksisterende SQLite-filer, ikke i én ny felles
-fil. Dette bevarer også eksisterende miljøoverstyringer og muligheten til å
-slette cache uten å slette oppgaver, snooze og Copilot-historikk. Fremmednøkler er
-aktivert, og en oppdatering av et datasett og relasjonene skjer atomisk.
+Nettverkscache er fortsatt isolert: GitHub etter konto/token og Jira etter
+server/token/spørring. Oppgaver, oppgavereferanser, koblinger, arkiv, snooze og
+review-sendetider samles i det lokale oppgavelageret, separat fra cache.
+Handlinger som endrer flere av disse datatypene bruker én SQLite-transaksjon.
+Copilot-historikk og øvrige lokale lagre beholder sine eksisterende grenser.
+Fremmednøkler er aktivert. Detaljer om eierskap, konfliktkontroll og migrering
+står i [domeneoversikten](docs/domain-architecture.md).
 Oppgavereferanser beholder provider, URL og visningssnapshot uten harde
 fremmednøkler til provider-cache, slik at de overlever tømming av cache.
 
@@ -1207,7 +1211,8 @@ Et initialiseringsmerke gjør at et tomt datasett ikke importeres på nytt fra g
 filer. En skadet database gir feil fremfor å hente en utdatert JSON-sikkerhetskopi.
 Ta sikkerhetskopi av `.sqlite`-filene når appen er avsluttet.
 
-`CUSTOM_VISNING_TASKS`, `CUSTOM_VISNING_SNOOZE` og `COPILOT_STORE_PATH` støtter
+`CUSTOM_VISNING_TASKS`, `CUSTOM_VISNING_LINKS`, `CUSTOM_VISNING_SNOOZE`,
+`CUSTOM_VISNING_LOCAL` og `COPILOT_STORE_PATH` støtter
 fortsatt gamle JSON-stier. Databasen ligger ved siden av filen med `.sqlite` i
 stedet for `.json`. Eksplisitte `.sqlite`, `.sqlite3` og `.db`-stier brukes direkte;
 andre filnavn får `.sqlite` lagt til. Mapper opprettes med 0700 og databaser med
@@ -1250,8 +1255,10 @@ Kalenderberegning bruker maskinens lokale tidssone. Ved et manglende klokkeslett
 under sommertidsovergangen flyttes tiden frem med gapet. Ved et klokkeslett som
 forekommer to ganger velges første forekomst. Timer er alltid medgått tid.
 
-Data lagres separat fra nettverkscache i `custom-visning/snooze.sqlite` under
-brukerens konfigurasjonsmappe (`CUSTOM_VISNING_SNOOZE` kan overstyre filstien).
+Data lagres separat fra nettverkscache i det felles lokale lageret, normalt
+`custom-visning/tasks.sqlite` under brukerens konfigurasjonsmappe.
+`CUSTOM_VISNING_SNOOZE` angir den gamle kildestien for engangsimport.
+`CUSTOM_VISNING_LOCAL` kan velge et annet samlet lager.
 Tabellen inneholder identitet, type, tittel, URL og returtid. Gruppens utgangspunkt
 og medlemmer ligger i `snooze_references`. Skriving bruker en
 SQLite-transaksjon, med 0600 på databasefilen og 0700 på nye mapper.

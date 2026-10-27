@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/app"
+	"github.com/haakonph/custom-visning-terminal/internal/config"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
@@ -33,13 +34,9 @@ type entityDialog struct {
 }
 
 func newEntities() *entityState {
-	path := os.Getenv("CUSTOM_VISNING_LINKS")
-	if path == "" {
-		dir, _ := os.UserConfigDir()
-		path = filepath.Join(dir, "custom-visning", "links.sqlite")
-	}
+	path := config.LocalPath()
 	s := &entityState{path: path}
-	s.err = storage.Load(path, &s.data)
+	s.err = storage.LoadLocal(path, config.LinkPath(), &s.data)
 	if errors.Is(s.err, os.ErrNotExist) {
 		s.err = nil
 	}
@@ -134,21 +131,7 @@ func (m *Model) rememberProvider(target string) {
 		m.previousProvider = current
 	}
 }
-func (m Model) baseProvider() string {
-	if m.mmReader != nil && m.mmReader.active {
-		return "mattermost"
-	}
-	if m.tasks.active {
-		return "task"
-	}
-	if m.copilotActive {
-		return "copilot"
-	}
-	if m.jiraActive {
-		return "jira"
-	}
-	return "github"
-}
+func (m Model) baseProvider() string { return m.page.provider() }
 func (m *Model) visibleReferences() []model.TaskReference {
 	var refs []model.TaskReference
 	switch m.visibleProvider() {
@@ -303,7 +286,7 @@ func sortedRefs(values map[string]model.TaskReference) []model.TaskReference {
 func (m *Model) currentReferences() []model.TaskReference {
 	kind := m.visibleProvider()
 	if kind == "github" && m.detail != nil && len(m.chosen) == 0 {
-		return []model.TaskReference{prRef(m.detail.pr)}
+		return []model.TaskReference{prRef(m.detailPR())}
 	}
 	if kind == "jira" && m.jira.detail != nil && len(m.jiraChosen) == 0 {
 		r := m.jira.detail
@@ -375,7 +358,7 @@ func (m *Model) selectReference(r model.TaskReference, toggle bool) {
 	}
 	switch r.Provider {
 	case "github":
-		for _, d := range m.snapshot.Datasets {
+		for _, d := range m.prs.Snapshot().Datasets {
 			for _, p := range d.PRs {
 				if p.URL == r.URL {
 					if toggle {
@@ -384,7 +367,7 @@ func (m *Model) selectReference(r model.TaskReference, toggle bool) {
 							return
 						}
 					}
-					m.chosen[p.Key()] = p
+					m.chosen[p.Key()] = struct{}{}
 					return
 				}
 			}
@@ -425,7 +408,7 @@ func (m *Model) allReferences() []model.TaskReference {
 			refs[refID(r)] = r
 		}
 	}
-	for _, d := range m.snapshot.Datasets {
+	for _, d := range m.prs.Snapshot().Datasets {
 		for _, p := range d.PRs {
 			add(prRef(p))
 		}
@@ -498,17 +481,17 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 	}
 	m.dialog = nil
 	m.detail = nil
-	m.tasks.active = false
-	m.jiraActive = false
-	m.copilotActive = false
+	m.setPageFlag(pageTasks, false)
+	m.setPageFlag(pageJira, false)
+	m.setPageFlag(pageCopilot, false)
 	if m.mmReader != nil {
-		m.mmReader.active = false
+		m.setPageFlag(pageChat, false)
 	}
 	switch r.Provider {
 	case "task":
 		for i, t := range m.tasks.items {
 			if t.ID == r.Key {
-				m.tasks.active = true
+				m.setPageFlag(pageTasks, true)
 				m.tasks.archived = t.Archived
 				m.tasks.query = ""
 				m.tasks.selected = i
@@ -519,7 +502,7 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 	case "github":
 		m.input.SetValue("")
 		m.relatedKey = ""
-		for v, d := range m.snapshot.Datasets {
+		for v, d := range m.prs.Snapshot().Datasets {
 			for _, p := range d.PRs {
 				if p.URL == r.URL {
 					m.active = model.View(v)
@@ -534,7 +517,7 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 		}
 	case "jira":
 		if m.jira != nil {
-			m.jiraActive = true
+			m.setPageFlag(pageJira, true)
 			m.jira.custom = "key IN (" + r.Key + ") ORDER BY key ASC"
 			m.jira.input.SetValue("")
 			m.jira.input.Prompt = ""
@@ -543,7 +526,7 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 		}
 	case "copilot":
 		if m.copilot != nil {
-			m.copilotActive = true
+			m.setPageFlag(pageCopilot, true)
 			m.copilot.input.SetValue("")
 			for i, s := range m.copilot.rows() {
 				if s.ID == r.Key {
@@ -554,7 +537,7 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 		}
 	case "mattermost":
 		if m.mmReader != nil {
-			m.mmReader.active = true
+			m.setPageFlag(pageChat, true)
 			m.mmReader.mentions = false
 			for _, p := range m.mmReader.data.Posts {
 				if p.ID == r.Key {
@@ -577,7 +560,7 @@ func (m Model) activateReference(r model.TaskReference) (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m *Model) updateCopilotDetail() tea.Cmd {
-	next, cmd := m.updateCopilot(tea.KeyPressMsg{Code: tea.KeyEnter})
+	next, cmd := m.openCopilotDetails()
 	*m = next.(Model)
 	return cmd
 }
@@ -590,65 +573,16 @@ func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model
 		m.sequenceNotice = "Kunne ikke lese koblinger: " + m.entities.err.Error()
 		return m, nil
 	}
-	state := m.entities.data
-	state.Links = append([]model.EntityLink(nil), state.Links...)
-	seen := map[string]bool{}
-	for _, e := range state.Links {
-		seen[refID(e.Left)+"\n"+refID(e.Right)] = true
-		seen[refID(e.Right)+"\n"+refID(e.Left)] = true
-	}
-	for _, a := range origins {
-		for _, b := range targets {
-			if refID(a) == refID(b) || seen[refID(a)+"\n"+refID(b)] {
-				continue
-			}
-			state.Links = append(state.Links, model.EntityLink{Left: a, Right: b})
-			seen[refID(a)+"\n"+refID(b)] = true
-		}
-	}
-	tasks := cloneTasks(m.tasks.items)
-	for _, a := range origins {
-		for _, b := range targets {
-			if refID(a) == refID(b) {
-				continue
-			}
-			for i := range tasks {
-				if a.Provider == "task" && a.Key == tasks[i].ID {
-					tasks[i].Add(b)
-				}
-				if b.Provider == "task" && b.Key == tasks[i].ID {
-					tasks[i].Add(a)
-				}
-			}
-		}
-	}
-	taskChanged := false
-	for _, r := range append(append([]model.TaskReference(nil), origins...), targets...) {
-		if r.Provider == "task" {
-			taskChanged = true
-		}
-	}
+	state, tasks, taskChanged := app.LinkReferences(m.entities.data, m.tasks.items, origins, targets)
 	if taskChanged && m.tasks.loadFailed {
 		m.sequenceNotice = "Oppgaver kunne ikke leses; lagring er sperret"
 		return m, nil
 	}
-	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
-	var partial bool
 	m.sequenceNotice = "Lagrer koblinger…"
-	m.enqueueLocal(func() (err error) {
-		partial, err = writeLocalState(path, before, state, taskPath, tasks, taskChanged)
-		return err
-	}, func(m *Model, err error) {
+	m.queueLocalEdit(state, tasks, taskChanged, func(m *Model, err error) {
 		if err != nil {
-			if partial {
-				m.entities.data = state
-			}
 			m.sequenceNotice = "Kunne ikke lagre koblinger: " + err.Error()
 			return
-		}
-		m.entities.data = state
-		if taskChanged {
-			m.tasks.items = tasks
 		}
 		m.dialog = nil
 		m.sequenceNotice = "Koblinger lagret lokalt"

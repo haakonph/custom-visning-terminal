@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
@@ -81,7 +81,7 @@ func TestArchiveAppliesOnlyAfterSuccessfulWrite(t *testing.T) {
 				if err := os.WriteFile(parent, nil, 0600); err != nil {
 					t.Fatal(err)
 				}
-				m.entities.path = filepath.Join(parent, "links.sqlite")
+				m.tasks.path = filepath.Join(parent, "local.sqlite")
 			}
 			refs := []model.TaskReference{prRef(m.filtered()[0])}
 			next, _ := m.archiveReferences(refs)
@@ -177,7 +177,9 @@ func TestGitHubNavigationReusesGroupsAndRefreshInvalidatesThem(t *testing.T) {
 func BenchmarkGitHubViewportNavigation(b *testing.B) {
 	m := readyBenchmark(b)
 	for i := 0; i < 5000; i++ {
-		m.snapshot.Datasets[model.Open].PRs = append(m.snapshot.Datasets[model.Open].PRs, model.PullRequest{URL: fmt.Sprintf("https://github.com/acme/api/pull/%d", i+1), Repository: "acme/api", Number: i + 1, Title: fmt.Sprintf("APP-%d work", i)})
+		m.editPRs(func(snapshot *model.Snapshot) {
+			snapshot.Datasets[model.Open].PRs = append(snapshot.Datasets[model.Open].PRs, model.PullRequest{URL: fmt.Sprintf("https://github.com/acme/api/pull/%d", i+1), Repository: "acme/api", Number: i + 1, Title: fmt.Sprintf("APP-%d work", i)})
+		})
 	}
 	_ = m.View()
 	b.ReportAllocs()
@@ -209,7 +211,7 @@ func readyBenchmark(b *testing.B) Model {
 	m := New(b.Context(), nil, nil)
 	b.Cleanup(m.cancel)
 	m.booting = false
-	m.snapshot.User = "alice"
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.User = "alice" })
 	return m
 }
 
@@ -253,39 +255,18 @@ func TestMattermostResultInstallsPreparedIndexAndRetainsOrder(t *testing.T) {
 	}
 }
 
-func TestLocalStateRollsBackEntitiesIfTaskWriteFails(t *testing.T) {
-	entityPath := filepath.Join(t.TempDir(), "links.sqlite")
-	parent := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(parent, nil, 0600); err != nil {
-		t.Fatal(err)
-	}
-	before := model.EntityState{}
-	after := model.EntityState{Archived: []model.TaskReference{{Provider: "github", URL: "https://example.test/1"}}}
-	partial, err := writeLocalState(entityPath, before, after, filepath.Join(parent, "tasks.sqlite"), []model.Task{}, true)
-	if err == nil || partial {
-		t.Fatal("task failure did not roll back archive", err)
-	}
-	var saved model.EntityState
-	if err := storage.Load(entityPath, &saved); err != nil {
-		t.Fatal(err)
-	}
-	if len(saved.Archived) != 0 {
-		t.Fatal("failed task transaction left archived entries")
-	}
-}
-
 func TestPartialRefreshRebasesOnNewerLocalRows(t *testing.T) {
 	m := ready(t)
-	previous := m.snapshot.Datasets[m.active].PRs
+	previous := m.prs.Snapshot().Datasets[m.active].PRs
 	fresh := []model.PullRequest{{URL: "new", Title: "New partial result"}}
 	result := refreshMsg{view: m.active, prepared: true, baseRows: previous, freshRows: fresh, result: model.Result{PRs: model.Merge(previous, fresh)}}
 	current := append([]model.PullRequest(nil), previous...)
 	current[0].Title = "Newer local detail"
-	m.snapshot.Datasets[m.active].PRs = current
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[m.active].PRs = current })
 	next, prepare := m.Update(result)
 	next, _ = next.(Model).Update(prepare())
 	m = next.(Model)
-	for _, p := range m.snapshot.Datasets[m.active].PRs {
+	for _, p := range m.prs.Snapshot().Datasets[m.active].PRs {
 		if p.URL == current[0].URL && p.Title != current[0].Title {
 			t.Fatal("partial refresh restored an old cached row")
 		}
@@ -324,7 +305,7 @@ func TestCopilotDetailScrollingUsesCachedLines(t *testing.T) {
 	if m.copilot.offset != 1 || &lines[0] != &m.copilot.formattedLines[0] {
 		t.Fatal("detail scrolling changed selection or rebuilt the history")
 	}
-	m.copilotActive = false
+	m.setPageFlag(pageCopilot, false)
 	m.copilot.loading = false
 	result := m.refreshCopilot()().(copilotResult)
 	if result.id != "" || result.detail != nil {

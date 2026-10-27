@@ -11,22 +11,22 @@ import (
 // Keeping this out of Snapshot preserves cache compatibility and avoids extra API calls.
 func (m Model) githubDataset(view model.View) model.Dataset {
 	if view != model.SharedReviews {
-		return m.snapshot.Datasets[view]
+		return m.prs.Snapshot().Datasets[view]
 	}
-	personal := m.snapshot.Datasets[model.Reviews]
-	team := m.snapshot.Datasets[model.TeamReviews]
+	personal := m.prs.Snapshot().Datasets[model.Reviews]
+	team := m.prs.Snapshot().Datasets[model.TeamReviews]
 	data := model.Dataset{SyncedAt: personal.SyncedAt}
 	if team.SyncedAt.Before(data.SyncedAt) {
 		data.SyncedAt = team.SyncedAt
 	}
 	seen := map[string]bool{}
 	for _, source := range []model.View{model.Reviews, model.TeamReviews} {
-		for _, p := range m.snapshot.Datasets[source].PRs {
+		for _, p := range m.prs.Snapshot().Datasets[source].PRs {
 			key := strings.ToLower(p.URL)
 			if seen[key] || m.reviewRequestedAt(p.URL).IsZero() {
 				continue
 			}
-			if source == model.TeamReviews && strings.EqualFold(p.Author, m.snapshot.User) {
+			if source == model.TeamReviews && strings.EqualFold(p.Author, m.prs.Snapshot().User) {
 				continue
 			}
 			seen[key] = true
@@ -59,9 +59,9 @@ func (m Model) githubWarning(view model.View) string {
 
 func (m Model) githubSyncedAt(view model.View) time.Time {
 	if view != model.SharedReviews {
-		return m.snapshot.Datasets[view].SyncedAt
+		return m.prs.Snapshot().Datasets[view].SyncedAt
 	}
-	personal, team := m.snapshot.Datasets[model.Reviews].SyncedAt, m.snapshot.Datasets[model.TeamReviews].SyncedAt
+	personal, team := m.prs.Snapshot().Datasets[model.Reviews].SyncedAt, m.prs.Snapshot().Datasets[model.TeamReviews].SyncedAt
 	if team.Before(personal) {
 		return team
 	}

@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -86,8 +88,10 @@ func ready(t *testing.T) Model {
 	m := New(context.Background(), &fakeSource{}, nil)
 	t.Cleanup(m.cancel)
 	m.booting = false
-	m.snapshot = model.Snapshot{Version: 1, User: "alice"}
-	m.snapshot.Datasets[0].PRs = []model.PullRequest{{URL: "https://github.com/acme/api/pull/1", Title: "Fix login", Repository: "acme/api", Author: "alice", Number: 1}, {URL: "https://github.com/acme/api/pull/2", Title: "Add endpoint", Repository: "acme/api", Author: "bob", Number: 2, RequestedTeams: []string{"acme/core"}, Labels: []string{"feature"}}}
+	m.editPRs(func(snapshot *model.Snapshot) { *snapshot = model.Snapshot{Version: 1, User: "alice"} })
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[0].PRs = []model.PullRequest{{URL: "https://github.com/acme/api/pull/1", Title: "Fix login", Repository: "acme/api", Author: "alice", Number: 1}, {URL: "https://github.com/acme/api/pull/2", Title: "Add endpoint", Repository: "acme/api", Author: "bob", Number: 2, RequestedTeams: []string{"acme/core"}, Labels: []string{"feature"}}}
+	})
 	return m
 }
 func TestNavigationAndFilter(t *testing.T) {
@@ -138,21 +142,21 @@ func TestNavigationAndFilter(t *testing.T) {
 func TestRefreshPreservesCacheAndSyncTime(t *testing.T) {
 	m := ready(t)
 	at := time.Now().Add(-time.Hour)
-	m.snapshot.Datasets[0].SyncedAt = at
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].SyncedAt = at })
 	m, _ = update(m, refreshMsg{view: 0, result: model.Result{PRs: []model.PullRequest{{URL: "new", Title: "New"}}, Complete: false}, err: errors.New("network error")})
-	if len(m.filtered()) != 3 || !m.snapshot.Datasets[0].SyncedAt.Equal(at) || m.warnings[0] == "" {
+	if len(m.filtered()) != 3 || !m.prs.Snapshot().Datasets[0].SyncedAt.Equal(at) || m.warnings[0] == "" {
 		t.Fatal("partial refresh lost cache or sync time")
 	}
 	fresh := time.Now()
 	m, _ = update(m, refreshMsg{view: 0, result: model.Result{Complete: true}, at: fresh})
-	if len(m.filtered()) != 0 || !m.snapshot.Datasets[0].SyncedAt.Equal(fresh) || m.warnings[0] != "" {
+	if len(m.filtered()) != 0 || !m.prs.Snapshot().Datasets[0].SyncedAt.Equal(fresh) || m.warnings[0] != "" {
 		t.Fatal("complete empty refresh should remove old rows")
 	}
 }
 func TestRefreshAsyncAndNoDuplicates(t *testing.T) {
 	m := ready(t)
 	source := &fakeSource{result: model.Result{Complete: true}}
-	m.source = source
+	m.useSource(source)
 	var cmd tea.Cmd
 	m, cmd = sequence(m, "au")
 	if cmd == nil || source.calls != 0 || !m.loading[0] {
@@ -180,7 +184,7 @@ func TestBootstrapLoadsCacheBeforeRefresh(t *testing.T) {
 	defer m.cancel()
 	msg := m.bootstrap()()
 	m, cmd := update(m, msg)
-	if cmd == nil || len(m.filtered()) != 1 || source.calls != 0 || m.snapshot.User != "alice" {
+	if cmd == nil || len(m.filtered()) != 1 || source.calls != 0 || m.prs.Snapshot().User != "alice" {
 		t.Fatal("cache was not displayed before API refresh")
 	}
 	for _, loading := range m.loading {
@@ -206,7 +210,7 @@ func TestBootstrapErrorAndRetry(t *testing.T) {
 func TestCacheWritesCoalesce(t *testing.T) {
 	m := ready(t)
 	store := &fakeCache{}
-	m.cache = store
+	m.prs.SetCache(store)
 	m, first := update(m, refreshMsg{view: 0, result: model.Result{Complete: true, PRs: []model.PullRequest{{Title: "first"}}}})
 	m, second := update(m, refreshMsg{view: 0, result: model.Result{Complete: true, PRs: []model.PullRequest{{Title: "latest"}}}})
 	if first == nil || second != nil || !m.dirty {
@@ -318,4 +322,48 @@ func TestHelpScrollAndSmallWindows(t *testing.T) {
 	if m.help {
 		t.Fatal("Esc did not close help")
 	}
+}
+
+// Fixture edits go through the domain boundary; projections remain read-only.
+func (m *Model) editPRs(edit func(*model.Snapshot)) {
+	before := m.prs.Export()
+	snapshot := m.prs.Export()
+	edit(&snapshot)
+	old := map[string]model.PullRequest{}
+	for _, d := range before.Datasets {
+		for _, p := range d.PRs {
+			old[p.Key()] = p
+		}
+	}
+	var changed []model.PullRequest
+	for v, d := range snapshot.Datasets {
+		snapshot.Datasets[v].PRs = append([]model.PullRequest(nil), d.PRs...)
+		for i, p := range d.PRs {
+			if p.URL == "" && (p.Repository != "" || p.Number != 0) {
+				p.URL = fmt.Sprintf("https://github.com/%s/pull/%d", p.Repository, p.Number)
+				snapshot.Datasets[v].PRs[i] = p
+			}
+			if previous, ok := old[p.Key()]; !ok || !reflect.DeepEqual(previous, p) {
+				changed = append(changed, p)
+			}
+		}
+	}
+	m.prs.Restore(snapshot)
+	for _, p := range before.Datasets {
+		for _, row := range p.PRs {
+			if _, ok := m.prs.Lookup(row.Key()); !ok {
+				m.prs.Upsert(row)
+			}
+		}
+	}
+	for _, p := range changed {
+		m.prs.Upsert(p)
+	}
+	m.invalidateViews(struct{}{})
+}
+
+func (m *Model) useSource(source model.Source) {
+	snapshot := m.prs.Export()
+	m.prs.Configure(source, m.prs.Cache())
+	m.prs.Restore(snapshot)
 }

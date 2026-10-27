@@ -25,7 +25,7 @@ func TestPRGroupingAcrossViews(t *testing.T) {
 	for view := model.Open; view < model.ViewCount; view++ {
 		t.Run(view.String(), func(t *testing.T) {
 			m.active = view
-			m.snapshot.Datasets[view].PRs = groupedFixture()
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[view].PRs = groupedFixture() })
 			rows := m.filtered()
 			var numbers []int
 			for _, p := range rows {
@@ -34,7 +34,7 @@ func TestPRGroupingAcrossViews(t *testing.T) {
 			if !reflect.DeepEqual(numbers, []int{1, 4, 3, 2}) {
 				t.Fatal(numbers)
 			}
-			if m.snapshot.Datasets[view].PRs[1].Number != 2 {
+			if m.prs.Snapshot().Datasets[view].PRs[1].Number != 2 {
 				t.Fatal("grouping changed source order")
 			}
 			m.height, m.width, m.selected = 40, 160, 0
@@ -70,7 +70,7 @@ func TestPRGroupsSortByRepository(t *testing.T) {
 	original := append([]model.PullRequest(nil), rows...)
 	for view := model.Open; view < model.ViewCount; view++ {
 		m.active = view
-		m.snapshot.Datasets[view].PRs = rows
+		m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[view].PRs = rows })
 		var numbers []int
 		for _, p := range m.filtered() {
 			numbers = append(numbers, p.Number)
@@ -119,7 +119,7 @@ func TestDependabotReviewGroupIsLast(t *testing.T) {
 			rows[2].Author = "DEPENDABOT"      // GraphQL login and case variants also match.
 			rows = append(rows, model.PullRequest{Number: 5, URL: "human", Repository: "acme/docs", Author: "dependabot-helper", Title: "Unlinked human PR"})
 			rows = append(rows, model.PullRequest{Number: 6, URL: "bot", Repository: "acme/web", Author: "dependabot[bot]", Title: "Update dependency"})
-			m.snapshot.Datasets[view].PRs = rows
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[view].PRs = rows })
 			var numbers []int
 			for _, p := range m.filtered() {
 				numbers = append(numbers, p.Number)
@@ -189,7 +189,7 @@ func TestGroupedPRViewportKeepsSelectedRow(t *testing.T) {
 
 func TestActivateGroupedPRUsesVisibleOrder(t *testing.T) {
 	m := ready(t)
-	m.snapshot.Datasets[model.Open].PRs = groupedFixture()
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs = groupedFixture() })
 	next, _ := m.activateReference(prRef(groupedFixture()[3]))
 	m = next.(Model)
 	if rows := m.filtered(); rows[m.selected].Number != 4 {
@@ -202,13 +202,13 @@ func TestStackLabelsSurviveFilteringAcrossViews(t *testing.T) {
 	m.width = 180
 	base := model.PullRequest{URL: "https://github.com/acme/api/pull/1", Repository: "acme/api", Number: 1, HeadRef: "base", Title: "Base"}
 	child := model.PullRequest{URL: "https://github.com/acme/api/pull/2", Repository: "acme/api", Number: 2, BaseRef: "base", Title: "Child"}
-	m.snapshot.Datasets[model.Drafts].PRs = []model.PullRequest{base}
-	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{child}
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Drafts].PRs = []model.PullRequest{base} })
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs = []model.PullRequest{child} })
 	text := ansi.Strip(strings.Join(m.groupedPRLines([]model.PullRequest{child}, 10), "\n"))
 	if !strings.Contains(text, "[stack 2/2]") {
 		t.Fatal(text)
 	}
-	if m.snapshot.Datasets[model.Open].PRs[0].Title != "Child" {
+	if m.prs.Snapshot().Datasets[model.Open].PRs[0].Title != "Child" {
 		t.Fatal("mutated cached title")
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/github"
+	"github.com/haakonph/custom-visning-terminal/internal/pullrequests/github"
 	"github.com/haakonph/custom-visning-terminal/internal/updater"
 )
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage/dbgen"
+	"github.com/haakonph/custom-visning-terminal/internal/tasks"
 )
 
 func writeDomain(ctx context.Context, q *dbgen.Queries, value any) error {
@@ -19,11 +20,15 @@ func writeDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 	case model.EntityState:
 		return writeEntities(ctx, q, v)
 	case []model.Task:
+		v = tasks.Clone(v)
+		if err := tasks.EnsureIDs(v); err != nil {
+			return err
+		}
 		if err := q.ClearTasks(ctx); err != nil {
 			return err
 		}
 		for pos, t := range v {
-			if err := q.InsertTasks(ctx, dbgen.InsertTasksParams{Position: int64(pos), StableID: t.ID, Title: t.Title, Archived: boolInt(t.Archived)}); err != nil {
+			if err := q.InsertTasks(ctx, dbgen.InsertTasksParams{Position: int64(pos), StableID: t.ID, Title: t.Title, Archived: boolInt(t.Archived), Revision: max(1, t.Revision)}); err != nil {
 				return err
 			}
 			for refPos, r := range t.References {
@@ -105,7 +110,7 @@ func readDomain(ctx context.Context, q *dbgen.Queries, value any) error {
 		items := make([]model.Task, len(rows))
 		indices := map[int64]int{}
 		for i, r := range rows {
-			items[i] = model.Task{ID: r.StableID, Title: r.Title, Archived: r.Archived != 0}
+			items[i] = model.Task{Revision: r.Revision, ID: r.StableID, Title: r.Title, Archived: r.Archived != 0}
 			indices[r.Position] = i
 		}
 		refs, err := q.ListTaskReferences(ctx)

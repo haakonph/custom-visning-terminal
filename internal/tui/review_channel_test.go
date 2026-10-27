@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )

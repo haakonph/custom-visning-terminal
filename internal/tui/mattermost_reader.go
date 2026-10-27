@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -15,9 +14,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
+	"github.com/haakonph/custom-visning-terminal/internal/syncstate"
 )
 
 type mattermostReader struct {
@@ -37,19 +37,20 @@ type mattermostReader struct {
 	searching        bool
 	channelSearching bool
 
-	open                                                          func(context.Context, string) error
-	service                                                       *mm.Service
-	api                                                           *mm.API
-	keychain                                                      mm.TokenStore
-	account, apiToken                                             string
-	reviewRequests                                                map[string]time.Time
-	data                                                          model.MattermostData
-	active, busy, authenticated, choosing, mentions, confirmClear bool
-	tab, row, channelRow, link, scroll                            int
-	root, mentionURL, notice, mode, password, jumpID              string
-	input                                                         textinput.Model
+	open                                                  func(context.Context, string) error
+	service                                               *mm.Service
+	api                                                   *mm.API
+	keychain                                              mm.TokenStore
+	account, apiToken                                     string
+	reviewRequests                                        map[string]time.Time
+	data                                                  model.MattermostData
+	busy, authenticated, choosing, mentions, confirmClear bool
+	tab, row, channelRow, link, scroll                    int
+	root, mentionURL, notice, mode, password, jumpID      string
+	input                                                 textinput.Model
 }
 type mmResult struct {
+	token syncstate.Token
 	index *mattermostIndex
 
 	data          model.MattermostData
@@ -62,13 +63,14 @@ type mmTick struct{}
 func mmTimer() tea.Cmd { return tea.Tick(30*time.Second, func(time.Time) tea.Msg { return mmTick{} }) }
 
 func (m Model) WithMattermostReader(service *mm.Service, api *mm.API, keychain mm.TokenStore, account, token string) Model {
+	m.chatSession.Configure(m.ctx)
 	input := textinput.New()
 	input.CharLimit = 512
 	data := service.Snapshot()
 	m.mmReader = &mattermostReader{reviewRequests: mattermostReviewTimes(data), entities: m.entities, snoozes: m.snoozes, open: openMattermostBrowser, service: service, api: api, keychain: keychain, account: account, apiToken: token, data: data, input: input}
-	if m.source == nil {
-		if !m.jiraActive && !m.copilotActive {
-			m.mmReader.active = true
+	if m.prs.Source() == nil {
+		if m.page == pageGitHub {
+			m.setPageFlag(pageChat, true)
 		}
 		m.booting = false
 	}
@@ -82,14 +84,16 @@ func (m *Model) mmCommand(operation func(context.Context) error) tea.Cmd {
 	s.busy = true
 	authenticated := s.authenticated
 	service := s.service
+	requestToken := m.chatSession.Begin("operation")
+	parent := m.chatSession.Context(m.ctx)
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 2*time.Minute)
+		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		err := operation(ctx)
 		if errors.Is(err, mm.ErrSession) || errors.Is(err, mm.ErrAccount) {
 			authenticated = false
 		}
-		return indexedMMResult(mmResult{data: service.Snapshot(), err: err, authenticated: authenticated})
+		return indexedMMResult(mmResult{token: requestToken, data: service.Snapshot(), err: err, authenticated: authenticated})
 	}
 }
 func (m *Model) mmStart() tea.Cmd {
@@ -98,8 +102,10 @@ func (m *Model) mmStart() tea.Cmd {
 		return nil
 	}
 	s.busy = true
+	requestToken := m.chatSession.Begin("operation")
+	parent := m.chatSession.Context(m.ctx)
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 2*time.Minute)
+		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		token, _ := s.keychain.Load(ctx)
 		// An explicitly supplied PAT takes precedence over a saved session.
@@ -107,17 +113,17 @@ func (m *Model) mmStart() tea.Cmd {
 			token = s.apiToken
 		}
 		if token == "" {
-			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: mm.ErrSession})
+			return indexedMMResult(mmResult{token: requestToken, data: s.service.Snapshot(), err: mm.ErrSession})
 		}
 		s.api.SetToken(token)
 		if _, err := s.api.Me(ctx); err != nil {
-			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: err, authenticated: !errors.Is(err, mm.ErrSession) && !errors.Is(err, mm.ErrAccess) && !errors.Is(err, mm.ErrAccount)})
+			return indexedMMResult(mmResult{token: requestToken, data: s.service.Snapshot(), err: err, authenticated: !errors.Is(err, mm.ErrSession) && !errors.Is(err, mm.ErrAccess) && !errors.Is(err, mm.ErrAccount)})
 		}
 		err := s.service.Discover(ctx)
 		if err == nil {
 			err = s.service.Sync(ctx)
 		}
-		return indexedMMResult(mmResult{data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err})
+		return indexedMMResult(mmResult{token: requestToken, data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err})
 	}
 }
 
@@ -252,8 +258,10 @@ func (m *Model) mmLogin(value string, pat bool) tea.Cmd {
 	s.input.SetValue("")
 	s.input.Blur()
 	s.busy = true
+	requestToken := m.chatSession.Begin("operation")
+	parent := m.chatSession.Context(m.ctx)
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 2*time.Minute)
+		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		token := value
 		var err error
@@ -261,11 +269,11 @@ func (m *Model) mmLogin(value string, pat bool) tea.Cmd {
 			token, err = s.api.Login(ctx, s.account, password, value)
 		}
 		if err != nil {
-			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: err})
+			return indexedMMResult(mmResult{token: requestToken, data: s.service.Snapshot(), err: err})
 		}
 		s.api.SetToken(token)
 		if _, err = s.api.Me(ctx); err != nil {
-			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: err})
+			return indexedMMResult(mmResult{token: requestToken, data: s.service.Snapshot(), err: err})
 		}
 		notice := ""
 		if s.keychain.Save(ctx, token) != nil {
@@ -275,7 +283,7 @@ func (m *Model) mmLogin(value string, pat bool) tea.Cmd {
 		if err == nil {
 			err = s.service.Sync(ctx)
 		}
-		return indexedMMResult(mmResult{data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err, notice: notice})
+		return indexedMMResult(mmResult{token: requestToken, data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err, notice: notice})
 	}
 }
 func (m *Model) mmRead() tea.Cmd {
@@ -297,7 +305,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case openMsg:
-		if s.active {
+		if m.page == pageChat {
 			if msg.err != nil {
 				s.notice = "Could not open the selected link"
 			}
@@ -305,6 +313,9 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		return false, nil
 	case mmResult:
+		if msg.token.Sequence != 0 && !m.chatSession.Accept("operation", msg.token) {
+			return true, nil
+		}
 		s.busy = false
 		s.authenticated = msg.authenticated
 		s.data = msg.data
@@ -342,7 +353,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 				}
 			}
 		}
-		if errors.Is(msg.err, mm.ErrSession) && s.active && s.mode == "" {
+		if errors.Is(msg.err, mm.ErrSession) && (m.page == pageChat) && s.mode == "" {
 			return true, s.prompt("Password")
 		}
 		return true, nil
@@ -354,17 +365,17 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		return true, tea.Batch(cmd, mmTimer())
 	case tea.KeyPressMsg:
 		key := msg.String()
-		if !s.active {
-			if key == "M" && !m.filtering && !m.tasks.active && !m.settings.active && !m.help && (m.mattermost == nil || !m.mattermost.active) && (m.jira == nil || m.jira.mode == "") && (m.copilot == nil || !m.copilot.filtering) {
-				s.active = true
+		if !(m.page == pageChat) {
+			if key == "M" && !m.filtering && !(m.page == pageTasks) && !m.settings.active && !m.help && (m.mattermost == nil || !m.mattermost.active) && (m.jira == nil || m.jira.mode == "") && (m.copilot == nil || !m.copilot.filtering) {
+				m.setPageFlag(pageChat, true)
 				return true, nil
 			}
-			if key == "v" && !m.jiraActive && !m.copilotActive && !m.tasks.active && !m.filtering && !m.settings.active && !m.help && (m.mattermost == nil || !m.mattermost.active) {
+			if key == "v" && !(m.page == pageJira) && !(m.page == pageCopilot) && !(m.page == pageTasks) && !m.filtering && !m.settings.active && !m.help && (m.mattermost == nil || !m.mattermost.active) {
 				rows := m.filtered()
 				if len(rows) > 0 {
 					s.mentionURL = strings.ToLower(rows[m.selected].URL)
 					s.mentions = true
-					s.active = true
+					m.setPageFlag(pageChat, true)
 					s.row = 0
 				}
 				return true, nil
@@ -478,14 +489,8 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		case "q":
 			return true, m.quit()
 		case "esc":
-			if s.root != "" {
-				s.root = ""
-				s.row = 0
-			} else {
-				s.active = false
-				s.mentions = false
-			}
-			s.scroll = 0
+			return m.backChat()
+
 		case "A":
 			if !s.busy {
 				return true, s.prompt("Password")
@@ -495,19 +500,14 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 				return true, s.prompt("PAT")
 			}
 		case "D":
-			if !s.busy {
-				s.confirmClear = true
-			}
+			return m.requestClearChat()
+
 		case "R":
-			if s.authenticated {
-				return true, m.mmCommand(s.service.Sync)
-			}
+			return m.refreshChat()
+
 		case "+":
-			s.choosing = true
-			s.input.SetValue("")
-			s.input.EchoMode = textinput.EchoNormal
-			s.input.Prompt = "Search channels: "
-			return true, tea.Batch(s.input.Focus(), m.mmCommand(s.service.Discover))
+			return m.chooseChatChannels()
+
 		case "tab", "right":
 			s.changeTab(1)
 		case "shift+tab", "left":
@@ -527,10 +527,8 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		case "u":
 			return true, m.mmRead()
 		case "-":
-			c := s.channel()
-			if c.ID != "" {
-				return true, m.mmCommand(func(context.Context) error { return s.service.Select(c.ID, false) })
-			}
+			return m.stopWatchingChat()
+
 		case "enter":
 			if s.mentions {
 				ps := s.posts()
@@ -582,42 +580,11 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		case "[":
 			s.link = max(0, s.link-1)
 		case "d":
-			ps := s.posts()
-			if len(ps) > 0 {
-				p := ps[s.row]
-				root := p.RootID
-				if root == "" {
-					root = p.ID
-				}
-				if s.mentions {
-					s.mentions = false
-					s.jumpID = p.ID
-					for i, c := range s.channels() {
-						if c.ID == p.ChannelID {
-							s.tab = i
-							break
-						}
-					}
-				}
-				s.root = root
-				s.row = 0
-				s.scroll = 0
-				return true, m.mmCommand(func(ctx context.Context) error {
-					if err := s.service.Select(p.ChannelID, true); err != nil {
-						return err
-					}
-					if !s.authenticated {
-						return nil
-					}
-					return s.service.More(ctx, p.ChannelID, "", root)
-				})
-			}
+			return m.openChatThread()
+
 		case "H":
-			ps := s.posts()
-			if len(ps) > 0 {
-				p := ps[0]
-				return true, m.mmCommand(func(ctx context.Context) error { return s.service.More(ctx, p.ChannelID, p.ID, "") })
-			}
+			return m.loadChatHistory()
+
 		case "g":
 			return true, m.mmGoPR()
 		}
@@ -657,16 +624,16 @@ func (m *Model) mmGoPR() tea.Cmd {
 	}
 	target := links[0].URL
 
-	for v, d := range m.snapshot.Datasets {
+	for v, d := range m.prs.Snapshot().Datasets {
 		for _, p := range d.PRs {
 			if strings.EqualFold(p.URL, target) {
 				m.active = model.View(v)
 				m.input.SetValue("")
 				m.relatedKey = ""
 				m.filtering = false
-				m.jiraActive = false
-				m.copilotActive = false
-				s.active = false
+				m.setPageFlag(pageJira, false)
+				m.setPageFlag(pageCopilot, false)
+				m.setPageFlag(pageChat, false)
 				for i, row := range m.filtered() {
 					if strings.EqualFold(row.URL, target) {
 						m.selected = i
@@ -794,7 +761,7 @@ func (m Model) mmReaderView() tea.View {
 					body = append(body, "    "+line)
 				}
 				for _, link := range mm.PRLinks(p.Message) {
-					for _, d := range m.snapshot.Datasets {
+					for _, d := range m.prs.Snapshot().Datasets {
 						found := false
 						for _, pr := range d.PRs {
 							if strings.EqualFold(pr.URL, link.URL) {
@@ -917,23 +884,14 @@ func (m Model) withMattermostSettings(c mm.Config, token string) (Model, error) 
 	if c.Server == "" || c.Username == "" {
 		return m, nil
 	}
-	api, err := mm.NewAPI(c.Server)
+	connection, err := mm.Connect(c)
 	if err != nil {
 		return m, err
 	}
-	api.ExpectAccount(c.Username)
-	cacheDir, err := os.UserCacheDir()
-	if err != nil {
+	if err = mm.SaveConfig(c); err != nil {
 		return m, err
 	}
-	service, err := mm.OpenService(api, filepath.Join(cacheDir, "custom-visning", "mattermost.sqlite"), c.Server, c.Username)
-	if err != nil {
-		return m, err
-	}
-	if err := mm.SaveConfig(c); err != nil {
-		return m, err
-	}
-	return m.WithMattermostReader(service, api, mm.Keychain{Server: c.Server, Account: c.Username}, c.Username, token), nil
+	return m.WithMattermostReader(connection.Service, connection.API, connection.Tokens, connection.Account, token), nil
 }
 
 // Channel PR shares count regardless of who posted them or which client they used.
@@ -956,4 +914,103 @@ func mattermostReviewTimes(data model.MattermostData) map[string]time.Time {
 		}
 	}
 	return times
+}
+
+func (m *Model) backChat() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	if s.root != "" {
+		s.root = ""
+		s.row = 0
+	} else {
+		m.setPageFlag(pageChat, false)
+		s.mentions = false
+	}
+	s.scroll = 0
+	return true, nil
+}
+
+func (m *Model) requestClearChat() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	if !s.busy {
+		s.confirmClear = true
+	}
+	return true, nil
+}
+
+func (m *Model) refreshChat() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	if s.authenticated {
+		return true, m.mmCommand(s.service.Sync)
+	}
+	return true, nil
+}
+
+func (m *Model) chooseChatChannels() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	s.choosing = true
+	s.input.SetValue("")
+	s.input.EchoMode = textinput.EchoNormal
+	s.input.Prompt = "Search channels: "
+	return true, tea.Batch(s.input.Focus(), m.mmCommand(s.service.Discover))
+}
+
+func (m *Model) stopWatchingChat() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	c := s.channel()
+	if c.ID != "" {
+		return true, m.mmCommand(func(context.Context) error { return s.service.Select(c.ID, false) })
+	}
+	return true, nil
+}
+
+func (m *Model) openChatThread() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	ps := s.posts()
+	if len(ps) > 0 {
+		p := ps[s.row]
+		root := p.RootID
+		if root == "" {
+			root = p.ID
+		}
+		if s.mentions {
+			s.mentions = false
+			s.jumpID = p.ID
+			for i, c := range s.channels() {
+				if c.ID == p.ChannelID {
+					s.tab = i
+					break
+				}
+			}
+		}
+		s.root = root
+		s.row = 0
+		s.scroll = 0
+		return true, m.mmCommand(func(ctx context.Context) error {
+			if err := s.service.Select(p.ChannelID, true); err != nil {
+				return err
+			}
+			if !s.authenticated {
+				return nil
+			}
+			return s.service.More(ctx, p.ChannelID, "", root)
+		})
+	}
+	return true, nil
+}
+
+func (m *Model) loadChatHistory() (bool, tea.Cmd) {
+	s := m.mmReader
+
+	ps := s.posts()
+	if len(ps) > 0 {
+		p := ps[0]
+		return true, m.mmCommand(func(ctx context.Context) error { return s.service.More(ctx, p.ChannelID, p.ID, "") })
+	}
+	return true, nil
 }

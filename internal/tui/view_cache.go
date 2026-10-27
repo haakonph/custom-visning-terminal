@@ -72,10 +72,10 @@ func (m *Model) invalidateViews(msg tea.Msg) {
 func (m Model) filtered() []model.PullRequest {
 	c := m.views
 	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
-	same := c != nil && c.user == m.snapshot.User && len(c.archived) == len(m.entities.data.Archived) && (len(c.archived) == 0 || &c.archived[0] == &m.entities.data.Archived[0])
+	same := c != nil && c.user == m.prs.Snapshot().User && len(c.archived) == len(m.entities.data.Archived) && (len(c.archived) == 0 || &c.archived[0] == &m.entities.data.Archived[0])
 	if same {
-		for v := range m.snapshot.Datasets {
-			if !sameRows(c.sources[v], m.snapshot.Datasets[v].PRs) {
+		for v := range m.prs.Snapshot().Datasets {
+			if !sameRows(c.sources[v], m.prs.Snapshot().Datasets[v].PRs) {
 				same = false
 				break
 			}
@@ -90,10 +90,10 @@ func (m Model) filtered() []model.PullRequest {
 	rows := m.filterGitHubRows()
 	if c != nil {
 		c.groups = nil
-		for v := range m.snapshot.Datasets {
-			c.sources[v] = m.snapshot.Datasets[v].PRs
+		for v := range m.prs.Snapshot().Datasets {
+			c.sources[v] = m.prs.Snapshot().Datasets[v].PRs
 		}
-		c.archived, c.user = m.entities.data.Archived, m.snapshot.User
+		c.archived, c.user = m.entities.data.Archived, m.prs.Snapshot().User
 		if m.snoozes != nil {
 			c.snoozeVersion = m.snoozes.visibilityVersion
 		}

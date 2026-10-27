@@ -11,7 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/local"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
@@ -27,14 +27,16 @@ func spaceActionModel(t *testing.T, scenario string) (Model, []model.PullRequest
 	rows[0].Title = "ABC-1 ABC-9 first"
 	rows[1].Title = "ABC-2 ABC-9 second"
 	rows = append(rows, model.PullRequest{Repository: "acme/api", Number: 3, URL: "https://github.com/acme/api/pull/3", Title: "ABC-3 unselected"})
-	m.snapshot.Datasets[model.Open].PRs = rows
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Open].PRs = rows })
 	m = press(m, " j j") // Space on rows 1 and 2; cursor on row 3.
 	want := rows[:2]
 	switch scenario {
 	case "across views and filter":
 		// Remove the second selection and reselect it from another view.
 		m = press(m, "k ")
-		m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{rows[1], rows[2]}
+		m.editPRs(func(snapshot *model.Snapshot) {
+			snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{rows[1], rows[2]}
+		})
 		m = press(m, "ll ")
 		m = press(m, "/no matches")
 		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -130,7 +132,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 				if actionKey == 't' {
 					taskIndex = 1
 				}
-				if (actionKey == 't' && !m.tasks.active) || len(m.tasks.items) != taskIndex+1 {
+				if (actionKey == 't' && !(m.page == pageTasks)) || len(m.tasks.items) != taskIndex+1 {
 					t.Fatal("wrong task created/selected")
 				}
 				saved := newTasks()
@@ -237,7 +239,7 @@ func TestSpaceSelectionActions(t *testing.T) {
 				if !reflect.DeepEqual(got, expected) {
 					t.Fatalf("targets %v want %v", got, expected)
 				}
-			} else if cmd == nil || !m.jiraActive {
+			} else if cmd == nil || !(m.page == pageJira) {
 				t.Fatal("single Jira target not opened")
 			}
 

@@ -10,14 +10,15 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
 
 func readerModel(t *testing.T) Model {
 	m := ready(t)
 	input := textinput.New()
-	m.mmReader = &mattermostReader{active: true, authenticated: true, input: input, data: model.MattermostData{Server: "https://chat.example", Channels: []model.MattermostChannel{{ID: "c", Name: "backend", Selected: true}, {ID: "d", Name: "frontend", Selected: true}}, Posts: []model.MattermostPost{{ID: "p", ChannelID: "c", Message: "https://github.com/acme/api/pull/1", CreatedAt: 100}, {ID: "reply", ChannelID: "d", RootID: "root", Message: "https://github.com/acme/api/pull/1 https://github.com/acme/api/pull/2", CreatedAt: 200}}}}
+	m.page = pageChat
+	m.mmReader = &mattermostReader{authenticated: true, input: input, data: model.MattermostData{Server: "https://chat.example", Channels: []model.MattermostChannel{{ID: "c", Name: "backend", Selected: true}, {ID: "d", Name: "frontend", Selected: true}}, Posts: []model.MattermostPost{{ID: "p", ChannelID: "c", Message: "https://github.com/acme/api/pull/1", CreatedAt: 100}, {ID: "reply", ChannelID: "d", RootID: "root", Message: "https://github.com/acme/api/pull/1 https://github.com/acme/api/pull/2", CreatedAt: 200}}}}
 	return m
 }
 func TestMattermostTabsAndAddTab(t *testing.T) {
@@ -45,7 +46,7 @@ func TestMattermostTabsAndAddTab(t *testing.T) {
 func TestMattermostPRRoundTrip(t *testing.T) {
 	m := readerModel(t)
 	m, _ = sequence(m, "rg")
-	if m.mmReader.active || m.active != model.Open || m.filtered()[m.selected].Number != 1 {
+	if (m.page == pageChat) || m.active != model.Open || m.filtered()[m.selected].Number != 1 {
 		t.Fatal("message to cached PR")
 	}
 	if m.mmMentionCount("https://github.com/acme/api/pull/1") != 2 {
@@ -102,8 +103,8 @@ func TestMattermostNarrowTabsAndControlSafety(t *testing.T) {
 }
 func TestMattermostLinkNavigationWithoutGitHub(t *testing.T) {
 	m := readerModel(t)
-	m.source = nil
-	m.snapshot = model.Snapshot{}
+	m.useSource(nil)
+	m.editPRs(func(snapshot *model.Snapshot) { *snapshot = model.Snapshot{} })
 	opened := ""
 	m.open = func(_ context.Context, u string) error { opened = u; return nil }
 	m, _ = sequence(m, "el")
@@ -117,7 +118,7 @@ func TestMattermostLinkNavigationWithoutGitHub(t *testing.T) {
 	}
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	m, _ = sequence(m, "rg")
-	if !m.mmReader.active || m.sequenceNotice == "" {
+	if !(m.page == pageChat) || m.sequenceNotice == "" {
 		t.Fatal("GitHub must be optional")
 	}
 }

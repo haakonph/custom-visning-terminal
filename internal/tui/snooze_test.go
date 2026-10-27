@@ -2,13 +2,12 @@ package tui
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
+	"github.com/haakonph/custom-visning-terminal/internal/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
 )
@@ -42,8 +41,8 @@ func TestSnoozeInputAndEscape(t *testing.T) {
 	if m.snoozes.input || len(m.snoozes.entries) != 0 {
 		t.Fatal("escape changed state")
 	}
-	if _, err := os.Stat(m.snoozes.store.Path); !os.IsNotExist(err) {
-		t.Fatal("escape wrote a file")
+	if entries, err := m.snoozes.store.Load(); err != nil || len(entries) != 0 {
+		t.Fatal("escape saved a snooze", err)
 	}
 	m = press(m, "z0h")
 	if !m.snoozes.input || len(m.filtered()) != 2 {
@@ -61,7 +60,7 @@ func TestSnoozeCrossViewRestartAndAutomaticExpiry(t *testing.T) {
 	now := time.Now()
 	m.snoozes.now = func() time.Time { return now }
 	pr := m.filtered()[0]
-	m.snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{pr}
+	m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[model.Reviews].PRs = []model.PullRequest{pr} })
 	m = press(m, "z12h")
 	if m.snoozes.input || len(m.filtered()) != 1 || m.selected != 0 {
 		t.Fatal("row not hidden naturally")
@@ -102,7 +101,7 @@ func TestSnoozeEditingAndWriteFailure(t *testing.T) {
 	}
 	m.filtering = false
 	m.input.SetValue("")
-	m.snoozes.store.Path = t.TempDir() // rename onto a directory must fail
+	m.tasks.path = t.TempDir() // a database path cannot be a directory
 	m = press(m, "z1h")
 	if !m.snoozes.input || len(m.filtered()) != 2 || len(m.snoozes.entries) != 0 {
 		t.Fatal("failed write presented as saved")
@@ -114,13 +113,15 @@ func TestJiraAndTaskScope(t *testing.T) {
 	now := m.snoozes.at
 	link := "https://jira.example/browse/ABC-1"
 	id := snooze.Identity("jira", link)
-	m.snoozes.entries[id] = snooze.Entry{ID: id, Kind: "jira", Title: "Issue", Until: now.Add(time.Hour)}
+	if err := m.snoozes.commit(snooze.Entry{ID: id, Kind: "jira", Title: "Issue", Until: now.Add(time.Hour)}, false); err != nil {
+		t.Fatal(err)
+	}
 	m.jira = &jiraState{snoozes: m.snoozes, rows: []jira.Issue{{URL: link}, {URL: "https://other.example/browse/ABC-1"}}}
 	if len(m.jira.filtered()) != 1 {
 		t.Fatal("Jira server identity")
 	}
 	m.tasks.items = []model.Task{{Title: "Task", References: []model.TaskReference{{Provider: "jira", URL: link, Title: "Issue"}}}}
-	m.tasks.active = true
+	m.setPageFlag(pageTasks, true)
 	m = press(m, "z")
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if len(m.snoozes.entries) != 1 {
@@ -165,15 +166,16 @@ func TestExpiryPreservesHighlightedRow(t *testing.T) {
 
 func TestSnoozeKeysStayTextInOtherEditors(t *testing.T) {
 	m := snoozeReady(t)
-	m.tasks.active, m.tasks.editing = true, true
+	m.setPageFlag(pageTasks, true)
+	m.tasks.editing = true
 	m.tasks.items = []model.Task{{Title: "Task"}}
 	m.tasks.input.Focus()
 	m = press(m, "z12hvz")
 	if m.snoozes.input || m.snoozes.active || m.tasks.input.Value() != "z12hvz" {
 		t.Fatal("task editor consumed snooze keys")
 	}
-	m.tasks.active = false
-	m.jiraActive = true
+	m.setPageFlag(pageTasks, false)
+	m.setPageFlag(pageJira, true)
 	m.jira = &jiraState{mode: "jql", input: m.input, snoozes: m.snoozes}
 	m.jira.input.Focus()
 	m = press(m, "z14mvz")

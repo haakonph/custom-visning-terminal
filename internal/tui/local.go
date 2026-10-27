@@ -16,7 +16,7 @@ type localState struct {
 	generation                 uint64
 	manager                    *local.WorktreeManager
 	launcher                   local.EditorLauncher
-	chosen                     map[string]model.PullRequest
+	chosen                     map[string]struct{}
 	statuses                   map[string]local.Status
 	preparing                  map[string]bool
 	updating                   map[string]bool
@@ -80,7 +80,7 @@ func (m *Model) refreshLocalWithNetwork(network bool) tea.Cmd {
 	generation := m.local.generation
 	rows := []model.PullRequest{}
 	seen := map[string]bool{}
-	for _, d := range m.snapshot.Datasets {
+	for _, d := range m.prs.Snapshot().Datasets {
 		for _, p := range d.PRs {
 			if !seen[p.Key()] {
 				rows = append(rows, p)
@@ -114,7 +114,7 @@ func (m *Model) refreshLocalWithNetwork(network bool) tea.Cmd {
 
 func (m *Model) cleanupIntelliJ(force bool) tea.Cmd {
 	l := m.local
-	source, ok := m.source.(local.PRClosureSource)
+	source, ok := m.prs.Source().(local.PRClosureSource)
 	if !ok || l.cleanupRunning || (!force && time.Since(l.cleanupAt) < 5*time.Minute) {
 		return nil
 	}
@@ -134,7 +134,7 @@ func (m *Model) warmLocal() tea.Cmd {
 	}
 	var id string
 	var oldest time.Time
-	for _, dataset := range m.snapshot.Datasets {
+	for _, dataset := range m.prs.Snapshot().Datasets {
 		for _, p := range dataset.PRs {
 			last := l.warmed[p.Repository]
 			if p.Repository != "" && time.Since(last) >= 5*time.Minute && (id == "" || last.Before(oldest)) {

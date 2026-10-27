@@ -218,6 +218,12 @@ type LocalFolder struct {
 	Hidden     int64
 }
 
+type LocalImport struct {
+	Kind        string
+	SourcePath  string
+	Fingerprint string
+}
+
 type LocalRepository struct {
 	Identity string
 	Path     string
@@ -321,6 +327,7 @@ type Task struct {
 	StableID string
 	Title    string
 	Archived int64
+	Revision int64
 }
 
 type TaskReference struct {

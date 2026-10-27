@@ -1,12 +1,15 @@
 package tui
 
 import (
-	"fmt"
+	"context"
 	"reflect"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haakonph/custom-visning-terminal/internal/app"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
+	"github.com/haakonph/custom-visning-terminal/internal/relations"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
+	"github.com/haakonph/custom-visning-terminal/internal/tasks"
 )
 
 // Only the UI loop owns the queue and applies completions. Workers receive
@@ -80,29 +83,6 @@ func cloneTasks(items []model.Task) []model.Task {
 	return out
 }
 
-// writeLocalState writes both snapshots in order and restores the first on
-// failure. A rollback failure is reported explicitly instead of claiming success.
-func writeLocalState(entityPath string, before, after model.EntityState, taskPath string, tasks []model.Task, taskChanged bool) (bool, error) {
-	changed := !reflect.DeepEqual(before, after)
-	if changed {
-		if err := storage.Save(entityPath, after); err != nil {
-			return false, err
-		}
-	}
-	if taskChanged {
-		if err := storage.Save(taskPath, tasks); err != nil {
-			if !changed {
-				return false, err
-			}
-			if rollback := storage.Save(entityPath, before); rollback != nil {
-				return true, fmt.Errorf("%w; tilbakeføring feilet: %v", err, rollback)
-			}
-			return false, err
-		}
-	}
-	return false, nil
-}
-
 func (m *Model) quit() tea.Cmd {
 	if m.localIO != nil && (m.localIO.active != nil || len(m.localIO.pending) != 0) {
 		m.localIO.quitting = true
@@ -111,4 +91,50 @@ func (m *Model) quit() tea.Cmd {
 	}
 	m.cancel()
 	return tea.Quit
+}
+
+// Commands capture immutable domain changes. Successful completions install the
+// committed result, preserving additions made by other processes.
+func (m *Model) queueLocalEdit(state model.EntityState, items []model.Task, taskChanged bool, finish func(*Model, error)) {
+	changes := app.LocalChanges{}
+	var err error
+	changes.Relations, err = relations.Diff(m.entities.data, state)
+	if err != nil {
+		finish(m, err)
+		return
+	}
+	if taskChanged {
+		if err = tasks.EnsureIDs(items); err != nil {
+			finish(m, err)
+			return
+		}
+		changes.Tasks, err = tasks.Changes(m.tasks.saved, items)
+		if err != nil {
+			finish(m, err)
+			return
+		}
+	}
+	m.commitLocal(changes, taskChanged, finish)
+}
+func (m *Model) commitLocal(changes app.LocalChanges, replaceDraft bool, finish func(*Model, error)) {
+	store := storage.LocalStore{Path: m.tasks.path}
+	var result app.LocalResult
+	m.enqueueLocal(func() (err error) {
+		result, err = app.Commit(context.Background(), store, changes)
+		return err
+	}, func(m *Model, err error) {
+		if err == nil {
+			if replaceDraft || reflect.DeepEqual(m.tasks.items, m.tasks.saved) {
+				m.tasks.items = result.Tasks
+				m.tasks.saved = tasks.Clone(result.Tasks)
+			}
+			m.entities.data = result.Relations
+			if m.snoozes != nil {
+				m.snoozes.entries = result.Snoozes
+				m.snoozes.visibilityVersion++
+				m.snoozes.indexContexts()
+			}
+		}
+		finish(m, err)
+	})
 }

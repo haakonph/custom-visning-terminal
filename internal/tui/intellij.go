@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/haakonph/custom-visning-terminal/internal/connectors/copilot"
+	"github.com/haakonph/custom-visning-terminal/internal/copilot"
 )
 
 type ideaLaunch struct {

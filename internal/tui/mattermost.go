@@ -1,20 +1,18 @@
 package tui
 
 import (
-	"context"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	mm "github.com/haakonph/custom-visning-terminal/internal/connectors/mattermost"
+	mm "github.com/haakonph/custom-visning-terminal/internal/conversations"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/storage"
+	"github.com/haakonph/custom-visning-terminal/internal/syncstate"
 )
 
-type messageSender interface {
-	Send(context.Context, string) error
-}
+type messageSender = mm.Sender
 type mattermostState struct {
 	sender          messageSender
 	active, sending bool
@@ -24,6 +22,7 @@ type mattermostState struct {
 	sent            map[string]time.Time
 }
 type mattermostSent struct {
+	token      syncstate.Token
 	err        error
 	sent       int
 	timestamps map[string]time.Time
@@ -31,6 +30,7 @@ type mattermostSent struct {
 }
 
 func (m Model) WithMattermost(sender messageSender) Model {
+	m.webhookSession.Configure(m.ctx)
 	m.mattermost = &mattermostState{sender: sender, sent: map[string]time.Time{}}
 	if m.entities != nil {
 		sent, err := storage.LoadReviewMessages(m.entities.path)
@@ -62,34 +62,19 @@ func (m *Model) sendMattermost(messages []string) tea.Cmd {
 	s.sending = true
 	s.offset = 0
 	s.notice = "Sender…"
-	sender, ctx := s.sender, m.ctx
+	sender, ctx := s.sender, m.webhookSession.Context(m.ctx)
+	token := m.webhookSession.Begin("share")
+	messages = append([]string(nil), messages...)
 	path := ""
 	if m.entities != nil {
 		path = m.entities.path
 	}
 	return func() tea.Msg {
-		result := mattermostSent{timestamps: map[string]time.Time{}}
-		for _, text := range messages {
-			if err := sender.Send(ctx, text); err != nil {
-				result.err = err
-				break
-			}
-			result.sent++
-			at := time.Now()
-			var links []string
-			for _, link := range mm.PRLinks(text) {
-				links = append(links, link.URL)
-				result.timestamps[link.URL] = at
-			}
-			if len(links) > 0 {
-				if err := storage.SaveReviewMessages(path, links, at); err != nil {
-					result.saveErr = err
-				}
-			}
-		}
-		return result
+		result := mm.Share(ctx, sender, messages, path)
+		return mattermostSent{token: token, err: result.Err, sent: result.Sent, timestamps: result.Timestamps, saveErr: result.SaveErr}
 	}
 }
+
 func (m *Model) composeMattermost() tea.Cmd {
 	if m.mattermost == nil {
 		m.notice = "Sett MATTERMOST_WEBHOOK_URL for å sende til Mattermost"
@@ -112,6 +97,9 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case mattermostSent:
+		if msg.token.Sequence != 0 && !m.webhookSession.Match("share", msg.token) {
+			return true, nil
+		}
 		s.sending = false
 		for link, at := range msg.timestamps {
 			s.sent[link] = at
@@ -152,15 +140,7 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 		case "k", "up":
 			s.offset = max(0, s.offset-1)
 		case "ctrl+s":
-			if strings.TrimSpace(s.text) == "" {
-				s.notice = "Meldingen er tom"
-				return true, nil
-			}
-			messages := s.messages
-			if len(messages) == 0 {
-				messages = []string{s.text}
-			}
-			return true, m.sendMattermost(messages)
+			return m.sendMattermostDraft()
 		}
 		return true, nil
 	}
@@ -182,4 +162,20 @@ func (m Model) mattermostView() tea.View {
 	view.AltScreen = true
 	view.WindowTitle = "custom-visning · Mattermost"
 	return view
+}
+
+func (m *Model) sendMattermostDraft() (bool, tea.Cmd) {
+	s := m.mattermost
+	if s == nil || s.sending {
+		return true, nil
+	}
+	if strings.TrimSpace(s.text) == "" {
+		s.notice = "Meldingen er tom"
+		return true, nil
+	}
+	messages := s.messages
+	if len(messages) == 0 {
+		messages = []string{s.text}
+	}
+	return true, m.sendMattermost(messages)
 }

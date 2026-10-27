@@ -16,7 +16,7 @@ type jiraPRSummary struct {
 // The snapshot contains open PRs from the configured GitHub views, not merge history.
 func (m Model) jiraPRSummary(key string) jiraPRSummary {
 	prs := m.relatedPRs(key)
-	if m.source == nil && len(prs) == 0 {
+	if m.prs.Source() == nil && len(prs) == 0 {
 		return jiraPRSummary{status: "Ukjent", explanation: "GitHub er ikke konfigurert; antall åpne PR-er er ukjent."}
 	}
 	if len(prs) == 0 {

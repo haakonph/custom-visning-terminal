@@ -54,7 +54,7 @@ func (*closureSource) Closed(context.Context, model.PullRequest) (bool, error) {
 
 func TestIntelliJCleanupRunsWithoutMainWarming(t *testing.T) {
 	m := localModel(t)
-	m.source = &closureSource{}
+	m.useSource(&closureSource{})
 	m.local.manager.Workspace.Warm = false
 	if cmd := m.refreshLocal(); cmd == nil || !m.local.warmTimerStarted || !m.local.cleanupRunning {
 		t.Fatal("startup did not schedule cleanup independently of main warming")
@@ -99,7 +99,9 @@ func localModel(t *testing.T) Model {
 func TestPRSelectionAcrossViews(t *testing.T) {
 	m := localModel(t)
 	m, _ = update(m, key(' '))
-	m.snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo", Number: 7, URL: "https://github.com/other/repo/pull/7"}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo", Number: 7, URL: "https://github.com/other/repo/pull/7"}}
+	})
 	m, _ = sequence(m, "l")
 	m, _ = update(m, key(' '))
 	if len(m.local.chosen) != 2 {
@@ -164,7 +166,7 @@ func TestProgressErrorsRemainVisible(t *testing.T) {
 	m := localModel(t)
 	p := m.filtered()[0]
 	for i := 0; i < 30; i++ {
-		m.snapshot.Datasets[0].PRs = append(m.snapshot.Datasets[0].PRs, p)
+		m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs = append(snapshot.Datasets[0].PRs, p) })
 	}
 	m.local.results = []string{"first result", "second result", "third result"}
 	m.notice = "editor missing"
@@ -205,7 +207,9 @@ func TestOpenedWorktreeUpdatesInBackgroundAndContinuesQueue(t *testing.T) {
 
 func TestMainWarmQueueDeduplicatesRepositoriesAcrossViews(t *testing.T) {
 	m := localModel(t)
-	m.snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo", Number: 7}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo", Number: 7}}
+	})
 	if cmd := m.warmLocal(); cmd == nil || !m.local.warming || len(m.local.warmed) != 1 {
 		t.Fatal("main preparation not scheduled")
 	}
@@ -221,7 +225,9 @@ func TestMainWarmQueueDeduplicatesRepositoriesAcrossViews(t *testing.T) {
 		t.Fatal("warmed repositories should wait before refreshing")
 	}
 	m.local.manager.Workspace.Warm = false
-	m.snapshot.Datasets[2].PRs = []model.PullRequest{{Repository: "third/repo"}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[2].PRs = []model.PullRequest{{Repository: "third/repo"}}
+	})
 	if cmd := m.warmLocal(); cmd != nil {
 		t.Fatal("disabled warming scheduled a job")
 	}
@@ -241,7 +247,9 @@ func TestBackgroundPreparationCompletesWhileSettingsOpen(t *testing.T) {
 func TestMainWarmQueuePrefersUnpreparedRepository(t *testing.T) {
 	m := localModel(t)
 	m.local.warmed["acme/api"] = time.Now().Add(-10 * time.Minute)
-	m.snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo"}}
+	m.editPRs(func(snapshot *model.Snapshot) {
+		snapshot.Datasets[1].PRs = []model.PullRequest{{Repository: "other/repo"}}
+	})
 	if cmd := m.warmLocal(); cmd == nil || m.local.warmed["other/repo"].IsZero() {
 		t.Fatal("slow preparation starved a new repository")
 	}
