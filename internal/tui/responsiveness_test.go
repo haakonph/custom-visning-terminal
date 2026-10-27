@@ -189,6 +189,99 @@ func BenchmarkGitHubViewportNavigation(b *testing.B) {
 	}
 }
 
+func BenchmarkGitHubAIViewportNavigation(b *testing.B) {
+	for _, n := range []int{1000, 5000} {
+		b.Run(fmt.Sprint(n), func(b *testing.B) {
+			m := readyBenchmark(b)
+			m.width, m.height = 160, 40
+			m.copilot = &copilotState{entities: m.entities, snoozes: m.snoozes}
+			for i := 0; i < n; i++ {
+				pr := model.PullRequest{URL: fmt.Sprintf("https://github.com/acme/api/pull/%d", i+1), Repository: "acme/api", Number: i + 1, Title: fmt.Sprintf("APP-%d work", i/20), HeadRef: fmt.Sprintf("branch-%d", i)}
+				m.snapshot.Datasets[model.Open].PRs = append(m.snapshot.Datasets[model.Open].PRs, pr)
+				m.copilot.sessions = append(m.copilot.sessions, model.CopilotSession{ID: fmt.Sprint(i), Name: "session", Repository: pr.Repository, Branch: pr.HeadRef, Status: "active", LastActivity: "2026-10-27T10:00:00Z"})
+			}
+			_ = m.View()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				next, _ := m.Update(key(rune("jk"[i%2])))
+				m = next.(Model)
+				_ = m.View()
+			}
+		})
+	}
+}
+
+func TestGitHubAIColumnFollowsRefreshAfterNavigation(t *testing.T) {
+	m := ready(t)
+	m.width = 160
+	m.snapshot.Datasets[model.Open].PRs[0].HeadRef = "feature"
+	m.copilot = &copilotState{entities: m.entities, snoozes: m.snoozes}
+	session := model.CopilotSession{ID: "one", Repository: "acme/api", Branch: "feature", Status: "active"}
+	m.copilot.sessions = []model.CopilotSession{session}
+	if view := m.View().Content; !strings.Contains(view, "🟢") {
+		t.Fatal("initial AI status missing", view)
+	}
+	for _, msg := range []tea.Msg{key('j'), key('k'), refreshTick{}, snoozeTick{}} {
+		next, _ := m.Update(msg)
+		m = next.(Model)
+		if view := m.View().Content; !strings.Contains(view, "🟢") {
+			t.Fatal("navigation or timer lost AI status", view)
+		}
+	}
+	for _, tc := range []struct{ status, branch, icon string }{
+		{"waiting", "feature", "🟡"},
+		{"failed", "unrelated", ""},
+		{"completed", "feature", "✅"},
+	} {
+		session.Status, session.Branch = tc.status, tc.branch
+		next, _ := m.Update(copilotResult{sessions: []model.CopilotSession{session}})
+		m = next.(Model)
+		view := m.View().Content
+		for _, icon := range []string{"🟢", "🟡", "🔴", "✅"} {
+			if strings.Contains(view, icon) != (icon == tc.icon) {
+				t.Fatalf("%s/%s: stale or missing %s in %s", tc.status, tc.branch, icon, view)
+			}
+		}
+	}
+	next, _ := m.Update(copilotResult{})
+	m = next.(Model)
+	if view := m.View().Content; strings.Contains(view, "✅") {
+		t.Fatal("removed session retained its status", view)
+	}
+}
+
+func TestGitHubAIColumnFollowsPRAndLinkChanges(t *testing.T) {
+	m := ready(t)
+	m.width = 160
+	m.copilot = &copilotState{entities: m.entities, snoozes: m.snoozes, sessions: []model.CopilotSession{
+		{ID: "one", Repository: "acme/api", Branch: "feature", Status: "active"},
+	}}
+	if view := m.View().Content; strings.Contains(view, "🟢") {
+		t.Fatal("unrelated session shown", view)
+	}
+	rows := append([]model.PullRequest(nil), m.snapshot.Datasets[model.Open].PRs...)
+	rows[0].HeadRef = "feature"
+	next, _ := m.Update(refreshMsg{view: model.Open, prepared: true, baseRows: m.snapshot.Datasets[model.Open].PRs, result: model.Result{Complete: true, PRs: rows}})
+	m = next.(Model)
+	if view := m.View().Content; strings.Count(view, "🟢") != 1 {
+		t.Fatal("PR refresh did not update AI relation", view)
+	}
+	next, _ = m.linkReferences([]model.TaskReference{prRef(rows[1])}, []model.TaskReference{copilotRef(m.copilot.sessions[0])})
+	next, write := next.(Model).Update(struct{}{})
+	if write == nil {
+		t.Fatal("link was not queued")
+	}
+	// The old cache is still usable until the write completion installs the link.
+	_ = next.(Model).View()
+	next, _ = next.(Model).Update(write())
+	m = next.(Model)
+	m.sequenceNotice = ""
+	if view := m.View().Content; strings.Count(view, "🟢") != 2 {
+		t.Fatal("saved link did not update AI relation", view)
+	}
+}
+
 func BenchmarkDetailViewportNavigation(b *testing.B) {
 	m := readyBenchmark(b)
 	m.detail = &detailState{data: model.PRDetails{Comments: []model.PRComment{{Body: strings.Repeat("large comment ", 10000)}}}}

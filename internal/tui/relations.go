@@ -8,6 +8,11 @@ import (
 // Adapt provider snapshots to domain documents. Sync detects source changes,
 // including in-place edits, and keeps unchanged indexes for later queries.
 func (m *Model) relatedReferenceKinds(origins []model.TaskReference, kinds ...string) []model.TaskReference {
+	m.syncRelations()
+	return m.relations.Related(origins, kinds...)
+}
+
+func (m *Model) syncRelations() {
 	if m.relations == nil {
 		m.relations = &relations.Index{}
 	}
@@ -62,5 +67,28 @@ func (m *Model) relatedReferenceKinds(origins []model.TaskReference, kinds ...st
 		options.JiraIdentity = m.jira.client.IssueURL("")
 	}
 	m.relations.Sync(documents, options)
-	return m.relations.Related(origins, kinds...)
+}
+
+// Rendering may query many PRs. Adapt the provider snapshots once after a data
+// change, then keep both indexes across cursor moves and timer-only redraws.
+// Commands still synchronize on each call so in-place edits remain visible.
+func (m *Model) prepareAILookup() {
+	if m.views == nil {
+		m.views = &viewCache{}
+	}
+	if !m.views.aiValid || m.relations == nil {
+		m.syncRelations()
+		m.views.aiSessions = m.indexAISessions()
+		m.views.aiValid = true
+	}
+	m.aiLookup = m.views.aiSessions
+}
+
+func (m Model) indexAISessions() map[string]*model.CopilotSession {
+	sessions := make(map[string]*model.CopilotSession, len(m.copilot.sessions))
+	for i := range m.copilot.sessions {
+		s := &m.copilot.sessions[i]
+		sessions[s.ID] = s
+	}
+	return sessions
 }
