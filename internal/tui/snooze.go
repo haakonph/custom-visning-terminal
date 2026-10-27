@@ -12,9 +12,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
+	"github.com/haakonph/custom-visning-terminal/internal/storage"
 )
 
 type snoozeState struct {
+	visibilityVersion uint64
+
+	contextDirty bool
+
 	store    snooze.Store
 	entries  map[string]snooze.Entry
 	coverage map[string][]string
@@ -167,6 +172,7 @@ func (s *snoozeState) commitEntries(batch []snooze.Entry, remove bool) error {
 		return err
 	}
 	s.entries = entries
+	s.visibilityVersion++
 	s.indexContexts()
 	return nil
 }
@@ -241,8 +247,22 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 		return false, nil
 	}
 	if _, ok := msg.(snoozeTick); ok {
+		now := s.now()
+		expired := false
+		for _, e := range s.entries {
+			if e.Until.After(s.at) && !e.Until.After(now) {
+				expired = true
+				break
+			}
+		}
+		if !expired {
+			s.at = now
+			m.refreshSnoozeContexts()
+			return true, snoozeTimer()
+		}
 		a := m.snoozeAnchor()
-		s.at = s.now()
+		s.at = now
+		s.visibilityVersion++
 		m.refreshSnoozeContexts()
 		m.restoreSnoozeAnchor(a)
 		return true, snoozeTimer()
@@ -279,16 +299,16 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				s.notice = err.Error()
 				return true, nil
 			}
+			if m.localBusy() {
+				s.notice = "Venter på lokal lagring…"
+				return true, nil
+			}
 			entry := s.target
 			entry.Until = at
+			var tasks []model.Task
 			if !s.active && m.tasks.active && len(m.tasks.items) > 0 && m.tasks.items[m.tasks.selected].ID == "" {
-				task := &m.tasks.items[m.tasks.selected]
-				task.ID = strings.TrimPrefix(entry.ID, "task:")
-				if err := m.tasks.save(); err != nil {
-					task.ID = ""
-					s.notice = "Kunne ikke lagre oppgave-ID: " + err.Error()
-					return true, nil
-				}
+				tasks = cloneTasks(m.tasks.items)
+				tasks[m.tasks.selected].ID = strings.TrimPrefix(entry.ID, "task:")
 			}
 			a := m.snoozeAnchor()
 			batch := append([]snooze.Entry(nil), s.targets...)
@@ -298,35 +318,37 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 			for i := range batch {
 				batch[i].Until = at
 			}
-			if err := s.commitEntries(batch, false); err != nil {
-				s.notice = "Kunne ikke lagre snooze: " + err.Error()
-				return true, nil
-			}
-			for _, e := range batch {
-				if e.Kind == "jira" {
-					for key, issue := range m.jiraChosen {
-						if issue.URL == e.URL {
-							delete(m.jiraChosen, key)
+			m.queueSnoozeTasks(batch, false, tasks, func(m *Model, err error) {
+				s := m.snoozes
+				if err != nil {
+					s.notice = "Kunne ikke lagre snooze: " + err.Error()
+					return
+				}
+				for _, e := range batch {
+					if e.Kind == "jira" {
+						for key, issue := range m.jiraChosen {
+							if issue.URL == e.URL {
+								delete(m.jiraChosen, key)
+							}
+						}
+					}
+					if e.Kind == "github" {
+						for key, p := range m.chosen {
+							if p.URL == e.URL {
+								delete(m.chosen, key)
+							}
 						}
 					}
 				}
-				if e.Kind == "github" {
-					for key, p := range m.chosen {
-						if p.URL == e.URL {
-							delete(m.chosen, key)
-						}
-					}
-				}
-			}
-			m.clearChosen()
-			s.targets = nil
-			s.origins, s.whole = nil, false
-			s.input, s.digits = false, ""
-			s.notice = "Utsatt til " + at.Local().Format("2006-01-02 15:04:05 MST -07:00")
-			m.restoreSnoozeAnchor(a)
+				m.clearChosen()
+				s.targets = nil
+				s.origins, s.whole = nil, false
+				s.input, s.digits = false, ""
+				s.notice = "Utsatt til " + at.Local().Format("2006-01-02 15:04:05 MST -07:00")
+				m.restoreSnoozeAnchor(a)
+			})
 		case "ctrl+c":
-			m.cancel()
-			return true, tea.Quit
+			return true, m.quit()
 		default:
 			if len(k) == 1 && k[0] >= '0' && k[0] <= '9' && len(s.digits) < 256 {
 				s.digits += k
@@ -351,12 +373,17 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 		case "u":
 			if entry, ok := m.snoozeTarget(); ok {
 				a := m.snoozeAnchor()
-				if err := s.commit(entry, true); err != nil {
-					s.notice = "Kunne ikke hente tilbake: " + err.Error()
-				} else {
-					s.notice = "Hentet tilbake: " + entry.Title
-					m.restoreSnoozeAnchor(a)
+				if m.localBusy() {
+					return true, nil
 				}
+				m.queueSnooze([]snooze.Entry{entry}, true, func(m *Model, err error) {
+					if err != nil {
+						m.snoozes.notice = "Kunne ikke hente tilbake: " + err.Error()
+						return
+					}
+					m.snoozes.notice = "Hentet tilbake: " + entry.Title
+					m.restoreSnoozeAnchor(a)
+				})
 			}
 		case "z":
 			if entry, ok := m.snoozeTarget(); ok {
@@ -364,8 +391,7 @@ func (m *Model) snoozeMessage(msg tea.Msg) (bool, tea.Cmd) {
 				s.targets = nil
 			}
 		case "ctrl+c", "q":
-			m.cancel()
-			return true, tea.Quit
+			return true, m.quit()
 		}
 		return true, nil
 	}
@@ -434,4 +460,49 @@ func (m Model) snoozeView() tea.View {
 	v.AltScreen = true
 	v.WindowTitle = "custom-visning · Utsatt"
 	return v
+}
+
+func (m *Model) queueSnooze(batch []snooze.Entry, remove bool, finish func(*Model, error)) {
+	m.queueSnoozeTasks(batch, remove, nil, finish)
+}
+func (m *Model) queueSnoozeTasks(batch []snooze.Entry, remove bool, tasks []model.Task, finish func(*Model, error)) {
+	s := m.snoozes
+	if s.loadErr != nil {
+		finish(m, s.loadErr)
+		return
+	}
+	entries := make(map[string]snooze.Entry, len(s.entries)+len(batch))
+	for id, e := range s.entries {
+		entries[id] = e
+	}
+	for _, e := range batch {
+		if remove {
+			delete(entries, e.ID)
+		} else {
+			entries[e.ID] = e
+		}
+	}
+	store := s.store
+	s.notice = "Lagrer utsettelse…"
+	taskPath := m.tasks.path
+	taskSaved := false
+	m.enqueueLocal(func() error {
+		if tasks != nil {
+			if err := storage.Save(taskPath, tasks); err != nil {
+				return err
+			}
+			taskSaved = true
+		}
+		return store.Save(entries)
+	}, func(m *Model, err error) {
+		if taskSaved {
+			m.tasks.items = tasks
+		}
+		if err == nil {
+			m.snoozes.entries = entries
+			m.snoozes.visibilityVersion++
+			m.snoozes.indexContexts()
+		}
+		finish(m, err)
+	})
 }

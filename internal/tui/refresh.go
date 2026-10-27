@@ -97,7 +97,9 @@ func (m *Model) autoMessage(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case bootMsg:
 		m.auto.bootstrap.complete(time.Now(), r.err != nil)
 	case refreshMsg:
-		m.auto.github[r.view].complete(time.Now(), r.err != nil || !r.result.Complete)
+		if r.prepared && sameRows(r.baseRows, m.snapshot.Datasets[r.view].PRs) {
+			m.auto.github[r.view].complete(time.Now(), r.err != nil || !r.result.Complete)
+		}
 	case detailMsg:
 		if m.detail != nil && m.detail.request == r.request {
 			m.auto.detail.complete(time.Now(), r.err != nil || len(r.data.Warnings) > 0)
@@ -117,16 +119,24 @@ func (m *Model) autoMessage(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if r.err == nil && m.jira != nil {
 			// A newer foreground request always owns the visible result.
 			if r.query != m.jira.query {
-				if err := m.jira.client.SaveCache(jira.Cached{Query: r.query, Issues: r.rows, SyncedAt: r.at}); err != nil {
-					m.auto.jira[r.query].complete(r.at, true)
-				}
+				client, data := m.jira.client, jira.Cached{Query: r.query, Issues: r.rows, SyncedAt: r.at}
+				m.enqueueLocal(func() error { return client.SaveCache(data) }, func(m *Model, err error) {
+					if err != nil {
+						if job := m.auto.jira[r.query]; job != nil && job.started.Equal(r.started) {
+							job.complete(r.at, true)
+						}
+						if m.jira != nil {
+							m.jira.notice = "Kunne ikke lagre Jira-cache: " + err.Error()
+						}
+					}
+				})
 			}
 		}
 		return *m, nil, true
 	case refreshTick:
 		cmds := []tea.Cmd{refreshTimer()}
 		o, now := m.auto.options, time.Time(r)
-		if !o.Enabled || m.setup.wizard != nil {
+		if !o.Enabled || m.setup.wizard != nil || (m.localIO != nil && m.localIO.quitting) {
 			return *m, tea.Batch(cmds...), true
 		}
 		active := refreshDuration(o.Active, time.Minute)

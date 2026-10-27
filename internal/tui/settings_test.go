@@ -16,6 +16,7 @@ import (
 )
 
 func editSetting(t *testing.T, m Model, index int, value string) Model {
+	m, _ = update(m, struct{}{})
 	t.Helper()
 	m.settings.selected = index
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})

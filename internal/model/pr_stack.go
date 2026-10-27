@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // StackPosition numbers the known PRs in a connected stack. Cyclic references
@@ -45,27 +46,49 @@ func PRStacks(rows []PullRequest) map[string]StackPosition {
 		neighbors[child][parent] = true
 		neighbors[parent][child] = true
 	}
+
+	// Resolve references through indexes instead of comparing every pair of PRs.
+	// Repository identity includes the URL prefix, so hosts remain isolated.
+	type repositoryID struct{ name, prefix string }
+	repositories := map[string]repositoryID{}
+	byURL := map[string][]string{}
+	byNumber := map[repositoryID]map[int][]string{}
+	byHead := map[repositoryID]map[string][]string{}
 	for _, k := range keys {
 		p := byKey[k]
-		urls := map[string]bool{}
-		for _, u := range prLink.FindAllString(p.Body, -1) {
-			urls[u] = true
+		prefix, _, _ := strings.Cut(p.URL, "/pull/")
+		repo := repositoryID{stackIdentity(p.Repository), stackIdentity(prefix)}
+		repositories[k] = repo
+		byURL[p.URL] = append(byURL[p.URL], k)
+		if byNumber[repo] == nil {
+			byNumber[repo] = map[int][]string{}
+			byHead[repo] = map[string][]string{}
 		}
-		numbers := map[int]bool{}
+		byNumber[repo][p.Number] = append(byNumber[repo][p.Number], k)
+		if p.HeadRef != "" {
+			byHead[repo][p.HeadRef] = append(byHead[repo][p.HeadRef], k)
+		}
+	}
+	for _, k := range keys {
+		p, repo := byKey[k], repositories[k]
+		for _, url := range prLink.FindAllString(p.Body, -1) {
+			for _, parent := range byURL[url] {
+				link(k, parent)
+			}
+		}
 		for _, match := range prNumber.FindAllStringSubmatch(prLink.ReplaceAllString(p.Body, ""), -1) {
-			n, _ := strconv.Atoi(match[1])
-			numbers[n] = true
+			number, _ := strconv.Atoi(match[1])
+			for _, parent := range byNumber[repo][number] {
+				link(k, parent)
+			}
 		}
-		for _, other := range keys {
-			q := byKey[other]
-			// A repository name alone does not distinguish GitHub hosts.
-			sameRepo := strings.EqualFold(p.Repository, q.Repository) &&
-				strings.EqualFold(strings.Split(p.URL, "/pull/")[0], strings.Split(q.URL, "/pull/")[0])
-			if urls[q.URL] || sameRepo && (numbers[q.Number] || p.BaseRef != "" && p.BaseRef == q.HeadRef) {
-				link(k, other)
+		if p.BaseRef != "" {
+			for _, parent := range byHead[repo][p.BaseRef] {
+				link(k, parent)
 			}
 		}
 	}
+
 	result := map[string]StackPosition{}
 	seen := map[string]bool{}
 	for _, root := range keys {
@@ -118,4 +141,18 @@ func PRStacks(rows []PullRequest) map[string]StackPosition {
 		}
 	}
 	return result
+}
+
+// Use the same Unicode equivalence as EqualFold when indexing repository names
+// and URL prefixes. Branch names and explicit body URLs remain case sensitive.
+func stackIdentity(value string) string {
+	return strings.Map(func(r rune) rune {
+		first := r
+		for next := unicode.SimpleFold(r); next != r; next = unicode.SimpleFold(next) {
+			if next < first {
+				first = next
+			}
+		}
+		return first
+	}, value)
 }

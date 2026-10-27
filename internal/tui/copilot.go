@@ -13,6 +13,10 @@ import (
 )
 
 type copilotState struct {
+	formattedDetail *copilot.Detail
+	formattedWidth  int
+	formattedLines  []string
+
 	entities *entityState
 	snoozes  *snoozeState
 
@@ -69,11 +73,10 @@ func (m *Model) refreshCopilot() tea.Cmd {
 	c.loading = true
 	client, ctx := c.client, m.ctx
 	id := ""
-	if c.detail != nil {
+	if c.detail != nil && m.visibleProvider() == "copilot" {
 		id = c.detail.Session.ID
 	}
 	return func() tea.Msg {
-		client.Scan(ctx)
 		sessions, err := client.Sessions(ctx)
 		result := copilotResult{sessions: sessions, id: id, err: err}
 		if err == nil {
@@ -143,7 +146,7 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if c.client != nil && !c.timerPending {
 			c.timerPending = true
 			interval := time.Minute
-			if m.copilotActive {
+			if m.visibleProvider() == "copilot" && !m.settings.active && !m.help {
 				interval = 3 * time.Second
 			}
 			return m, tea.Tick(interval, func(time.Time) tea.Msg { return copilotTick{} })
@@ -151,8 +154,7 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "ctrl+c" {
-			m.cancel()
-			return m, tea.Quit
+			return m, m.quit()
 		}
 		if c.filtering {
 			switch key {
@@ -173,8 +175,7 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch key {
 		case "q":
-			m.cancel()
-			return m, tea.Quit
+			return m, m.quit()
 		case "g":
 			if m.source == nil {
 				c.notice = "GitHub er ikke konfigurert. Start appen med GitHub-token for å bytte."
@@ -278,22 +279,7 @@ func (m Model) copilotView() tea.View {
 		)
 		body = append(body, d.Errors...)
 	} else if c.detail != nil {
-		s := c.detail.Session
-		body = append(body, s.Name+" · "+s.ID, "Status: "+s.Status+" ("+s.StatusSource+")", "Klient: "+s.Client+" · modell: "+s.Model+" · agent: "+s.Agent, "Repository: "+m.githubName(s.Repository)+" · branch: "+s.Branch+" · Jira: "+s.Jira, "Cwd: "+s.Cwd, "Prosjekt: "+s.ProjectRoot+" · git: "+s.GitRoot, "Remote: "+s.Remote, "Start: "+s.StartedAt+" · aktivitet: "+s.LastActivity, "Tokens inn/ut: "+metric(s.InputTokens)+" / "+metric(s.OutputTokens), "Trace IDs: "+strings.Join(s.TraceIDs, ", "))
-		if s.DurationMs != nil {
-			body = append(body, fmt.Sprintf("Varighet: %.0f ms", *s.DurationMs))
-		}
-		if len(c.detail.Events) == 0 {
-			body = append(body, "Ingen hendelser mottatt eller innhold er skjult.")
-		}
-		for _, e := range c.detail.Events {
-			body = append(body, "", e.Time+" · "+e.Type+" · "+e.Source+" · "+e.Role+" "+e.Tool)
-			for _, v := range []struct{ label, value string }{{"", e.Content}, {"Argumenter: ", e.Args}, {"Resultat: ", e.Result}, {"Feil: ", e.Error}, {"Advarsel: ", e.Warning}} {
-				if v.value != "" {
-					body = append(body, v.label+v.value)
-				}
-			}
-		}
+		body = m.copilotDetailLines()
 	} else {
 		if c.filtering || c.input.Value() != "" {
 			lines = append(lines, c.input.View())
@@ -319,7 +305,7 @@ func (m Model) copilotView() tea.View {
 			body = append(body, "Ingen Copilot-sesjoner. vh viser oppsett; vi viser diagnostikk.", "Start en Copilot CLI-sesjon. Historikk leses fra ~/.copilot/session-state.", "vs lar deg endre sesjonsmappe og innsamling; au skanner på nytt.")
 		}
 	}
-	if c.detail != nil || c.diagnosticsOpen {
+	if c.diagnosticsOpen {
 		wrapped := []string{}
 		for _, line := range body {
 			wrapped = append(wrapped, strings.Split(ansi.Hardwrap(cleanMultiline(line), max(1, m.width), true), "\n")...)
@@ -327,6 +313,11 @@ func (m Model) copilotView() tea.View {
 		capacity := max(1, m.height-len(lines)-3)
 		offset := min(c.offset, max(0, len(wrapped)-capacity))
 		body = wrapped[offset:min(len(wrapped), offset+capacity)]
+	}
+	if c.detail != nil && !c.diagnosticsOpen {
+		capacity := max(1, m.height-len(lines)-3)
+		offset := min(c.offset, max(0, len(body)-capacity))
+		body = body[offset:min(len(body), offset+capacity)]
 	}
 	lines = append(lines, body...)
 	if c.loading {
@@ -361,4 +352,34 @@ func cleanMultiline(s string) string {
 		parts[i] = clean(p)
 	}
 	return strings.Join(parts, "\n")
+}
+
+func (m Model) copilotDetailLines() []string {
+	c := m.copilot
+	if c.formattedDetail == c.detail && c.formattedWidth == m.width {
+		return c.formattedLines
+	}
+	var body []string
+	s := c.detail.Session
+	body = append(body, s.Name+" · "+s.ID, "Status: "+s.Status+" ("+s.StatusSource+")", "Klient: "+s.Client+" · modell: "+s.Model+" · agent: "+s.Agent, "Repository: "+m.githubName(s.Repository)+" · branch: "+s.Branch+" · Jira: "+s.Jira, "Cwd: "+s.Cwd, "Prosjekt: "+s.ProjectRoot+" · git: "+s.GitRoot, "Remote: "+s.Remote, "Start: "+s.StartedAt+" · aktivitet: "+s.LastActivity, "Tokens inn/ut: "+metric(s.InputTokens)+" / "+metric(s.OutputTokens), "Trace IDs: "+strings.Join(s.TraceIDs, ", "))
+	if s.DurationMs != nil {
+		body = append(body, fmt.Sprintf("Varighet: %.0f ms", *s.DurationMs))
+	}
+	if len(c.detail.Events) == 0 {
+		body = append(body, "Ingen hendelser mottatt eller innhold er skjult.")
+	}
+	for _, e := range c.detail.Events {
+		body = append(body, "", e.Time+" · "+e.Type+" · "+e.Source+" · "+e.Role+" "+e.Tool)
+		for _, v := range []struct{ label, value string }{{"", e.Content}, {"Argumenter: ", e.Args}, {"Resultat: ", e.Result}, {"Feil: ", e.Error}, {"Advarsel: ", e.Warning}} {
+			if v.value != "" {
+				body = append(body, v.label+v.value)
+			}
+		}
+	}
+	var wrapped []string
+	for _, line := range body {
+		wrapped = append(wrapped, strings.Split(ansi.Hardwrap(cleanMultiline(line), max(1, m.width), true), "\n")...)
+	}
+	c.formattedDetail, c.formattedWidth, c.formattedLines = c.detail, m.width, wrapped
+	return wrapped
 }

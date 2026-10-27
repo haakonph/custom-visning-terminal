@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 )
@@ -54,4 +55,15 @@ func (m Model) githubWarning(view model.View) string {
 		return strings.Join(warnings, "; ")
 	}
 	return m.warnings[view]
+}
+
+func (m Model) githubSyncedAt(view model.View) time.Time {
+	if view != model.SharedReviews {
+		return m.snapshot.Datasets[view].SyncedAt
+	}
+	personal, team := m.snapshot.Datasets[model.Reviews].SyncedAt, m.snapshot.Datasets[model.TeamReviews].SyncedAt
+	if team.Before(personal) {
+		return team
+	}
+	return personal
 }

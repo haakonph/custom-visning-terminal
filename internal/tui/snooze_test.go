@@ -188,6 +188,7 @@ func TestSnoozeTaskSelectionAfterRestart(t *testing.T) {
 	if err := m.tasks.save(); err != nil {
 		t.Fatal(err)
 	}
+	m, _ = update(m, struct{}{})
 	entry := snooze.Entry{ID: "task:hidden", Kind: "task", Title: "Hidden", Until: time.Now().Add(time.Hour)}
 	if err := m.snoozes.commit(entry, false); err != nil {
 		t.Fatal(err)

@@ -12,6 +12,11 @@ import (
 )
 
 type detailState struct {
+	lines       []string
+	lineWidth   int
+	lineLoading bool
+	lineAge     string
+
 	synced  time.Time
 	pr      model.PullRequest
 	data    model.PRDetails
@@ -56,6 +61,10 @@ func (m *Model) loadDetails() tea.Cmd {
 }
 func (m Model) detailLines() []string {
 	d := m.detail
+	age := syncAge(d.synced)
+	if d.lines != nil && d.lineWidth == m.width && d.lineAge == age && d.lineLoading == d.loading {
+		return d.lines
+	}
 	lines := []string{fmt.Sprintf("%s #%d · %s", m.githubName(d.pr.Repository), d.pr.Number, d.pr.DisplayTitle(m.jiraPattern)), "Esc tilbake · j/k ↑/↓ bla · au oppdater · en nettleser", "Oppdatert: " + syncAge(d.synced), ""}
 	auto := ""
 	if label := autoMergeLabel(d.pr); label != "" {
@@ -126,6 +135,8 @@ func (m Model) detailLines() []string {
 	for _, line := range lines {
 		wrapped = append(wrapped, strings.Split(ansi.Hardwrap(clean(line), max(1, m.width-2), true), "\n")...)
 	}
+	d.lines, d.lineWidth, d.lineAge = wrapped, m.width, age
+	d.lineLoading = d.loading
 	return wrapped
 }
 func (m Model) detailView() tea.View {

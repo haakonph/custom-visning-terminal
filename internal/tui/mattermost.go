@@ -139,8 +139,7 @@ func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return false, nil
 		}
 		if msg.String() == "ctrl+c" {
-			m.cancel()
-			return true, tea.Quit
+			return true, m.quit()
 		}
 		if s.sending {
 			return true, nil

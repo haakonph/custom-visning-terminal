@@ -6,7 +6,6 @@ import (
 	"github.com/haakonph/custom-visning-terminal/internal/connectors/jira"
 	"github.com/haakonph/custom-visning-terminal/internal/model"
 	"github.com/haakonph/custom-visning-terminal/internal/snooze"
-	"github.com/haakonph/custom-visning-terminal/internal/storage"
 	"net/url"
 	"strings"
 )
@@ -401,6 +400,9 @@ func (m Model) refreshVisible() (tea.Model, tea.Cmd) {
 	return m.unavailable()
 }
 func (m Model) newTaskFrom(refs []model.TaskReference) (tea.Model, tea.Cmd) {
+	if m.localBusy() {
+		return m, nil
+	}
 	refs = underlyingReferences(refs)
 	if m.tasks.loadFailed {
 		return m.unavailable()
@@ -662,6 +664,9 @@ func (m Model) openReferencesWithTarget(refs []model.TaskReference, editor bool,
 	}
 }
 func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd) {
+	if m.localBusy() {
+		return m, nil
+	}
 	refs = underlyingReferences(refs)
 	if len(refs) == 0 || m.entities.err != nil {
 		return m.unavailable()
@@ -669,12 +674,12 @@ func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 	restore := (m.dialog != nil && (m.dialog.mode == "archive" || m.dialog.restore)) || (m.visibleProvider() == "task" && m.tasks.archived)
 	state := m.entities.data
 	state.Archived = append([]model.TaskReference(nil), state.Archived...)
-	tasks := append([]model.Task(nil), m.tasks.items...)
+	tasks := cloneTasks(m.tasks.items)
 	for _, r := range refs {
 		if r.Provider == "task" {
-			for i := range m.tasks.items {
-				if m.tasks.items[i].ID == r.Key {
-					m.tasks.items[i].Archived = !restore
+			for i := range tasks {
+				if tasks[i].ID == r.Key {
+					tasks[i].Archived = !restore
 				}
 			}
 		} else {
@@ -690,53 +695,57 @@ func (m Model) archiveReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 			state.Archived = kept
 		}
 	}
-	if err := storage.Save(m.entities.path, state); err != nil {
-		m.tasks.items = tasks
-		m.sequenceNotice = err.Error()
-		return m, nil
-	}
 	taskChanged := false
 	for _, r := range refs {
 		if r.Provider == "task" {
 			taskChanged = true
 		}
 	}
-	if taskChanged {
-		if err := m.tasks.save(); err != nil {
-			m.tasks.items = tasks
-			if rollback := storage.Save(m.entities.path, m.entities.data); rollback != nil {
+	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
+	var partial bool
+	m.sequenceNotice = "Lagrer arkiv…"
+	m.enqueueLocal(func() (err error) {
+		partial, err = writeLocalState(path, before, state, taskPath, tasks, taskChanged)
+		return err
+	}, func(m *Model, err error) {
+		if err != nil {
+			if partial {
 				m.entities.data = state
-				m.sequenceNotice = "Delvis arkivoppdatering: " + err.Error() + "; tilbakeføring feilet: " + rollback.Error()
-			} else {
-				m.sequenceNotice = err.Error()
 			}
-			return m, nil
+			m.sequenceNotice = "Kunne ikke lagre arkiv: " + err.Error()
+			return
 		}
-	}
-	m.entities.data = state
-	m.clearChosen()
-	m.dialog = nil
-	m.tasks.selectVisible()
-	m.clamp()
-	if m.jira != nil {
-		m.jira.clamp()
-	}
-	m.detail = nil
-	m.tasks.details = false
-	if m.jira != nil {
-		m.jira.detail = nil
-	}
-	if m.copilot != nil {
-		m.copilot.detail = nil
-		m.copilot.selected = max(0, min(m.copilot.selected, len(m.copilot.rows())-1))
-	}
-	if m.mmReader != nil {
-		m.mmReader.clamp()
-	}
-	m.sequenceNotice = "Arkivet er oppdatert lokalt"
+		m.entities.data = state
+		if taskChanged {
+			m.tasks.items = tasks
+		}
+		m.clearChosen()
+		m.dialog = nil
+		m.tasks.selectVisible()
+		m.clamp()
+		if m.jira != nil {
+			m.jira.clamp()
+		}
+		m.detail = nil
+		m.tasks.details = false
+		if m.jira != nil {
+			m.jira.detail = nil
+		}
+		if m.copilot != nil {
+			m.copilot.detail = nil
+			m.copilot.selected = max(0, min(m.copilot.selected, len(m.copilot.rows())-1))
+		}
+		if m.mmReader != nil {
+			m.mmReader.clamp()
+		}
+		m.sequenceNotice = "Arkivet er oppdatert lokalt"
+	})
 	return m, nil
 }
 func (m Model) deleteReferences(refs []model.TaskReference) (tea.Model, tea.Cmd) {
+	if m.localBusy() {
+		return m, nil
+	}
 	if m.visibleProvider() != "task" && !allProvider(refs, "task") {
 		m.sequenceNotice = "Sletting i eksterne systemer er ikke definert. ad sletter lokale oppgaver eller oppgavereferanser."
 		return m, nil
@@ -748,14 +757,14 @@ func (m Model) deleteReferences(refs []model.TaskReference) (tea.Model, tea.Cmd)
 	for _, r := range refs {
 		remove[refID(r)] = true
 	}
-	before := append([]model.Task(nil), m.tasks.items...)
+	tasks := cloneTasks(m.tasks.items)
 	owner := ""
 	referenceMode := m.visibleProvider() == "task" && m.tasks.details
 	if referenceMode {
 		if len(m.tasks.visibleTasks()) == 0 {
 			return m.unavailable()
 		}
-		task := &m.tasks.items[m.tasks.selected]
+		task := &tasks[m.tasks.selected]
 		owner = refID(taskRef(*task))
 		var kept []model.TaskReference
 		for _, r := range task.References {
@@ -767,17 +776,12 @@ func (m Model) deleteReferences(refs []model.TaskReference) (tea.Model, tea.Cmd)
 		m.tasks.row = 0
 	} else {
 		var kept []model.Task
-		for _, t := range m.tasks.items {
+		for _, t := range tasks {
 			if !remove[refID(taskRef(t))] {
 				kept = append(kept, t)
 			}
 		}
-		m.tasks.items = kept
-	}
-	if err := m.tasks.save(); err != nil {
-		m.tasks.items = before
-		m.sequenceNotice = err.Error()
-		return m, nil
+		tasks = kept
 	}
 	state := m.entities.data
 	state.Links = nil
@@ -793,20 +797,25 @@ func (m Model) deleteReferences(refs []model.TaskReference) (tea.Model, tea.Cmd)
 			state.Links = append(state.Links, edge)
 		}
 	}
-	if len(state.Links) != len(m.entities.data.Links) {
-		if err := storage.Save(m.entities.path, state); err != nil {
-			m.tasks.items = before
-			rollback := m.tasks.save()
-			m.sequenceNotice = "Kunne ikke slette koblingene: " + err.Error()
-			if rollback != nil {
-				m.sequenceNotice += "; tilbakeføring feilet: " + rollback.Error()
+	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
+	var partial bool
+	m.sequenceNotice = "Lagrer sletting…"
+	m.enqueueLocal(func() (err error) {
+		partial, err = writeLocalState(path, before, state, taskPath, tasks, true)
+		return err
+	}, func(m *Model, err error) {
+		if err != nil {
+			if partial {
+				m.entities.data = state
 			}
-			return m, nil
+			m.sequenceNotice = "Kunne ikke slette: " + err.Error()
+			return
 		}
-		m.entities.data = state
-	}
-	m.clearChosen()
-	m.tasks.selectVisible()
+		m.entities.data, m.tasks.items = state, tasks
+		m.clearChosen()
+		m.tasks.selectVisible()
+		m.sequenceNotice = "Slettet lokalt"
+	})
 	return m, nil
 }
 func (m Model) beginSnooze() (tea.Model, tea.Cmd) {
@@ -878,13 +887,18 @@ func (m Model) restoreDeferred(refs []model.TaskReference) (tea.Model, tea.Cmd) 
 		return m.unavailable()
 	}
 	anchor := m.snoozeAnchor()
-	if err := m.snoozes.commitEntries(entries, true); err != nil {
-		m.sequenceNotice = "Kunne ikke hente tilbake: " + err.Error()
+	if m.localBusy() {
 		return m, nil
 	}
-	m.clearChosen()
-	m.dialog = nil
-	m.restoreSnoozeAnchor(anchor)
-	m.snoozes.notice = fmt.Sprintf("Hentet tilbake %d elementer", len(entries))
+	m.queueSnooze(entries, true, func(m *Model, err error) {
+		if err != nil {
+			m.sequenceNotice = "Kunne ikke hente tilbake: " + err.Error()
+			return
+		}
+		m.clearChosen()
+		m.dialog = nil
+		m.restoreSnoozeAnchor(anchor)
+		m.snoozes.notice = fmt.Sprintf("Hentet tilbake %d elementer", len(entries))
+	})
 	return m, nil
 }

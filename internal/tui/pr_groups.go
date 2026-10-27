@@ -72,6 +72,60 @@ func (m Model) groupedPRLines(rows []model.PullRequest, capacity int) []string {
 		return nil
 	}
 	capacity = max(1, capacity)
+	layout := m.prLayout(rows)
+	counts, stacks, entries := layout.counts, layout.stacks, layout.entries
+	selectedLine := 0
+	if m.selected >= 0 && m.selected < len(layout.rowLines) {
+		selectedLine = layout.rowLines[m.selected]
+	}
+	start := max(0, selectedLine-capacity+1)
+	var lines []string
+	if start > 0 && entries[start].row >= 0 && capacity > 1 {
+		key := entries[start].heading
+		start++
+		if entries[start].row >= 0 {
+			lines = append(lines, m.prGroupHeading(key, counts[key]))
+		}
+	}
+	for _, e := range entries[start:min(len(entries), start+capacity-len(lines))] {
+		if e.row < 0 {
+			lines = append(lines, m.prGroupHeading(e.heading, counts[e.heading]))
+			continue
+		}
+		rowModel := m
+		rowModel.width = max(1, m.width-3)
+		p := rows[e.row]
+		lines = append(lines, "   "+rowModel.stackRow(p, e.row == m.selected, stacks[p.Key()]))
+	}
+	return lines
+}
+
+// Add stack position to the title, preserving the original PR identity.
+func (m Model) stackRow(p model.PullRequest, selected bool, stack model.StackPosition) string {
+	if stack.Total > 1 {
+		p.Title = fmt.Sprintf("[stack %d/%d] %s", stack.Position, stack.Total, p.Title)
+	}
+	return m.row(p, false, selected)
+}
+
+// Group structure and stack positions depend on data, never on the cursor.
+// Cache these alongside the filtered list, then format only viewport rows.
+type prGroupEntry struct {
+	row     int
+	heading string
+}
+type prGroupLayout struct {
+	rows     []model.PullRequest
+	counts   map[string]int
+	stacks   map[string]model.StackPosition
+	entries  []prGroupEntry
+	rowLines []int
+}
+
+func (m Model) prLayout(rows []model.PullRequest) *prGroupLayout {
+	if m.views != nil && m.views.groups != nil && sameRows(m.views.groups.rows, rows) {
+		return m.views.groups
+	}
 	counts := map[string]int{}
 	for _, p := range rows {
 		counts[m.prGroupKey(p)]++
@@ -81,40 +135,17 @@ func (m Model) groupedPRLines(rows []model.PullRequest, capacity int) []string {
 		known = append(known, dataset.PRs...)
 	}
 	known = append(known, rows...)
-	stacks := model.PRStacks(known)
-	var lines, headings []string
-	selectedLine := 0
+	layout := &prGroupLayout{rows: rows, counts: counts, stacks: model.PRStacks(known), rowLines: make([]int, len(rows))}
 	for i, p := range rows {
 		key := m.prGroupKey(p)
-		heading := m.prGroupHeading(key, counts[key])
 		if i == 0 || key != m.prGroupKey(rows[i-1]) {
-			lines = append(lines, heading)
-			headings = append(headings, "")
+			layout.entries = append(layout.entries, prGroupEntry{row: -1, heading: key})
 		}
-		if i == m.selected {
-			selectedLine = len(lines)
-		}
-		rowModel := m
-		rowModel.width = max(1, m.width-3)
-		lines = append(lines, "   "+rowModel.stackRow(p, i == m.selected, stacks[p.Key()]))
-		headings = append(headings, heading)
+		layout.rowLines[i] = len(layout.entries)
+		layout.entries = append(layout.entries, prGroupEntry{row: i, heading: key})
 	}
-	start := max(0, selectedLine-capacity+1)
-	if start > 0 && headings[start] != "" && capacity > 1 {
-		// Reserve one line for context without pushing the selected PR out.
-		start++
-		if headings[start] == "" {
-			return lines[start:min(len(lines), start+capacity)]
-		}
-		return append([]string{headings[start-1]}, lines[start:min(len(lines), start+capacity-1)]...)
+	if m.views != nil {
+		m.views.groups = layout
 	}
-	return lines[start:min(len(lines), start+capacity)]
-}
-
-// Add stack position to the title, preserving the original PR identity.
-func (m Model) stackRow(p model.PullRequest, selected bool, stack model.StackPosition) string {
-	if stack.Total > 1 {
-		p.Title = fmt.Sprintf("[stack %d/%d] %s", stack.Position, stack.Total, p.Title)
-	}
-	return m.row(p, false, selected)
+	return layout
 }
