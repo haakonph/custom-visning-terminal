@@ -20,6 +20,15 @@ func editSetting(t *testing.T, m Model, index int, value string) Model {
 	t.Helper()
 	m.settings.selected = index
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.settings.editorPicker {
+		for i, name := range []string{"intellij", "vscode", "custom"} {
+			if name == value {
+				m.settings.editorChoice = i
+			}
+		}
+		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+		return m
+	}
 	if !m.settings.editing {
 		t.Fatal(m.settings.notice)
 	}
@@ -222,5 +231,45 @@ func TestSettingsTokenHelpNavigation(t *testing.T) {
 	m, _ = update(m, key('?'))
 	if m.settings.help || !strings.Contains(m.settings.input.Value(), "?") {
 		t.Fatal("help intercepted editing input")
+	}
+}
+
+func TestDefaultEditorNavigationAndCustom(t *testing.T) {
+	m := jiraModel(t)
+	defer m.cancel()
+	m = m.WithLocal(nil, local.Defaults().Editors)
+	m, _ = sequence(m, "vs")
+	m.settings.selected = 5
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = update(m, key('j'))
+	if m.settings.editorChoice != 1 || m.settings.selected != 5 {
+		t.Fatal("navigation moved setting")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.local.launcher.Editors.Default != "vscode" {
+		t.Fatal("default not applied")
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = update(m, key('j'))
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !m.settings.editing || !m.settings.chooseCustom {
+		t.Fatal("custom command not focused")
+	}
+	m.settings.input.SetValue("")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !m.settings.editing || m.local.launcher.Editors.Default != "vscode" {
+		t.Fatal("empty custom command accepted")
+	}
+	m.settings.input.SetValue("my-editor")
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.local.launcher.Editors.Default != "custom" || m.local.launcher.Editors.Custom.Command != "my-editor" {
+		t.Fatal("custom not applied")
+	}
+	m.settings.selected = 5
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = update(m, key('k'))
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.settings.editorPicker || !m.settings.active || m.local.launcher.Editors.Default != "custom" {
+		t.Fatal("cancel changed default")
 	}
 }

@@ -637,7 +637,11 @@ Alle appinnstillinger ligger i én fil:
 for å velge en annen fil. Siden viser filstien og felter for Jira-server,
 standardprosjekt, Jira-mønster, lagrede søk, lokale repoer, editorer og
 Copilot-innstillinger (mapper, port, innsamling, innholdsvalg, Jira-mønster og
-IntelliJ-launcher). Lister og editorargumenter redigeres som JSON, for eksempel
+IntelliJ-launcher). Under «Editor · standard» velger du IntelliJ, VS Code eller
+«Annen» med ↑/↓ eller j/k og Enter. «Annen» åpner feltet for editorens
+launcherkommando, for eksempel `zed`; argumenter settes i neste felt som JSON.
+Valget tas i bruk med en gang og lagres til neste oppstart. Esc avbryter.
+Lister og editorargumenter redigeres som JSON, for eksempel
 `["/sti/til/repo"]` og `["--new-window", "{path}"]`.
 
 Jira-mønsteret og GitHub-prefiksene tas i bruk med en gang. Tom verdi gjenoppretter

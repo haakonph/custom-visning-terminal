@@ -66,6 +66,9 @@ type settingsState struct {
 	busy    bool
 
 	active, editing bool
+	editorPicker    bool
+	chooseCustom    bool
+	editorChoice    int
 	help            bool
 	helpOffset      int
 	selected        int
@@ -290,8 +293,13 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.help = false
 				return m, nil
 			}
+			if s.editorPicker {
+				s.editorPicker = false
+				return m, nil
+			}
 			if s.editing {
 				s.editing = false
+				s.chooseCustom = false
 				s.input.Blur()
 			} else {
 				s.active = false
@@ -301,9 +309,34 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if s.busy {
 				return m, nil
 			}
+			if s.editorPicker {
+				value := []string{"intellij", "vscode", "custom"}[s.editorChoice]
+				if value == "custom" {
+					s.editorPicker = false
+					s.chooseCustom = true
+					s.selected = 10
+					s.input.SetValue(s.values[s.selected])
+					s.editing = true
+					s.notice = "Skriv editorens launcher. Argumenter kan endres i neste felt."
+					return m, s.input.Focus()
+				}
+				field := settingFields[s.selected]
+				m.queueSettings(&field, value)
+				return m, nil
+			}
 			if !s.editing {
 				if len(s.values) != len(settingFields) {
 					m.queueSettings(nil, "")
+					return m, nil
+				}
+				if settingFields[s.selected].kind == "editor" {
+					s.editorPicker = true
+					s.editorChoice = 0
+					for i, value := range []string{"intellij", "vscode", "custom"} {
+						if value == s.values[s.selected] {
+							s.editorChoice = i
+						}
+					}
 					return m, nil
 				}
 				s.input.SetValue(s.values[s.selected])
@@ -312,7 +345,20 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, s.input.Focus()
 			}
 			field := settingFields[s.selected]
+			if field.path == "editors.custom.command" && strings.TrimSpace(s.input.Value()) == "" {
+				s.notice = "Skriv en kommando for editoren."
+				return m, nil
+			}
 			m.queueSettings(&field, s.input.Value())
+			return m, nil
+		}
+		if s.editorPicker {
+			switch key.String() {
+			case "j", "down":
+				s.editorChoice = (s.editorChoice + 1) % 3
+			case "k", "up":
+				s.editorChoice = (s.editorChoice + 2) % 3
+			}
 			return m, nil
 		}
 		if !s.editing {
@@ -391,6 +437,16 @@ func (m Model) settingsView() tea.View {
 		}
 		lines = append(lines, row)
 	}
+	if s.editorPicker {
+		lines = append(lines, "", "Velg standardeditor:")
+		for i, label := range []string{"IntelliJ IDEA", "VS Code", "Annen · egen kommando"} {
+			prefix := "  "
+			if i == s.editorChoice {
+				prefix = "> "
+			}
+			lines = append(lines, prefix+label)
+		}
+	}
 	if s.editing {
 		lines = append(lines, "", settingFields[s.selected].label, s.input.View())
 	}
@@ -423,10 +479,24 @@ func (m *Model) queueSettings(field *settingField, value string) {
 	var loaded settingsState
 	var runtime Model
 	var config jira.Config
+	var editors local.Config
+	chooseCustom := m.settings.chooseCustom
 	m.enqueueLocal(func() error {
 		if field != nil {
 			if err := saveSetting(*field, value); err != nil {
 				return err
+			}
+		}
+		if field != nil && field.path == "editors.custom.command" && chooseCustom {
+			if err := saveSetting(settingFields[5], "custom"); err != nil {
+				return err
+			}
+		}
+		if field != nil && strings.HasPrefix(field.path, "editors.") {
+			var editorErr error
+			editors, editorErr = local.LoadConfig(appconfig.Path())
+			if editorErr != nil {
+				return editorErr
 			}
 		}
 		if err := loaded.loadValues(); err != nil {
@@ -442,6 +512,9 @@ func (m *Model) queueSettings(field *settingField, value string) {
 	}, func(m *Model, err error) {
 		// Saved configuration still applies if the user closed the editor meanwhile.
 		if err == nil && field != nil {
+			if strings.HasPrefix(field.path, "editors.") && m.local != nil {
+				m.local.launcher.Editors = editors.Editors
+			}
 			switch {
 			case strings.HasPrefix(field.path, "refresh."):
 				m.auto.options = runtime.auto.options
@@ -471,9 +544,13 @@ func (m *Model) queueSettings(field *settingField, value string) {
 		m.settings.notice = ""
 		if field != nil {
 			m.settings.editing = false
+			m.settings.editorPicker = false
+			m.settings.chooseCustom = false
 			m.settings.input.Blur()
 			m.settings.notice = "Lagret. Øvrige innstillinger tas i bruk etter omstart."
 			switch {
+			case strings.HasPrefix(field.path, "editors."):
+				m.settings.notice = "Editor lagret og tatt i bruk."
 			case strings.HasPrefix(field.path, "mattermost.") && m.mmReader == nil:
 				m.settings.notice = "Lagret. Esc tilbake og vc tar førstegangsoppsettet i bruk uten omstart."
 			case strings.HasPrefix(field.path, "notifications."):
