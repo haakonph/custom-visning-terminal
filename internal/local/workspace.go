@@ -138,7 +138,7 @@ func (w *WorktreeManager) prepareProject(ctx context.Context, path, head string)
 	if err != nil {
 		return err
 	}
-	digest := sha256.Sum256(append([]byte(path+"\x00"+head+"\x00"), config...))
+	digest := sha256.Sum256(append([]byte("submodules-v1\x00"+path+"\x00"+head+"\x00"), config...))
 	name := hex.EncodeToString(digest[:])
 	stamp, err := git(ctx, path, "rev-parse", "--git-path", "custom-visning-prepared")
 	if err != nil {
@@ -151,8 +151,18 @@ func (w *WorktreeManager) prepareProject(ctx context.Context, path, head string)
 		return nil
 	}
 	var commands []projectCommand
+	if _, statErr := os.Stat(filepath.Join(path, ".gitmodules")); statErr == nil {
+		// Use the commits recorded by this checkout, including nested modules.
+		// Following remote branches would dirty the checkout and block updates.
+		commands = append(commands,
+			projectCommand{"git", []string{"submodule", "sync", "--recursive"}},
+			projectCommand{"git", []string{"-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "submodule", "update", "--init", "--recursive", "--checkout"}},
+		)
+	} else if !os.IsNotExist(statErr) {
+		return statErr
+	}
 	if w.Workspace.Install {
-		commands = projectCommands(path, w.Workspace.MavenFlags)
+		commands = append(commands, projectCommands(path, w.Workspace.MavenFlags)...)
 	}
 	if indexer := w.Workspace.Indexer; indexer.Command != "" {
 		args := make([]string, 0, len(indexer.Args)+1)

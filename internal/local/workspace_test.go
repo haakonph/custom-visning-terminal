@@ -265,3 +265,82 @@ func TestPreparationRunsOncePerCommitAndFailureStillOpens(t *testing.T) {
 		t.Fatal(s, err)
 	}
 }
+
+func TestWarmInitializesSubmodulesBeforeBuild(t *testing.T) {
+	w, p, source := fixture(t)
+	ctx := context.Background()
+	run(t, source, "branch", "-M", "main")
+	// Local fixture URLs require an explicit file transport opt-in for submodules.
+	run(t, source, "config", "--global", "protocol.file.allow", "always")
+	module := t.TempDir()
+	run(t, module, "init")
+	if err := os.WriteFile(filepath.Join(module, "dependency.txt"), []byte("first"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, module, "add", ".")
+	run(t, module, "commit", "-m", "dependency")
+	run(t, source, "submodule", "add", module, "dependency")
+	for name, content := range map[string]string{
+		"pom.xml":    "<project/>",
+		"mvnw":       "#!/bin/sh\ncat dependency/dependency.txt > build-result\n",
+		".gitignore": "build-result\n",
+	} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte(content), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run(t, source, "add", ".")
+	run(t, source, "commit", "-m", "build with submodule")
+	w.Workspace.Install = true
+	check := func(want string) {
+		t.Helper()
+		if err := w.Warm(ctx, p.Repository); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(w.Repositories.Dir, "main", "acme", "repo")
+		got, err := os.ReadFile(filepath.Join(path, "build-result"))
+		if err != nil || string(got) != want {
+			t.Fatalf("build result %q: %v", got, err)
+		}
+		if status := run(t, path, "status", "--porcelain"); status != "" {
+			t.Fatal(status)
+		}
+	}
+	check("first")
+	// A remote dependency advance alone must not dirty the main checkout.
+	if err := os.WriteFile(filepath.Join(module, "dependency.txt"), []byte("second"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, module, "add", ".")
+	run(t, module, "commit", "-m", "advance dependency")
+	check("first")
+	run(t, filepath.Join(source, "dependency"), "pull", "--ff-only")
+	run(t, source, "add", "dependency")
+	run(t, source, "commit", "-m", "update dependency on main")
+	check("second")
+}
+
+func TestSubmoduleFailureStopsBuildAndRetries(t *testing.T) {
+	w, _, source := fixture(t)
+	for name, content := range map[string]string{
+		".gitmodules": "[submodule \"missing\"]\npath = missing\nurl = /nonexistent/custom-visning-submodule\n",
+		"pom.xml":     "<project/>",
+		"mvnw":        "#!/bin/sh\ntouch build-ran\n",
+	} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte(content), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	head := run(t, source, "rev-parse", "HEAD")
+	run(t, source, "update-index", "--add", "--cacheinfo", "160000,"+head+",missing")
+	w.Workspace.Install = true
+	for i := 0; i < 2; i++ {
+		err := w.prepareProject(context.Background(), source, head)
+		if err == nil || !strings.Contains(err.Error(), "git preparation failed") {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(source, "build-ran")); !os.IsNotExist(err) {
+			t.Fatal("build ran after submodule failure", err)
+		}
+	}
+}
