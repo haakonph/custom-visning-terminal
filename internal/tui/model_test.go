@@ -33,9 +33,51 @@ type fakeCache struct {
 func (f *fakeCache) Load(string) (model.Snapshot, error) { return f.snap, f.err }
 func (f *fakeCache) Save(s model.Snapshot) error         { f.snap = s; f.saves++; return f.err }
 func key(code rune) tea.KeyPressMsg                      { return tea.KeyPressMsg{Code: code, Text: string(code)} }
+
+// update advances local I/O completions like the terminal event loop. Network
+// commands and timers remain under each test's explicit control.
 func update(m Model, msg tea.Msg) (Model, tea.Cmd) {
+	m.invalidateViews(struct{}{}) // Fixtures can edit data directly.
+	var previous *localIOJob
+	if m.localIO != nil {
+		previous = m.localIO.active
+	}
 	next, cmd := m.Update(msg)
-	return next.(Model), cmd
+	m = next.(Model)
+	if r, ok := msg.(refreshMsg); ok && !r.prepared && cmd != nil {
+		next, cmd = m.Update(cmd())
+		m = next.(Model)
+	}
+	var completion *localIOResult
+	if m.localIO != nil && m.localIO.active != nil && m.localIO.active != previous {
+		// Update appends the writer after the original command. Unwrap only this
+		// batch; network commands and timers remain controlled by the calling test.
+		switch out := cmd().(type) {
+		case tea.BatchMsg:
+			cmd = tea.Batch(out[:len(out)-1]...)
+		case localIOResult:
+			completion = &out
+			cmd = nil
+		default:
+			panic("unexpected writer command")
+		}
+	}
+	for m.localIO != nil && (m.localIO.active != nil || len(m.localIO.pending) != 0) {
+		if m.localIO.active == nil {
+			_ = m.nextLocalWrite()
+		}
+		job := m.localIO.active
+		result := localIOResult{job: job}
+		if completion != nil {
+			result = *completion
+			completion = nil
+		} else {
+			result.err = job.run()
+		}
+		next, _ = m.Update(result)
+		m = next.(Model)
+	}
+	return m, cmd
 }
 func ready(t *testing.T) Model {
 	t.Helper()

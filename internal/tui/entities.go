@@ -80,6 +80,9 @@ func (m *Model) ensureTaskIDs() error {
 	changed := false
 	for i := range m.tasks.items {
 		if m.tasks.items[i].ID == "" {
+			if m.localBusy() {
+				return fmt.Errorf("venter på lokal lagring")
+			}
 			var id [16]byte
 			if _, err := rand.Read(id[:]); err != nil {
 				return err
@@ -237,8 +240,30 @@ func (m Model) cursor() int {
 	}
 }
 func (m *Model) setCursor(i int) {
-	refs := m.visibleReferences()
-	i = max(0, min(i, len(refs)-1))
+	count := 0
+	switch m.visibleProvider() {
+	case "dialog":
+		count = len(m.dialog.filtered())
+	case "deferred":
+		count = len(m.snoozes.rows())
+	case "task":
+		if m.tasks.details {
+			if len(m.tasks.visibleTasks()) > 0 {
+				count = len(m.tasks.items[m.tasks.selected].References)
+			}
+		} else {
+			count = len(m.tasks.visibleTasks())
+		}
+	case "jira":
+		count = len(m.jira.filtered())
+	case "copilot":
+		count = len(m.copilot.rows())
+	case "mattermost":
+		count = len(m.mmReader.posts())
+	default:
+		count = len(m.filtered())
+	}
+	i = max(0, min(i, count-1))
 	switch m.visibleProvider() {
 	case "dialog":
 		m.dialog.selected = i
@@ -674,6 +699,9 @@ func (m *Model) updateCopilotDetail() tea.Cmd {
 	return cmd
 }
 func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model, tea.Cmd) {
+	if m.localBusy() {
+		return m, nil
+	}
 	origins, targets = underlyingReferences(origins), underlyingReferences(targets)
 	if m.entities.err != nil {
 		m.sequenceNotice = "Kunne ikke lese koblinger: " + m.entities.err.Error()
@@ -695,22 +723,18 @@ func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model
 			seen[refID(a)+"\n"+refID(b)] = true
 		}
 	}
-	if err := storage.Save(m.entities.path, state); err != nil {
-		m.sequenceNotice = "Kunne ikke lagre koblinger: " + err.Error()
-		return m, nil
-	}
-	m.entities.data = state
+	tasks := cloneTasks(m.tasks.items)
 	for _, a := range origins {
 		for _, b := range targets {
 			if refID(a) == refID(b) {
 				continue
 			}
-			for i := range m.tasks.items {
-				if a.Provider == "task" && a.Key == m.tasks.items[i].ID {
-					m.tasks.items[i].Add(b)
+			for i := range tasks {
+				if a.Provider == "task" && a.Key == tasks[i].ID {
+					tasks[i].Add(b)
 				}
-				if b.Provider == "task" && b.Key == m.tasks.items[i].ID {
-					m.tasks.items[i].Add(a)
+				if b.Provider == "task" && b.Key == tasks[i].ID {
+					tasks[i].Add(a)
 				}
 			}
 		}
@@ -721,14 +745,31 @@ func (m Model) linkReferences(origins, targets []model.TaskReference) (tea.Model
 			taskChanged = true
 		}
 	}
-	if taskChanged {
-		if err := m.tasks.save(); err != nil {
-			m.sequenceNotice = "Kobling lagret; oppgavelagring feilet: " + err.Error()
-			return m, nil
-		}
+	if taskChanged && m.tasks.loadFailed {
+		m.sequenceNotice = "Oppgaver kunne ikke leses; lagring er sperret"
+		return m, nil
 	}
-	m.dialog = nil
-	m.sequenceNotice = "Koblinger lagret lokalt"
+	path, taskPath, before := m.entities.path, m.tasks.path, m.entities.data
+	var partial bool
+	m.sequenceNotice = "Lagrer koblinger…"
+	m.enqueueLocal(func() (err error) {
+		partial, err = writeLocalState(path, before, state, taskPath, tasks, taskChanged)
+		return err
+	}, func(m *Model, err error) {
+		if err != nil {
+			if partial {
+				m.entities.data = state
+			}
+			m.sequenceNotice = "Kunne ikke lagre koblinger: " + err.Error()
+			return
+		}
+		m.entities.data = state
+		if taskChanged {
+			m.tasks.items = tasks
+		}
+		m.dialog = nil
+		m.sequenceNotice = "Koblinger lagret lokalt"
+	})
 	return m, nil
 }
 func refSnoozeID(r model.TaskReference) string {

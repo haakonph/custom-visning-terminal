@@ -495,10 +495,19 @@ om gangen. Åpne PR-detaljer hentes hvert 30. sekund. Lokal Git-status leses hve
 15. sekund i GitHub-visningen og hvert minutt i bakgrunnen. Denne lokale
 statusavlesningen utfører ingen fetch eller endringer i worktrees.
 
-Copilot beholder visningsintervallet på tre sekunder og import hvert andre
-sekund. Mattermost beholder polling hvert 30. sekund, også i bakgrunnen.
+Copilot oppdaterer visningsdata hvert tredje sekund når siden er synlig, og
+hvert minutt i bakgrunnen. Skjulte sesjonsdetaljer hentes ikke. Filimporten
+kjører separat hvert andre sekund; visningsoppdatering starter ingen ekstra
+skanning. Mattermost beholder polling hvert 30. sekund, også i bakgrunnen.
 Snooze sjekkes lokalt hvert sekund. Eksisterende main-klargjøring og
 IntelliJ-opprydding beholder fem minutters intervall.
+
+Lokal lagring av oppgaver, koblinger, arkiv, snooze og innstillinger kjører
+utenfor UI-løkken. Lagringer utføres i rekkefølge; arkivering og snooze endrer
+først hvilke elementer som vises etter vellykket lagring. Navigering fortsetter
+mens lagring pågår. Ctrl+C venter på lokal lagring; en lagringsfeil beholder
+appen åpen med en feilmelding. Detaljvisninger mellomlagrer linjebryting, og
+PR-lister formaterer bare radene som får plass på skjermen.
 
 `vs` har innstillinger for automatisk GitHub-/Jira-/lokal oppdatering og
 intervallene. Endringene tas i bruk straks. Eksempel på `refresh` i config.json:

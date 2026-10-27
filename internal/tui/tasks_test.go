@@ -15,8 +15,8 @@ import (
 )
 
 func taskKey(m Model, key string) Model {
-	next, _ := m.Update(tea.KeyPressMsg{Code: []rune(key)[0], Text: key})
-	return next.(Model)
+	next, _ := update(m, tea.KeyPressMsg{Code: []rune(key)[0], Text: key})
+	return next
 }
 
 func TestTasksCollectAcrossProvidersAndReload(t *testing.T) {
@@ -101,6 +101,7 @@ func TestTasksTitleEditingDoesNotTriggerGlobalShortcuts(t *testing.T) {
 
 func TestTaskProviderNavigationAndBackgroundRefresh(t *testing.T) {
 	t.Setenv("CUSTOM_VISNING_TASKS", filepath.Join(t.TempDir(), "tasks.json"))
+	t.Setenv("CUSTOM_VISNING_LINKS", filepath.Join(t.TempDir(), "links.sqlite"))
 	m := New(context.Background(), &fakeSource{}, nil)
 	defer m.cancel()
 	m.snapshot.Datasets[model.Open].PRs = []model.PullRequest{{URL: "https://github.com/org/repo/pull/1", Title: "Old title"}}

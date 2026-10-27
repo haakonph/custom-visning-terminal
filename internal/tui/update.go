@@ -16,6 +16,26 @@ import (
 )
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if result, ok := msg.(localIOResult); ok {
+		if m.localIO != nil && m.localIO.active == result.job {
+			m.localIO.active = nil
+			if result.err != nil {
+				if m.localIO.quitting {
+					m.sequenceNotice = "Kunne ikke avslutte: lokal lagring feilet: " + result.err.Error()
+				}
+				m.localIO.quitting = false
+			}
+			result.job.finish(&m, result.err)
+		}
+		return m, nil
+	}
+	if cached, ok := msg.(jiraCachedResult); ok {
+		if j := m.jira; j != nil && j.loading && j.generation == cached.generation && j.query == cached.query && cached.err == nil {
+			j.rows, j.synced = cached.cached.Issues, cached.cached.SyncedAt
+			j.clamp()
+		}
+		return m, nil
+	}
 	if m.folderMessage(msg) {
 		return m, nil
 	}
@@ -82,12 +102,14 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.detail.data = retainDetailSections(m.detail.data, result.data)
 				if pr := result.data.PullRequest; pr != nil && pr.Key() == m.detail.pr.Key() {
 					m.detail.pr = *pr
-					for _, dataset := range m.snapshot.Datasets {
-						for i := range dataset.PRs {
-							if dataset.PRs[i].Key() == pr.Key() {
-								dataset.PRs[i] = *pr
+					for v, dataset := range m.snapshot.Datasets {
+						rows := append([]model.PullRequest(nil), dataset.PRs...)
+						for i := range rows {
+							if rows[i].Key() == pr.Key() {
+								rows[i] = *pr
 							}
 						}
+						m.snapshot.Datasets[v].PRs = rows
 					}
 					cmd = m.persist()
 				}
@@ -141,8 +163,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "k", "up":
 				m.helpOffset = max(0, m.helpOffset-1)
 			case "q", "ctrl+c":
-				m.cancel()
-				return m, tea.Quit
+				return m, m.quit()
 			}
 			return m, nil
 		}
@@ -252,6 +273,22 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.refreshLocal())
 		return m, tea.Batch(cmds...)
 	case refreshMsg:
+		current := m.snapshot.Datasets[msg.view].PRs
+		if !msg.prepared || !sameRows(msg.baseRows, current) {
+			if !msg.prepared {
+				msg.freshRows = msg.result.PRs
+			}
+			return m, func() tea.Msg {
+				msg.baseRows, msg.prepared = current, true
+				if msg.err == nil && msg.result.Complete {
+					msg.result.PRs = append([]model.PullRequest(nil), msg.result.PRs...)
+					model.Sort(msg.result.PRs)
+				} else {
+					msg.result.PRs = model.Merge(current, msg.freshRows)
+				}
+				return msg
+			}
+		}
 		m.loading[msg.view] = false
 		if msg.autoMergeVersion != m.autoMergeVersion {
 			return m, m.refresh(msg.view)
@@ -268,7 +305,6 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		data := &m.snapshot.Datasets[msg.view]
 		if msg.err == nil && msg.result.Complete {
 			data.PRs = msg.result.PRs
-			model.Sort(data.PRs)
 			data.SyncedAt = msg.at
 			if m.detail != nil {
 				for _, pr := range data.PRs {
@@ -279,7 +315,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		} else {
-			data.PRs = model.Merge(data.PRs, msg.result.PRs)
+			data.PRs = msg.result.PRs
 			if m.warnings[msg.view] == "" {
 				m.warnings[msg.view] = "Partial results; cached rows retained"
 			}
@@ -309,8 +345,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "ctrl+c" {
-			m.cancel()
-			return m, tea.Quit
+			return m, m.quit()
 		}
 		if m.filtering {
 			if key == "esc" {
@@ -374,7 +409,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-func (m Model) filtered() []model.PullRequest {
+func (m Model) filterGitHubRows() []model.PullRequest {
 	rows := m.githubDataset(m.active).PRs
 	if m.relatedKey != "" {
 		rows = m.relatedPRs(m.relatedKey)

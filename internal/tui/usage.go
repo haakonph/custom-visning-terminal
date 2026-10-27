@@ -17,7 +17,7 @@ func (m Model) WithUsage(recorder *usage.Recorder, notice string) Model {
 
 // Update observes only real key messages. Internal compatibility dispatch and
 // background refreshes must never count as user activity.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) observedUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, isKey := msg.(tea.KeyPressMsg)
 	if m.usage == nil || !isKey || m.internalKey {
 		return m.update(msg)

@@ -42,13 +42,15 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	if result, ok := msg.(copilotReviewRequested); ok {
 		m.reviewRequestBusy = false
 		for _, url := range result.urls {
-			for _, dataset := range m.snapshot.Datasets {
-				for i := range dataset.PRs {
-					p := &dataset.PRs[i]
+			for v, dataset := range m.snapshot.Datasets {
+				rows := append([]model.PullRequest(nil), dataset.PRs...)
+				for i := range rows {
+					p := &rows[i]
 					if p.URL == url && !copilotReviewPending(*p) {
-						p.RequestedReviewers = append(p.RequestedReviewers, "copilot-pull-request-reviewer[bot]")
+						p.RequestedReviewers = append(append([]string(nil), p.RequestedReviewers...), "copilot-pull-request-reviewer[bot]")
 					}
 				}
+				m.snapshot.Datasets[v].PRs = rows
 			}
 			if m.detail != nil && m.detail.pr.URL == url && !copilotReviewPending(m.detail.pr) {
 				m.detail.pr.RequestedReviewers = append(m.detail.pr.RequestedReviewers, "copilot-pull-request-reviewer[bot]")
@@ -73,8 +75,7 @@ func (m Model) updateKeyboard(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	}
 	k := key.String()
 	if k == "ctrl+c" {
-		m.cancel()
-		return m, tea.Quit, true
+		return m, m.quit(), true
 	}
 	if m.usageView {
 		switch k {

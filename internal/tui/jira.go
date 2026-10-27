@@ -40,6 +40,13 @@ type jiraState struct {
 	cancel                context.CancelFunc
 	help                  bool
 }
+type jiraCachedResult struct {
+	generation int
+	query      string
+	cached     jira.Cached
+	err        error
+}
+
 type jiraResult struct {
 	generation int
 	query      string
@@ -108,15 +115,12 @@ func (m *Model) refreshJira() tea.Cmd {
 		m.auto.jira[query] = job
 	}
 	job.started = time.Now()
-	if query != j.query {
+	loadCache := query != j.query
+	if loadCache {
 		j.rows = nil
 		j.synced = time.Time{}
 		j.selected = 0
 		j.query = query
-		if cached, err := j.client.LoadCache(query); err == nil {
-			j.rows = cached.Issues
-			j.synced = cached.SyncedAt
-		}
 	}
 	if j.cancel != nil {
 		j.cancel()
@@ -127,12 +131,19 @@ func (m *Model) refreshJira() tea.Cmd {
 	generation := j.generation
 	j.loading = true
 	ctx, client := requestCtx, j.client
-	return func() tea.Msg {
+	search := func() tea.Msg {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()
 		rows, err := client.Search(ctx, query)
 		return jiraResult{generation, query, rows, err, time.Now()}
 	}
+	if !loadCache {
+		return search
+	}
+	return tea.Batch(func() tea.Msg {
+		cached, err := client.LoadCache(query)
+		return jiraCachedResult{generation, query, cached, err}
+	}, search)
 }
 func (j *jiraState) filtered() []jira.Issue {
 	visible := make([]jira.Issue, 0, len(j.rows))
@@ -202,14 +213,16 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 		j.synced = msg.at
 		j.notice = ""
 		j.clamp()
-		if err := j.client.SaveCache(jira.Cached{Query: msg.query, Issues: msg.rows, SyncedAt: msg.at}); err != nil {
-			j.notice = "Kunne ikke lagre Jira-cache"
-		}
+		client, data := j.client, jira.Cached{Query: msg.query, Issues: msg.rows, SyncedAt: msg.at}
+		m.enqueueLocal(func() error { return client.SaveCache(data) }, func(m *Model, err error) {
+			if err != nil && m.jira == j {
+				m.jira.notice = "Kunne ikke lagre Jira-cache: " + err.Error()
+			}
+		})
 	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "ctrl+c" {
-			m.cancel()
-			return m, tea.Quit
+			return m, m.quit()
 		}
 		if j.mode != "" {
 			if key == "esc" {
@@ -261,13 +274,20 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if !found {
 						config.Queries = append(config.Queries, q)
 					}
-					if err := jira.SaveConfig(j.configPath, config); err != nil {
-						j.notice = "Kunne ikke lagre søket"
+					if m.localBusy() {
 						return m, nil
 					}
-					j.config = config
-					j.tabs = append(j.tabs[:4:4], config.Queries...)
-					j.notice = "Søk lagret: " + value
+					path := j.configPath
+					j.notice = "Lagrer søk…"
+					m.enqueueLocal(func() error { return jira.SaveConfig(path, config) }, func(m *Model, err error) {
+						if err != nil {
+							j.notice = "Kunne ikke lagre søket: " + err.Error()
+							return
+						}
+						j.config = config
+						j.tabs = append(j.tabs[:4:4], config.Queries...)
+						j.notice = "Søk lagret: " + value
+					})
 				case "filter":
 					*j.filterPointers()[j.filterIndex] = value
 					j.filterIndex++
@@ -288,8 +308,7 @@ func (m Model) updateJira(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			j.help = !j.help
 		case "q":
-			m.cancel()
-			return m, tea.Quit
+			return m, m.quit()
 
 		case "j", "down":
 			j.selected++

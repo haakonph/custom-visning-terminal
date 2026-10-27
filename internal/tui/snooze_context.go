@@ -71,9 +71,13 @@ func (m *Model) expandSnooze() {
 // when a provider is unavailable, so refresh/restart cannot undo the pause.
 func (m *Model) refreshSnoozeContexts() {
 	s := m.snoozes
-	if s == nil {
+	if s == nil || !s.contextDirty {
 		return
 	}
+	if m.localIO.busy() {
+		return
+	}
+	s.contextDirty = false
 	var changed []snooze.Entry
 	for _, e := range s.rows() {
 		if len(e.Roots) == 0 {
@@ -93,9 +97,16 @@ func (m *Model) refreshSnoozeContexts() {
 		}
 	}
 	if len(changed) > 0 {
-		if err := s.commitEntries(changed, false); err != nil {
-			s.notice = "Kunne ikke utvide snooze: " + err.Error()
-		}
+		anchor := m.snoozeAnchor()
+		m.queueSnooze(changed, false, func(m *Model, err error) {
+			if err != nil {
+				m.snoozes.contextDirty = true
+				m.snoozes.notice = "Kunne ikke utvide snooze: " + err.Error()
+				return
+			}
+			m.snoozes.notice = ""
+			m.restoreSnoozeAnchor(anchor)
+		})
 	}
 }
 

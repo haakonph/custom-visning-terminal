@@ -57,3 +57,22 @@ func TestPRStacksUseNewestObservationAndHost(t *testing.T) {
 		t.Fatalf("cross-host dependency: %v", got)
 	}
 }
+
+func TestPRStackIndexPreservesCaseAndDuplicateBranchRules(t *testing.T) {
+	a, b, c := stackPR(1), stackPR(2), stackPR(3)
+	b.Repository = "ORG/REPO"
+	b.URL = "https://GITHUB.COM/ORG/REPO/pull/2"
+	b.BaseRef = a.HeadRef
+	c.HeadRef = a.HeadRef
+	got := PRStacks([]PullRequest{a, b, c})
+	if len(got) != 3 || got[b.Key()].Total != 3 {
+		t.Fatal("case-insensitive repository or duplicate branch lost", got)
+	}
+	b.BaseRef = "BRANCH-1"
+	if got := PRStacks([]PullRequest{a, b, c}); len(got) != 0 {
+		t.Fatal("branch matching must be case sensitive", got)
+	}
+	if stackIdentity("Σ/K") != stackIdentity("ς/k") {
+		t.Fatal("repository index changed EqualFold semantics")
+	}
+}

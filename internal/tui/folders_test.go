@@ -42,16 +42,14 @@ func TestFoldersNavigationPreferencesAndSearchOwnInput(t *testing.T) {
 	second := local.Folder{Path: filepath.Join(t.TempDir(), "repo two"), Repository: "acme/two"}
 	m, _ = update(m, foldersLoaded{rows: []local.Folder{first, second}})
 	m, cmd = sequence(m, "af")
-	if !m.folders.rows[0].Favorite || cmd == nil {
+	if !m.folders.rows[0].Favorite {
 		t.Fatal("favorite not saved")
 	}
-	m, _ = update(m, cmd())
-	// The refresh contains saved metadata, including the chosen favorite.
+	// The save completion applies metadata without a second folder scan.
 	if len(m.folderRows()) != 1 || !m.folderRows()[0].Favorite {
 		t.Fatal("favorite did not persist")
 	}
-	m, cmd = sequence(m, "ah")
-	m, _ = update(m, cmd())
+	m, _ = sequence(m, "ah")
 	if len(m.folderRows()) != 0 {
 		t.Fatal("hidden folder still visible")
 	}
@@ -59,8 +57,7 @@ func TestFoldersNavigationPreferencesAndSearchOwnInput(t *testing.T) {
 	if len(m.folderRows()) != 1 {
 		t.Fatal("cannot recover hidden folder")
 	}
-	m, cmd = sequence(m, "ah")
-	m, _ = update(m, cmd())
+	m, _ = sequence(m, "ah")
 	if len(m.folderRows()) != 0 {
 		t.Fatal("unhidden folder still in hidden tab")
 	}

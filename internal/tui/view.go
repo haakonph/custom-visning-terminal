@@ -128,7 +128,7 @@ func (m Model) View() tea.View {
 		lines = append(lines, " Relaterte PR-er: "+m.relatedKey+" · lastede GitHub-visninger · Esc tilbake")
 	}
 	sync := "never"
-	if at := m.githubDataset(m.active).SyncedAt; !at.IsZero() {
+	if at := m.githubSyncedAt(m.active); !at.IsZero() {
 		sync = syncAge(at)
 	}
 	state := "ready"

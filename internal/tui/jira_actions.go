@@ -139,8 +139,7 @@ func statusMatches(name, shortcut string) bool {
 func (m Model) jiraActionKey(k string) (tea.Model, tea.Cmd) {
 	state := m.jiraAction
 	if k == "ctrl+c" {
-		m.cancel()
-		return m, tea.Quit
+		return m, m.quit()
 	}
 	if state.running {
 		return m, nil

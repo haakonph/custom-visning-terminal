@@ -17,6 +17,9 @@ type Cache interface {
 	Save(model.Snapshot) error
 }
 type Model struct {
+	localIO *localIOState
+	views   *viewCache
+
 	folders          folderState
 	usage            *usage.Recorder
 	usageView        bool
@@ -82,6 +85,11 @@ type bootMsg struct {
 	warning  string
 }
 type refreshMsg struct {
+	freshRows []model.PullRequest
+
+	prepared bool
+	baseRows []model.PullRequest
+
 	autoMergeVersion uint64
 	view             model.View
 	result           model.Result
@@ -100,7 +108,9 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	s := newSnooze()
 	tasks := newTasks()
 	tasks.snoozes = s
-	m := Model{auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	io := &localIOState{}
+	tasks.io = io
+	m := Model{localIO: io, views: &viewCache{}, auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]model.PullRequest{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, source: source, cache: cache, input: input, width: 100, height: 24, booting: true, open: openBrowser}
 	m.loadRefresh()
 	m.loadNotifications()
 	m.loadJiraPattern()
@@ -163,11 +173,18 @@ func (m *Model) refresh(view model.View) tea.Cmd {
 	m.auto.github[view].started = time.Now()
 	source, user, parent := m.source, m.snapshot.User, m.ctx
 	version := m.autoMergeVersion
+	previous := m.snapshot.Datasets[view].PRs
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		result, err := source.List(ctx, view, user)
-		return refreshMsg{view: view, result: result, err: err, at: time.Now(), autoMergeVersion: version}
+		fresh := result.PRs
+		result.PRs = append([]model.PullRequest(nil), result.PRs...)
+		model.Sort(result.PRs)
+		if err != nil || !result.Complete {
+			result.PRs = model.Merge(previous, result.PRs)
+		}
+		return refreshMsg{freshRows: fresh, prepared: true, baseRows: previous, view: view, result: result, err: err, at: time.Now(), autoMergeVersion: version}
 	}
 }
 
@@ -199,4 +216,8 @@ func (m Model) WithJiraPattern(pattern *regexp.Regexp) Model {
 		m.jiraPattern = pattern
 	}
 	return m
+}
+
+func sameRows(a, b []model.PullRequest) bool {
+	return len(a) == len(b) && (len(a) == 0 || &a[0] == &b[0])
 }

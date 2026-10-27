@@ -75,8 +75,7 @@ func TestJiraSavesAndReloadsCustomQuery(t *testing.T) {
 	defer m.cancel()
 	m.jira.custom = "project = APP ORDER BY updated ASC"
 	m.jira.edit("name", "Lagre søk som: ", "Arbeid")
-	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = updated.(Model)
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	config, err := jira.LoadConfig(m.jira.configPath)
 	if err != nil || len(config.Queries) != 1 {
 		t.Fatal(config, err)
@@ -86,8 +85,7 @@ func TestJiraSavesAndReloadsCustomQuery(t *testing.T) {
 	}
 	m.jira.custom = "statusCategory = Done"
 	m.jira.edit("name", "Lagre søk som: ", "Arbeid")
-	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = updated.(Model)
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.jira.tabs) != 5 || m.jira.config.Queries[0].JQL != "statusCategory = Done" {
 		t.Fatal("named replacement failed")
 	}
@@ -109,8 +107,7 @@ func TestJiraPastedJQLAndModeSwitch(t *testing.T) {
 	}
 	// GitHub results still finish while Jira is visible.
 	m.loading[0] = true
-	updated, _ = m.Update(refreshMsg{view: 0})
-	m = updated.(Model)
+	m, _ = update(m, refreshMsg{view: 0})
 	if m.loading[0] {
 		t.Fatal("background GitHub refresh was swallowed")
 	}

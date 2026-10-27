@@ -21,6 +21,16 @@ import (
 )
 
 type mattermostReader struct {
+	indexedChannels  int
+	indexedPosts     int
+	indexed          bool
+	byChannel        map[string][]model.MattermostPost
+	selectedChannels []model.MattermostChannel
+	latest           map[string]int64
+	filteredValid    bool
+	filteredKey      string
+	filteredPosts    []model.MattermostPost
+
 	entities         *entityState
 	snoozes          *snoozeState
 	query            string
@@ -40,6 +50,8 @@ type mattermostReader struct {
 	input                                                         textinput.Model
 }
 type mmResult struct {
+	index *mattermostIndex
+
 	data          model.MattermostData
 	err           error
 	authenticated bool
@@ -77,7 +89,7 @@ func (m *Model) mmCommand(operation func(context.Context) error) tea.Cmd {
 		if errors.Is(err, mm.ErrSession) || errors.Is(err, mm.ErrAccount) {
 			authenticated = false
 		}
-		return mmResult{data: service.Snapshot(), err: err, authenticated: authenticated}
+		return indexedMMResult(mmResult{data: service.Snapshot(), err: err, authenticated: authenticated})
 	}
 }
 func (m *Model) mmStart() tea.Cmd {
@@ -95,27 +107,61 @@ func (m *Model) mmStart() tea.Cmd {
 			token = s.apiToken
 		}
 		if token == "" {
-			return mmResult{data: s.service.Snapshot(), err: mm.ErrSession}
+			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: mm.ErrSession})
 		}
 		s.api.SetToken(token)
 		if _, err := s.api.Me(ctx); err != nil {
-			return mmResult{data: s.service.Snapshot(), err: err, authenticated: !errors.Is(err, mm.ErrSession) && !errors.Is(err, mm.ErrAccess) && !errors.Is(err, mm.ErrAccount)}
+			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: err, authenticated: !errors.Is(err, mm.ErrSession) && !errors.Is(err, mm.ErrAccess) && !errors.Is(err, mm.ErrAccount)})
 		}
 		err := s.service.Discover(ctx)
 		if err == nil {
 			err = s.service.Sync(ctx)
 		}
-		return mmResult{data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err}
+		return indexedMMResult(mmResult{data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err})
 	}
 }
-func (s *mattermostReader) channels() []model.MattermostChannel {
-	var out []model.MattermostChannel
-	for _, c := range s.data.Channels {
+
+type mattermostIndex struct {
+	byChannel        map[string][]model.MattermostPost
+	selectedChannels []model.MattermostChannel
+	latest           map[string]int64
+	reviews          map[string]time.Time
+}
+
+func buildMattermostIndex(data model.MattermostData) *mattermostIndex {
+	index := &mattermostIndex{byChannel: map[string][]model.MattermostPost{}, latest: map[string]int64{}, reviews: mattermostReviewTimes(data)}
+	for _, c := range data.Channels {
 		if c.Selected {
-			out = append(out, c)
+			index.selectedChannels = append(index.selectedChannels, c)
 		}
 	}
-	return out
+	for _, p := range data.Posts {
+		if p.DeletedAt != 0 {
+			continue
+		}
+		index.byChannel[p.ChannelID] = append(index.byChannel[p.ChannelID], p)
+		index.latest[p.ChannelID] = max(index.latest[p.ChannelID], p.CreatedAt)
+	}
+	return index
+}
+func indexedMMResult(result mmResult) mmResult {
+	result.index = buildMattermostIndex(result.data)
+	return result
+}
+func (s *mattermostReader) installIndex(index *mattermostIndex) {
+	s.byChannel, s.selectedChannels, s.latest, s.reviewRequests = index.byChannel, index.selectedChannels, index.latest, index.reviews
+	s.indexed, s.filteredValid = true, false
+	s.indexedChannels, s.indexedPosts = len(s.data.Channels), len(s.data.Posts)
+}
+func (s *mattermostReader) index() {
+	if s.indexed && s.indexedChannels == len(s.data.Channels) && s.indexedPosts == len(s.data.Posts) {
+		return
+	}
+	s.installIndex(buildMattermostIndex(s.data))
+}
+func (s *mattermostReader) channels() []model.MattermostChannel {
+	s.index()
+	return s.selectedChannels
 }
 func (s *mattermostReader) channel() model.MattermostChannel {
 	cs := s.channels()
@@ -125,11 +171,21 @@ func (s *mattermostReader) channel() model.MattermostChannel {
 	return model.MattermostChannel{}
 }
 func (s *mattermostReader) posts() []model.MattermostPost {
-	var out []model.MattermostPost
+	s.index()
 	c := s.channel()
-	for _, p := range s.data.Posts {
+	key := fmt.Sprintf("%s\x00%s\x00%s\x00%t\x00%s", c.ID, s.root, s.query, s.mentions, s.mentionURL)
+	if s.filteredValid && s.filteredKey == key {
+		return s.filteredPosts
+	}
+	var out []model.MattermostPost
+	posts := s.byChannel[c.ID]
+	if s.mentions {
+		posts = s.data.Posts
+	}
+	q := strings.ToLower(s.query)
+	for _, p := range posts {
 		link := strings.TrimRight(s.data.Server, "/") + "/_redirect/pl/" + p.ID
-		if s.entities.archived("mattermost", link) || (s.snoozes != nil && s.snoozes.hidden(snooze.Identity("mattermost", link))) || !strings.Contains(strings.ToLower(p.Message+" "+p.Author), strings.ToLower(s.query)) {
+		if s.entities.archived("mattermost", link) || (s.snoozes != nil && s.snoozes.hidden(snooze.Identity("mattermost", link))) || !strings.Contains(strings.ToLower(p.Message+" "+p.Author), q) {
 			continue
 		}
 		if p.DeletedAt != 0 {
@@ -152,6 +208,7 @@ func (s *mattermostReader) posts() []model.MattermostPost {
 		}
 		out = append(out, p)
 	}
+	s.filteredValid, s.filteredKey, s.filteredPosts = true, key, out
 	return out
 }
 func (s *mattermostReader) choices() []model.MattermostChannel {
@@ -204,11 +261,11 @@ func (m *Model) mmLogin(value string, pat bool) tea.Cmd {
 			token, err = s.api.Login(ctx, s.account, password, value)
 		}
 		if err != nil {
-			return mmResult{data: s.service.Snapshot(), err: err}
+			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: err})
 		}
 		s.api.SetToken(token)
 		if _, err = s.api.Me(ctx); err != nil {
-			return mmResult{data: s.service.Snapshot(), err: err}
+			return indexedMMResult(mmResult{data: s.service.Snapshot(), err: err})
 		}
 		notice := ""
 		if s.keychain.Save(ctx, token) != nil {
@@ -218,7 +275,7 @@ func (m *Model) mmLogin(value string, pat bool) tea.Cmd {
 		if err == nil {
 			err = s.service.Sync(ctx)
 		}
-		return mmResult{data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err, notice: notice}
+		return indexedMMResult(mmResult{data: s.service.Snapshot(), authenticated: !errors.Is(err, mm.ErrSession), err: err, notice: notice})
 	}
 }
 func (m *Model) mmRead() tea.Cmd {
@@ -251,7 +308,12 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		s.busy = false
 		s.authenticated = msg.authenticated
 		s.data = msg.data
-		s.reviewRequests = mattermostReviewTimes(msg.data)
+		s.indexed, s.filteredValid = false, false
+		if msg.index != nil {
+			s.installIndex(msg.index)
+		} else {
+			s.reviewRequests = mattermostReviewTimes(msg.data)
+		}
 		if m.active == model.SharedReviews {
 			m.clamp()
 		}
@@ -310,8 +372,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return false, nil
 		}
 		if key == "ctrl+c" {
-			m.cancel()
-			return true, tea.Quit
+			return true, m.quit()
 		}
 		if s.searching {
 			switch key {
@@ -415,8 +476,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		switch key {
 		case "q":
-			m.cancel()
-			return true, tea.Quit
+			return true, m.quit()
 		case "esc":
 			if s.root != "" {
 				s.root = ""
@@ -644,13 +704,7 @@ func (m Model) mmReaderView() tea.View {
 	cs := s.channels()
 	tabs := make([]string, 0, len(cs)+1)
 	for _, c := range cs {
-		unread := false
-		for _, p := range s.data.Posts {
-			if p.ChannelID == c.ID && p.DeletedAt == 0 && p.CreatedAt > c.ReadAt {
-				unread = true
-				break
-			}
-		}
+		unread := s.latest[c.ID] > c.ReadAt
 		label := "#" + c.Name
 		if unread {
 			label += " ●"
@@ -701,6 +755,7 @@ func (m Model) mmReaderView() tea.View {
 		if len(ps) == 0 {
 			lines = append(lines, "No cached messages. vk velger kanaler; al logger inn; ap bruker PAT.")
 		} else {
+			channelReadAt := s.channel().ReadAt
 			var body []string
 			selectedLine := 0
 			for i := s.row; i < len(ps); i++ {
@@ -719,7 +774,7 @@ func (m Model) mmReaderView() tea.View {
 				if i == s.row {
 					prefix = "› "
 				}
-				if p.CreatedAt > s.channel().ReadAt {
+				if p.CreatedAt > channelReadAt {
 					prefix += "● "
 				}
 				channel := ""

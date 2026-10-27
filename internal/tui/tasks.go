@@ -15,6 +15,8 @@ import (
 )
 
 type taskState struct {
+	io *localIOState
+
 	snoozes            *snoozeState
 	items              []model.Task
 	active             bool
@@ -57,13 +59,19 @@ func (t *taskState) save() error {
 	if t.loadFailed {
 		return errors.New("oppgaver kunne ikke leses")
 	}
-	err := storage.Save(t.path, t.items)
-	if err != nil {
-		t.notice = "Kunne ikke lagre oppgaver; endringene finnes kun i minnet"
-	} else {
-		t.notice = "Oppgaver lagret lokalt"
+	items, path := cloneTasks(t.items), t.path
+	if t.io == nil { // Standalone stores, outside the terminal program.
+		return storage.Save(path, items)
 	}
-	return err
+	t.notice = "Lagrer oppgaver…"
+	t.io.enqueue(func() error { return storage.Save(path, items) }, func(m *Model, err error) {
+		if err != nil {
+			m.tasks.notice = "Kunne ikke lagre oppgaver; endringene finnes kun i minnet: " + err.Error()
+		} else {
+			m.tasks.notice = "Oppgaver lagret lokalt"
+		}
+	})
+	return nil
 }
 
 func (m Model) taskReference() (model.TaskReference, bool) {
@@ -88,6 +96,9 @@ func (m Model) taskReference() (model.TaskReference, bool) {
 }
 
 func (m Model) collectTask(create bool) (tea.Model, tea.Cmd) {
+	if m.localBusy() {
+		return m, nil
+	}
 	t := &m.tasks
 	if t.loadFailed {
 		t.active = true
@@ -121,9 +132,11 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		t.selectVisible()
 	}
 	k := key.String()
+	if (k == "n" || k == "D" || k == "d" || (t.editing && k == "enter")) && m.localBusy() {
+		return m, nil
+	}
 	if k == "ctrl+c" {
-		m.cancel()
-		return m, tea.Quit
+		return m, m.quit()
 	}
 	if t.searching {
 		if k == "enter" || k == "esc" {
@@ -167,8 +180,7 @@ func (m Model) updateTasks(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	switch k {
 	case "q":
-		m.cancel()
-		return m, tea.Quit
+		return m, m.quit()
 	case "esc":
 		if t.details {
 			t.details = false

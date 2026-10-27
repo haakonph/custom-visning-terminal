@@ -380,17 +380,31 @@ func (m Model) folderAction(prefix, k string) (tea.Model, tea.Cmd) {
 		} else {
 			folder.Hidden = !folder.Hidden
 		}
-		if err := m.local.manager.SaveFolder(folder); err != nil {
-			m.folders.notice = err.Error()
+		if m.localBusy() {
 			return m, nil
 		}
-		for i, f := range m.folders.rows {
-			if f.Path == folder.Path {
-				m.folders.rows[i] = folder
+		manager, parent := m.local.manager, m.ctx
+		var rows []local.Folder
+		m.folders.notice = "Lagrer…"
+		m.enqueueLocal(func() error {
+			if err := manager.SaveFolder(folder); err != nil {
+				return err
 			}
-		}
-		m.folders.selected = max(0, min(m.folders.selected, len(m.folderRows())-1))
-		return m, m.loadFolders()
+			ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+			defer cancel()
+			var err error
+			rows, err = manager.Folders(ctx)
+			return err
+		}, func(m *Model, err error) {
+			if err != nil {
+				m.folders.notice = err.Error()
+				return
+			}
+			m.folders.rows = rows
+			m.folders.selected = max(0, min(m.folders.selected, len(m.folderRows())-1))
+			m.folders.notice = "Lagret"
+		})
+		return m, nil
 	}
 	return m, nil
 }

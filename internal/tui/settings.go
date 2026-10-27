@@ -62,6 +62,9 @@ var settingFields = []settingField{
 }
 
 type settingsState struct {
+	request *settingsRequest
+	busy    bool
+
 	active, editing bool
 	help            bool
 	helpOffset      int
@@ -158,9 +161,7 @@ func (m Model) openSettings() (tea.Model, tea.Cmd) {
 	m.settings.input.CharLimit = 32768
 	m.settings.input.SetWidth(max(1, m.width-6))
 	m.settings.input.Prompt = "> "
-	if err := m.settings.loadValues(); err != nil {
-		m.settings.notice = err.Error()
-	}
+	m.queueSettings(nil, "")
 	return m, nil
 }
 func parseSetting(field settingField, text string) (any, error) {
@@ -283,8 +284,7 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch key.String() {
 		case "ctrl+c":
-			m.cancel()
-			return m, tea.Quit
+			return m, m.quit()
 		case "esc":
 			if s.help {
 				s.help = false
@@ -298,9 +298,12 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
+			if s.busy {
+				return m, nil
+			}
 			if !s.editing {
-				if err := s.loadValues(); err != nil {
-					s.notice = err.Error()
+				if len(s.values) != len(settingFields) {
+					m.queueSettings(nil, "")
 					return m, nil
 				}
 				s.input.SetValue(s.values[s.selected])
@@ -309,45 +312,7 @@ func (m Model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, s.input.Focus()
 			}
 			field := settingFields[s.selected]
-			if err := saveSetting(field, s.input.Value()); err != nil {
-				s.notice = "Kunne ikke lagre: " + err.Error()
-				return m, nil
-			}
-			s.editing = false
-			s.input.Blur()
-			s.notice = "Lagret. Øvrige innstillinger tas i bruk etter omstart."
-			if strings.HasPrefix(field.path, "mattermost.") && m.mmReader == nil {
-				s.notice = "Lagret. Esc tilbake og vc tar førstegangsoppsettet i bruk uten omstart."
-			}
-			if err := s.loadValues(); err != nil {
-				s.notice = err.Error()
-			}
-			if strings.HasPrefix(field.path, "notifications.") {
-				m.loadNotifications()
-				s.notice = "Varslingsinnstillinger tatt i bruk."
-			}
-			if strings.HasPrefix(field.path, "refresh.") {
-				m.loadRefresh()
-				s.notice = "Oppdateringsinnstillinger tatt i bruk."
-			}
-			if field.path == "github.hidden_prefixes" {
-				m.loadGitHubDisplay()
-				s.notice = "GitHub-visning lagret og tatt i bruk."
-			}
-			if field.path == "jira.pattern" {
-				m.jiraPattern = nil
-				m.loadJiraPattern()
-				m.selected = 0
-				s.notice = "Jira-mønster lagret og tatt i bruk."
-			}
-			if m.jira != nil {
-				config, err := jira.LoadConfig(jira.ConfigPath())
-				if err == nil {
-					m.jira.config = config
-					m.jira.tabs = append(m.jira.tabs[:4:4], config.Queries...)
-					m.jira.active = min(m.jira.active, len(m.jira.tabs)-1)
-				}
-			}
+			m.queueSettings(&field, s.input.Value())
 			return m, nil
 		}
 		if !s.editing {
@@ -443,4 +408,83 @@ func (m Model) settingsView() tea.View {
 	view.AltScreen = true
 	view.WindowTitle = "custom-visning · Innstillinger"
 	return view
+}
+
+// A request identity prevents an old load from changing a reopened editor.
+type settingsRequest struct{ marker bool }
+
+func (m *Model) queueSettings(field *settingField, value string) {
+	request := &settingsRequest{}
+	m.settings.request, m.settings.busy = request, true
+	m.settings.notice = "Laster…"
+	if field != nil {
+		m.settings.notice = "Lagrer…"
+	}
+	var loaded settingsState
+	var runtime Model
+	var config jira.Config
+	m.enqueueLocal(func() error {
+		if field != nil {
+			if err := saveSetting(*field, value); err != nil {
+				return err
+			}
+		}
+		if err := loaded.loadValues(); err != nil {
+			return err
+		}
+		runtime.loadRefresh()
+		runtime.loadNotifications()
+		runtime.loadGitHubDisplay()
+		runtime.loadJiraPattern()
+		var err error
+		config, err = jira.LoadConfig(jira.ConfigPath())
+		return err
+	}, func(m *Model, err error) {
+		// Saved configuration still applies if the user closed the editor meanwhile.
+		if err == nil && field != nil {
+			switch {
+			case strings.HasPrefix(field.path, "refresh."):
+				m.auto.options = runtime.auto.options
+			case strings.HasPrefix(field.path, "notifications."):
+				m.notifications.options = runtime.notifications.options
+			case field.path == "github.hidden_prefixes":
+				m.githubHiddenPrefixes = runtime.githubHiddenPrefixes
+			case field.path == "jira.pattern":
+				m.jiraPattern = runtime.jiraPattern
+				m.selected = 0
+			}
+			if m.jira != nil {
+				m.jira.config = config
+				m.jira.tabs = append(m.jira.tabs[:4:4], config.Queries...)
+				m.jira.active = min(m.jira.active, len(m.jira.tabs)-1)
+			}
+		}
+		if m.settings.request != request {
+			return
+		}
+		m.settings.busy = false
+		if err != nil {
+			m.settings.notice = "Kunne ikke lese/lagre innstillinger: " + err.Error()
+			return
+		}
+		m.settings.values = loaded.values
+		m.settings.notice = ""
+		if field != nil {
+			m.settings.editing = false
+			m.settings.input.Blur()
+			m.settings.notice = "Lagret. Øvrige innstillinger tas i bruk etter omstart."
+			switch {
+			case strings.HasPrefix(field.path, "mattermost.") && m.mmReader == nil:
+				m.settings.notice = "Lagret. Esc tilbake og vc tar førstegangsoppsettet i bruk uten omstart."
+			case strings.HasPrefix(field.path, "notifications."):
+				m.settings.notice = "Varslingsinnstillinger tatt i bruk."
+			case strings.HasPrefix(field.path, "refresh."):
+				m.settings.notice = "Oppdateringsinnstillinger tatt i bruk."
+			case field.path == "github.hidden_prefixes":
+				m.settings.notice = "GitHub-visning lagret og tatt i bruk."
+			case field.path == "jira.pattern":
+				m.settings.notice = "Jira-mønster lagret og tatt i bruk."
+			}
+		}
+	})
 }
