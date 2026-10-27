@@ -164,6 +164,7 @@ func (w *WorktreeManager) prepareProject(ctx context.Context, path, head string)
 	if w.Workspace.Install {
 		commands = append(commands, projectCommands(path, w.Workspace.MavenFlags)...)
 	}
+	buildCommands := len(commands)
 	if indexer := w.Workspace.Indexer; indexer.Command != "" {
 		args := make([]string, 0, len(indexer.Args)+1)
 		replaced := false
@@ -185,7 +186,15 @@ func (w *WorktreeManager) prepareProject(ctx context.Context, path, head string)
 		return err
 	}
 	defer log.Close()
-	for _, command := range commands {
+	skipped := false
+	for i, command := range commands {
+		if i < buildCommands {
+			if _, lookupErr := exec.LookPath(command.command); lookupErr != nil {
+				fmt.Fprintf(log, "Skipping %s preparation: %v\n", filepath.Base(command.command), lookupErr)
+				skipped = true
+				continue
+			}
+		}
 		cmd := exec.CommandContext(ctx, command.command, command.args...)
 		cmd.Dir, cmd.Stdout, cmd.Stderr = path, log, log
 		cmd.Env = append(os.Environ(), "CI=true", "GIT_TERMINAL_PROMPT=0")
@@ -195,6 +204,10 @@ func (w *WorktreeManager) prepareProject(ctx context.Context, path, head string)
 			}
 			return fmt.Errorf("%s preparation failed; see %s: %w", filepath.Base(command.command), logPath, err)
 		}
+	}
+	// Retry missing build tools on the next preparation instead of caching success.
+	if skipped {
+		return nil
 	}
 	if err = os.MkdirAll(filepath.Dir(stamp), 0700); err != nil {
 		return err
