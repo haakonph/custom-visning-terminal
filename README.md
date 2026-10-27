@@ -1033,6 +1033,9 @@ root build files. Maven uses `./mvnw -B -DskipTests -Dmaven.gitcommitid.skip=tru
 uses `./gradlew --no-daemon assemble -x test` (or `gradle`), and npm uses `npm ci`
 when a lockfile exists, otherwise `npm install`. Java builds prefer Maven when
 both Maven and Gradle root files exist; npm also runs for mixed projects.
+Preparation checks that the selected wrapper or tool is executable before running
+it. Missing tools are skipped and recorded in the preparation log; preparation is
+retried on the next opening so newly installed tools can run.
 This executes the repository's build/install scripts. Set `workspace.install`
 to false to disable it. Java/Node and any required SDK versions must already be
 available in the app's environment. Monorepos should expose their build from the

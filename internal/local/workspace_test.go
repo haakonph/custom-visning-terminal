@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -214,6 +215,60 @@ func TestProjectCommandsUseWrappersAndLockfile(t *testing.T) {
 	want[0] = projectCommand{filepath.Join(path, "gradlew"), []string{"--no-daemon", "assemble", "-x", "test"}}
 	if got := projectCommands(path, []string{"-Pcustom"}); !reflect.DeepEqual(got, want) {
 		t.Fatal(got)
+	}
+}
+
+func TestPreparationSkipsMissingToolsAndRetries(t *testing.T) {
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, manifest := range []string{"pom.xml", "build.gradle", "package.json"} {
+		t.Run(manifest, func(t *testing.T) {
+			w, p, _ := fixture(t)
+			w.Workspace.Install = false
+			s, err := w.Prepare(context.Background(), p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.Workspace.Install = true
+			if err := os.WriteFile(filepath.Join(s.Path, manifest), nil, 0600); err != nil {
+				t.Fatal(err)
+			}
+			bin := t.TempDir()
+			if err := os.Symlink(gitPath, filepath.Join(bin, "git")); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", bin)
+			if err := w.prepareProject(context.Background(), s.Path, s.Head); err != nil {
+				t.Fatal(err)
+			}
+			logs, err := filepath.Glob(filepath.Join(w.Repositories.Dir, "logs", "*.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, log := range logs {
+				data, err := os.ReadFile(log)
+				if err != nil {
+					t.Fatal(err)
+				}
+				found = found || strings.Contains(string(data), "Skipping ")
+			}
+			if !found {
+				t.Fatal("missing tool was not logged")
+			}
+			command := projectCommands(s.Path, nil)[0].command
+			if err := os.WriteFile(filepath.Join(bin, command), []byte("#!/bin/sh\necho ran > build-ran\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.prepareProject(context.Background(), s.Path, s.Head); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(s.Path, "build-ran")); err != nil {
+				t.Fatal("preparation was not retried after installing tool:", err)
+			}
+		})
 	}
 }
 
