@@ -827,6 +827,37 @@ og pek Copilots exporter til `http://127.0.0.1:4319`. Begge appene kan lese de s
 Copilot-filene uavhengig. En exporter sender til det endpointet du konfigurerer;
 appene deler ikke telemetri eller lagringsfiler.
 
+### Rå OTLP-logg og unike hendelser
+
+For å undersøke alle hendelsestypene som kommer inn, aktiver en egen JSONL-fil
+før du starter terminalappen:
+
+```sh
+export COPILOT_OTLP_LOG_PATH="$PWD/otlp.jsonl"
+```
+
+Hver gyldige OTLP-forespørsel lagres som én linje med `time`, `signal`,
+`content_type` og `payload`. JSON-innhold beholdes med alle felter; protobuf
+konverteres til OTLP-JSON og originalbytes beholdes i `protobuf_base64`.
+Dette inkluderer felter som dagens normalisering og visning ikke bruker.
+Loggen krever at innsamling og `COPILOT_CAPTURE_CONTENT` er aktivert.
+Uten angitt sti opprettes ingen rålogg. Filen har rettigheter `0600`.
+Skrivefeil gir HTTP 503 slik at avsenderen kan prøve igjen.
+
+Vis unike hendelsesnavn, antall, attributtnøkler og ett komplett eksempel per navn:
+
+```sh
+node scripts/otlp-unique.mjs "$COPILOT_OTLP_LOG_PATH"
+node scripts/otlp-unique.mjs "$COPILOT_OTLP_LOG_PATH" > otlp-unike.json
+```
+
+Unik betyr kombinasjonen av signal og navn: `eventName` / `event.name` /
+`event_name` for logger, span-navn, navn på span-hendelser og metrikknavn.
+Logger uten navn samles under `(uten navn)`; alle originalposter finnes i JSONL-filen.
+Antall inkluderer gjentatte leveranser. Filen vokser uten automatisk rotasjon,
+og kan inneholde prompter, svar og hemmeligheter. Stopp appen før du arkiverer
+eller analyserer filen for et stabilt uttrekk uten en uferdig siste linje.
+
 ### Konfigurasjon og innhold
 
 Disse miljøvariablene styrer terminalappen; start den på nytt etter endringer:
@@ -835,6 +866,7 @@ Disse miljøvariablene styrer terminalappen; start den på nytt etter endringer:
 | --- | --- | --- |
 | `COPILOT_SESSION_ROOT` | `~/.copilot/session-state` | Absolutt sti til historikkmappen; en egendefinert verdi må være ferdig ekspandert |
 | `COPILOT_STORE_PATH` | Se datalagerstien ovenfor | Absolutt sti til terminalens eget SQLite-lager (eldre JSON-stier støttes) |
+| `COPILOT_OTLP_LOG_PATH` | Tom (av) | Absolutt sti til rå OTLP-logg i JSONL-format |
 | `COPILOT_OTLP_PORT` | `4318` | Lokal mottakerport |
 | `COPILOT_COLLECTION_ENABLED` | `true` | `false` stopper filimport og mottaker; lagret historikk kan leses |
 | `COPILOT_CAPTURE_CONTENT` | `true` | `false` utelater innhold, argumenter/resultater, feiltekst og rådata fra nye lagrede observasjoner |

@@ -69,6 +69,11 @@ func (s *Service) handler() http.Handler {
 		}
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if err := s.appendOTLPLog(signal, kind, body); err != nil {
+			s.reportSaveErrorLocked("OTLP-logg", err)
+			http.Error(w, "OTLP log persistence failed", 503)
+			return
+		}
 		s.ingestLocked(events)
 		s.diagnostics.LastOtel = time.Now().UTC().Format(time.RFC3339Nano)
 		for _, e := range events {
@@ -90,7 +95,7 @@ func (s *Service) handler() http.Handler {
 		}
 	}), "/v1/traces", "/v1/logs", "/v1/metrics"))
 }
-func decodeOTLP(signal, kind string, b []byte) ([]Event, error) {
+func otlpJSON(signal, kind string, b []byte) ([]byte, error) {
 	if kind == "application/x-protobuf" {
 		var message proto.Message
 		switch signal {
@@ -111,6 +116,14 @@ func decodeOTLP(signal, kind string, b []byte) ([]Event, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	return b, nil
+}
+
+func decodeOTLP(signal, kind string, b []byte) ([]Event, error) {
+	b, err := otlpJSON(signal, kind, b)
+	if err != nil {
+		return nil, err
 	}
 	var payload map[string]any
 	if json.Unmarshal(b, &payload) != nil {
