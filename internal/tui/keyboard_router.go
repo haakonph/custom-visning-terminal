@@ -361,7 +361,13 @@ func (m Model) changeTab(delta int) (tea.Model, tea.Cmd) {
 	case "mattermost":
 		m.mmReader.changeTab(delta)
 	case "github":
-		m.active = model.View((int(m.active) + delta + (int(model.SharedReviews) + 1)) % (int(model.SharedReviews) + 1))
+		tabs := model.GitHubTabs()
+		for i, view := range tabs {
+			if view == m.active {
+				m.active = tabs[((i+delta)%len(tabs)+len(tabs))%len(tabs)]
+				break
+			}
+		}
 		m.selected = 0
 	}
 	return m, nil

@@ -17,6 +17,8 @@ func query(view model.View, user string) string {
 		return "is:open is:pr author:" + user + " draft:false"
 	case model.Drafts:
 		return "is:open is:pr author:" + user + " draft:true"
+	case model.Reviewed:
+		return "is:open is:pr reviewed-by:" + user
 	case model.Reviews:
 		return "is:open is:pr user-review-requested:" + user
 	}

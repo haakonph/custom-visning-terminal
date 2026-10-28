@@ -376,3 +376,30 @@ func TestLatestObservationWinsWhenPRUpdateTimeIsUnchanged(t *testing.T) {
 		t.Fatal("older observation replaced the shared PR")
 	}
 }
+
+func TestGitHubCacheBeforeReviewedTab(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "github.json")
+	snap := model.Snapshot{Version: 1, User: "alice"}
+	snap.Datasets[model.TeamReviews] = model.Dataset{PRs: []model.PullRequest{{URL: "https://github.com/acme/api/pull/1", Repository: "acme/api", Number: 1, Title: "Team request"}}, SyncedAt: time.Now().UTC()}
+	if err := Save(path, snap); err != nil {
+		t.Fatal(err)
+	}
+	db, err := open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec("DELETE FROM sync_state WHERE view_id = ?", int(model.Reviewed)); err != nil {
+		t.Fatal(err)
+	}
+	var got model.Snapshot
+	if err := Load(path, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.Datasets[model.TeamReviews], snap.Datasets[model.TeamReviews]) {
+		t.Fatal("existing team requests changed")
+	}
+	if len(got.Datasets[model.Reviewed].PRs) != 0 || !got.Datasets[model.Reviewed].SyncedAt.IsZero() {
+		t.Fatal("new view should start empty and unsynced")
+	}
+}
