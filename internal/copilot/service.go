@@ -20,6 +20,7 @@ import (
 )
 
 type Options struct {
+	OTLPLogPath    string            `json:"otlp_log_path"`
 	SessionRoot    string            `json:"session_root"`
 	StorePath      string            `json:"store_path"`
 	Port           int               `json:"port"`
@@ -50,7 +51,7 @@ func OptionsFromEnv() (Options, error) {
 	if err := appconfig.Section(appconfig.Path(), "copilot", &o); err != nil {
 		return o, err
 	}
-	for key, target := range map[string]*string{"COPILOT_SESSION_ROOT": &o.SessionRoot, "COPILOT_STORE_PATH": &o.StorePath, "COPILOT_JIRA_PATTERN": &o.JiraPattern} {
+	for key, target := range map[string]*string{"COPILOT_OTLP_LOG_PATH": &o.OTLPLogPath, "COPILOT_SESSION_ROOT": &o.SessionRoot, "COPILOT_STORE_PATH": &o.StorePath, "COPILOT_JIRA_PATTERN": &o.JiraPattern} {
 		if v, ok := os.LookupEnv(key); ok {
 			*target = v
 		}
@@ -118,6 +119,9 @@ func NewDeferred(o Options) (*Service, error) {
 	}
 	if o.Port < 0 || o.Port > 65535 {
 		return nil, errors.New("invalid OTLP port")
+	}
+	if o.OTLPLogPath != "" && !filepath.IsAbs(o.OTLPLogPath) {
+		return nil, errors.New("COPILOT_OTLP_LOG_PATH must be absolute")
 	}
 	re, err := regexp.Compile(o.JiraPattern)
 	if err != nil {
