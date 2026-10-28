@@ -48,7 +48,7 @@ func graph(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"data": map[string]any{"nodes": nodes}})
 }
 func TestSearchFiltersPaginationAndMapping(t *testing.T) {
-	for _, view := range []model.View{model.Open, model.Drafts, model.Reviews} {
+	for _, view := range []model.View{model.Open, model.Drafts, model.Reviews, model.Reviewed} {
 		t.Run(view.String(), func(t *testing.T) {
 			var searches, graphs atomic.Int32
 			client := fixture(t, func(w http.ResponseWriter, r *http.Request) {
@@ -377,5 +377,11 @@ func TestIncompleteTeamMembershipIsNotCached(t *testing.T) {
 	teams, err := c.Teams(context.Background())
 	if err != nil || calls != 2 || len(teams) != 1 {
 		t.Fatal("failed membership response cached", teams, err, calls)
+	}
+}
+
+func TestReviewedQuery(t *testing.T) {
+	if got := query(model.Reviewed, "alice"); got != "is:open is:pr reviewed-by:alice" {
+		t.Fatalf("reviewed query: %q", got)
 	}
 }

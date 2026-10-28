@@ -104,7 +104,11 @@ func (m Model) View() tea.View {
 	}
 	lines = append(lines, accent.Render(" CUSTOM VISNING ")+muted.Render("GitHub · "+clean(user)+"  [vg GitHub] · vt Jira"))
 	tabs := []string{}
-	for v := model.Open; v <= model.SharedReviews; v++ {
+	activeTab := 0
+	for i, v := range model.GitHubTabs() {
+		if v == m.active {
+			activeTab = i
+		}
 		label := v.String()
 		if m.githubLoading(v) {
 			label += " ↻"
@@ -118,7 +122,7 @@ func (m Model) View() tea.View {
 	}
 	// Scroll the tab strip so the active tab remains visible in narrow terminals.
 	start := 0
-	for start < int(m.active) && ansi.StringWidth(strings.Join(tabs[start:int(m.active)+1], "  ")) > m.width {
+	for start < activeTab && ansi.StringWidth(strings.Join(tabs[start:activeTab+1], "  ")) > m.width {
 		start++
 	}
 	tabs = tabs[start:]

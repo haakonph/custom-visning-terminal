@@ -14,18 +14,24 @@ const (
 	Drafts
 	Reviews
 	TeamReviews
+	Reviewed
 	ViewCount
 )
 
 // SharedReviews is derived from personal and team requests; it is not cached separately.
 const SharedReviews View = ViewCount
 
+// GitHubTabs defines display order independently of persisted view IDs.
+func GitHubTabs() []View {
+	return []View{Open, Drafts, Reviews, SharedReviews, Reviewed, TeamReviews}
+}
+
 func (v View) IsReview() bool {
-	return v == Reviews || v == TeamReviews || v == SharedReviews
+	return v == Reviews || v == TeamReviews || v == SharedReviews || v == Reviewed
 }
 
 func (v View) String() string {
-	return [...]string{"My Open PRs", "My Draft PRs", "My Review Requests", "Team Review Requests", "Shared Review Requests"}[v]
+	return [...]string{"My Open PRs", "My Draft PRs", "My Review Requests", "Team Review Requests", "My Reviewed PRs", "Shared Review Requests"}[v]
 }
 
 type Status string

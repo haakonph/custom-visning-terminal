@@ -217,12 +217,16 @@ func readGitHub(ctx context.Context, q *dbgen.Queries) (model.Snapshot, error) {
 	if err != nil {
 		return out, err
 	}
-	if len(syncs) != int(model.ViewCount) {
+	// Older caches have no Reviewed dataset; retain them and refresh the new view.
+	if len(syncs) != int(model.ViewCount) && len(syncs) != int(model.ViewCount)-1 {
 		return out, errors.New("incomplete GitHub sync state")
 	}
 	for _, r := range syncs {
 		if r.ViewID < 0 || r.ViewID >= int64(model.ViewCount) {
 			return out, errors.New("invalid GitHub view")
+		}
+		if len(syncs) == int(model.ViewCount)-1 && r.ViewID == int64(model.Reviewed) {
+			return out, errors.New("incomplete GitHub sync state")
 		}
 		at, err := parseTime(r.SyncedAt)
 		if err != nil {

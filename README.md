@@ -6,7 +6,7 @@ tilgang til, inkludert private repositories og flere organisasjoner.
 
 ```text
  CUSTOM VISNING GitHub · alice
-[1 My Open PRs]  2 My Draft PRs  3 My Review Requests  4 Team Review Requests
+[My Open PRs]  My Draft PRs  My Review Requests  Shared Review Requests  My Reviewed PRs  Team Review Requests
  ready · last full sync: 2026-10-17 10:35:02
 REPOSITORY           PR      TITLE                       AUTHOR       REVIEW    CI      UPDATED
 acme/frontend        #123    Fix login flow              alice        APPROVED  PASS    2h
@@ -184,8 +184,10 @@ Gamle enkelttaster, talltaster for faner og Tab-snarveier er fjernet. Enter bruk
 bare til å bekrefte dialoger/tekstfelt. AI og chat har også flervalg, koblinger,
 relasjoner, snooze og lokalt arkiv. Typene kan inngå i kjedede handlinger.
 
-GitHub-fanene er egne åpne PR-er uten drafts, egne drafts, direkte reviewforespørsler
-og teamforespørsler. Sist ligger **Shared Review Requests**, som samler direkte og teamrettede
+GitHub-fanene er egne åpne PR-er uten drafts, egne drafts, direkte reviewforespørsler,
+**Shared Review Requests**, **My Reviewed PRs** og teamforespørsler.
+**My Reviewed PRs** viser åpne PR-er du har reviewet på GitHub (`reviewed-by`),
+selv om du ikke lenger står som forespurt reviewer. **Shared Review Requests** samler direkte og teamrettede
 reviewforespørsler med PR-lenke i en valgt Mattermost-kanal eller en melding sendt fra appen.
 Hver PR vises én gang. Visningen følger de lastede reviewlistene og oppdateres når meldinger
 eller reviewforespørsler endres. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
