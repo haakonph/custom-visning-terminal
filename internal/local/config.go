@@ -36,7 +36,7 @@ type WorkspaceConfig struct {
 }
 
 func Defaults() Config {
-	return Config{Workspace: WorkspaceConfig{Warm: true, Install: true, MainBranch: "main", MavenFlags: []string{"-Dmaven.gitcommitid.skip=true"}, Indexer: Editor{Args: []string{"warmup", "{path}"}}}, Editors: Editors{Default: "intellij", IntelliJ: Editor{"idea", []string{"{path}"}}, VSCode: Editor{"code", []string{"--new-window", "{path}"}}}}
+	return Config{Workspace: WorkspaceConfig{Warm: true, Install: true, MainBranch: "main", MavenFlags: []string{"-Dmaven.gitcommitid.skip=true"}, Indexer: Editor{Args: []string{"warmup", "{path}"}}}, Editors: Editors{Default: "vscode", IntelliJ: Editor{"idea", []string{"{path}"}}, VSCode: Editor{"code", []string{"--new-window", "{path}"}}}}
 }
 func Directories() (config, data string, err error) {
 	config, err = os.UserConfigDir()
