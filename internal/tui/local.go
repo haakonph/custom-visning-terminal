@@ -164,7 +164,7 @@ func (m *Model) openLocal(editor string) tea.Cmd {
 	if editor == "" {
 		editor = l.launcher.Editors.Default
 		if editor == "" {
-			editor = "intellij"
+			editor = local.Defaults().Editors.Default
 		}
 	}
 	if l.running > 0 || len(l.preparing) > 0 {

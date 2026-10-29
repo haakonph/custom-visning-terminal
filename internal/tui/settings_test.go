@@ -241,6 +241,10 @@ func TestDefaultEditorNavigationAndCustom(t *testing.T) {
 	m, _ = sequence(m, "vs")
 	m.settings.selected = 5
 	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.settings.editorChoice != 1 {
+		t.Fatal("VS Code default not selected")
+	}
+	m, _ = update(m, key('k'))
 	m, _ = update(m, key('j'))
 	if m.settings.editorChoice != 1 || m.settings.selected != 5 {
 		t.Fatal("navigation moved setting")

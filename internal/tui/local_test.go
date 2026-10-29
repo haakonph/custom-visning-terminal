@@ -37,7 +37,7 @@ func TestExistingWorktreeLaunchesBeforeProjectPreparation(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(path, "pom.xml"), []byte("<project/>"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	m.local.launcher.Editors.IntelliJ.Args = []string{"--version"}
+	m.local.launcher.Editors.VSCode.Args = []string{"--version"}
 	m.local.queue = []model.PullRequest{p}
 	msg := m.nextLocal()()
 	opened, ok := msg.(localOpened)
@@ -94,6 +94,7 @@ func localModel(t *testing.T) Model {
 		t.Skip("git required")
 	}
 	c.Editors.IntelliJ.Command = binary
+	c.Editors.VSCode.Command = binary
 	return m.WithLocal(w, c.Editors)
 }
 func TestPRSelectionAcrossViews(t *testing.T) {

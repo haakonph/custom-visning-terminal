@@ -955,7 +955,7 @@ Edit it and restart the application:
     }
   },
   "editors": {
-    "default": "intellij",
+    "default": "vscode",
     "intellij": {"command": "idea", "args": ["{path}"]},
     "vscode": {"command": "code", "args": ["--new-window", "{path}"]},
     "custom": {"command": "my-editor", "args": ["--project", "{path}"]}
@@ -970,6 +970,7 @@ and HTTPS remotes are matched by GitHub owner/repository, case insensitively.
 Registered repositories take priority over cached clones. Moved/deleted paths
 are ignored; update the configuration to register their new location.
 
+VS Code is the default editor for new configurations; existing editor preferences are preserved.
 Each executable is checked on PATH before preparation starts. Arguments are
 passed directly with Go's `os/exec`, without a shell. Every `{path}` is replaced
 with the absolute worktree directory; if no placeholder is supplied the path is

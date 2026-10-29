@@ -314,7 +314,7 @@ func (m Model) folderKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			launcher, openRequested := m.local.launcher, f.openAfterCreate
 			editor := launcher.Editors.Default
 			if editor == "" {
-				editor = "intellij"
+				editor = local.Defaults().Editors.Default
 			}
 			f.busy = true
 			f.notice = "Oppretter mappe for " + issue.Key + "…"
@@ -360,7 +360,7 @@ func (m Model) folderAction(prefix, k string) (tea.Model, tea.Cmd) {
 		launcher := m.local.launcher
 		editor := launcher.Editors.Default
 		if editor == "" {
-			editor = "intellij"
+			editor = local.Defaults().Editors.Default
 		}
 		m.folders.busy = true
 		return m, func() tea.Msg {
