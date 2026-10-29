@@ -169,6 +169,10 @@ PR-bygg bruker GitHubs test-merge-commit.
 
 ## Visninger og hurtigtaster
 
+Et [forslag til nytt tastaturoppsett](docs/keyboard-proposal.md) beskriver
+enklere bokstavkommandoer, sidemeny og sideavgrensede handlinger, med alle dagens
+funksjoner bevart. Forslaget er ikke implementert; oversikten under gjelder dagens app.
+
 Alle snarveier følger nå ett mønster. Se [fullstendig tastaturoversikt](docs/keyboard.md),
 inkludert tastene som ikke var definert i den opprinnelige listen.
 
