@@ -237,7 +237,11 @@ func checkStatus(rollup *checkRollup, required ...string) model.Status {
 			state = check.Conclusion
 		}
 		switch state {
-		case "SUCCESS", "NEUTRAL", "SKIPPED":
+		case "SUCCESS", "NEUTRAL":
+		case "SKIPPED":
+			if required {
+				missing = true
+			}
 		case "PENDING":
 			pending = true
 		case "EXPECTED":
