@@ -38,7 +38,7 @@ func status(s model.Status) string {
 		color = "108"
 	case model.Fail, model.ChangesRequested, model.Conflicting:
 		color = "174"
-	case model.Pending, model.Warning:
+	case model.Missing, model.Pending, model.Warning:
 		color = "179"
 	case model.Texts:
 		color = "141"

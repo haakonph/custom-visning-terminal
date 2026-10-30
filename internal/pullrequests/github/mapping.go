@@ -42,6 +42,7 @@ const detailsQuery = `query($ids:[ID!]!) {
 }`
 
 type details struct {
+	RequiredChecks           *requiredChecks     `json:"baseRef"`
 	CopilotReviews           copilotReviews      `json:"copilotReviews"`
 	ReviewThreads            *reviewThreads      `json:"reviewThreads"`
 	BaseRef                  string              `json:"baseRefName"`
@@ -128,12 +129,15 @@ func (c *Client) enrich(ctx context.Context, rows []model.PullRequest) error {
 					rows[i].CI = model.Unknown
 					failures = append(failures, errors.New("could not read GitHub checks"))
 					d.Commits.Nodes = nil
+					d.RequiredChecks = nil
 				} else {
 					d.Commits = checks.Commits
+					d.RequiredChecks = checks.RequiredChecks
 					if err := c.completeChecks(ctx, rows[i], d); err != nil {
 						failures = append(failures, err)
 						rows[i].CI = model.Unknown
 						d.Commits.Nodes = nil
+						d.RequiredChecks = nil
 					}
 				}
 			}
@@ -218,8 +222,12 @@ func applyDetails(p *model.PullRequest, d *details) {
 	}
 	applyReview(p, d)
 	applyCopilotReview(p, d)
-	if len(d.Commits.Nodes) > 0 && d.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
-		p.CI = checkStatus(d.Commits.Nodes[0].Commit.StatusCheckRollup)
+	if len(d.Commits.Nodes) > 0 || d.RequiredChecks != nil {
+		var rollup *checkRollup
+		if len(d.Commits.Nodes) > 0 {
+			rollup = d.Commits.Nodes[0].Commit.StatusCheckRollup
+		}
+		p.CI = checkStatus(rollup, d.RequiredChecks.contexts()...)
 	}
 }
 func contains(values []string, value string) bool {
