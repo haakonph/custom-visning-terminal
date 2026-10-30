@@ -177,6 +177,24 @@ func TestReviewSummaryRendering(t *testing.T) {
 	}
 }
 
+func TestMissingCIInAllGitHubTabs(t *testing.T) {
+	m := New(context.Background(), nil, nil)
+	defer m.cancel()
+	p := model.PullRequest{Title: "Required build has not started", CI: model.Missing}
+	for _, view := range model.GitHubTabs() {
+		m.active = view
+		for _, width := range []int{100, 120, 160, 200} {
+			m.width = width
+			for _, selected := range []bool{false, true} {
+				row := ansi.Strip(m.row(p, false, selected))
+				if !strings.Contains(row, "MISSING") {
+					t.Fatalf("%s, width %d, selected %v: CI missing from row %q", view, width, selected, row)
+				}
+			}
+		}
+	}
+}
+
 func TestCopilotReviewLabel(t *testing.T) {
 	for _, tc := range []struct{ recommendation, want string }{
 		{"Approval", "🟢"}, {"Changes", "🔴"}, {"Review", "🟡"}, {"Comments", "💬"}, {"Dismissed", "⚪"},
