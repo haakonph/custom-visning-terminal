@@ -898,13 +898,13 @@ JSONL-poster er begrenset til 2 MiB, workspace til 1 MiB og OTLP-forespørsler t
 ikke. Filfeil beholder tidligere importerte data og rapporteres uten kildeinnhold.
 
 - **/** søker på sesjon, repository, prosjekt, Jira, klient, modell og status.
-- **Enter** viser metadata, samtale, verktøyargumenter/resultater og feil.
+- **d** viser metadata, samtale, verktøyargumenter/resultater og feil.
 - **eee** åpner den valgte sesjonens arbeidsmappe i IntelliJ fra listen eller detaljene.
 - **eew** åpner sesjonens Git-/worktreerot i IntelliJ.
 - **j/k** eller pil opp/ned velger sesjon eller ruller i detaljene.
 - **vi** viser diagnostikk; **Esc** går tilbake og fjerner søket.
 - **au** oppdaterer manuelt. Visningen oppdateres også hvert tredje sekund.
-- **g** og **J** bytter til GitHub/Jira når de er konfigurert.
+- **vg** og **vt** bytter til GitHub/Jira når de er konfigurert.
 
 ### Åpne IntelliJ fra en sesjon
 

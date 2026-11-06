@@ -19,7 +19,7 @@ type Cache = pullrequests.Cache
 type Model struct {
 	page           page
 	jiraSession    syncstate.Scope
-	copilotSession syncstate.Scope
+	copilotSession *syncstate.Scope // Init and Update must share request identity across Model copies.
 	chatSession    syncstate.Scope
 	webhookSession syncstate.Scope
 	localIO        *localIOState
@@ -116,6 +116,7 @@ func New(ctx context.Context, source model.Source, cache Cache) Model {
 	io := &localIOState{}
 	tasks.io = io
 	m := Model{prs: pullrequests.New(ctx, source, cache), relations: &relations.Index{}, localIO: io, views: &viewCache{}, auto: refreshState{jira: map[string]*refreshJob{}}, entities: newEntities(), extraChosen: map[string]model.TaskReference{}, chosen: map[string]struct{}{}, snoozes: s, tasks: tasks, ctx: ctx, cancel: cancel, input: input, width: 100, height: 24, booting: true, open: openBrowser}
+	m.copilotSession = &syncstate.Scope{}
 	m.loadRefresh()
 	m.loadNotifications()
 	m.loadJiraPattern()
