@@ -54,15 +54,19 @@ func (m Model) prGroupHeading(key string, count int) string {
 	label := key
 	if key == "" {
 		label = "Uten Jira-sak"
-	} else if key != dependabotGroup && m.jira != nil {
+	}
+	label = fmt.Sprintf("%s · %d PR", label, count)
+	if key != "" && key != dependabotGroup && m.jira != nil {
 		for _, issue := range m.jira.rows {
 			if issue.Key == key {
-				label += " · " + issue.Title
+				if title := strings.TrimSpace(issue.Title); title != "" {
+					label += " · " + title
+				}
 				break
 			}
 		}
 	}
-	return accent.Render(clean(fmt.Sprintf(" ▼ %s · %d PR", label, count)))
+	return accent.Render(clean(" ▼ " + label))
 }
 
 // Headers are presentation only: selection, ranges and actions all use the
