@@ -156,6 +156,11 @@ func (m Model) updateCopilot(msg tea.Msg) (tea.Model, tea.Cmd) {
 				c.detail = msg.detail
 			}
 		}
+		// Navigation can open another session while a refresh is in flight.
+		// Load its content as soon as that earlier request has completed.
+		if msg.err == nil && c.detail != nil && m.visibleProvider() == "copilot" && c.detail.Session.ID != msg.id {
+			return m, m.refreshCopilot()
+		}
 		if c.client != nil && !c.timerPending {
 			c.timerPending = true
 			interval := time.Minute
@@ -410,7 +415,7 @@ func (m Model) openCopilotDetails() (tea.Model, tea.Cmd) {
 	c := m.copilot
 
 	rows := c.rows()
-	if len(rows) == 0 || c.loading {
+	if len(rows) == 0 {
 		return m, nil
 	}
 	s := rows[c.selected]
