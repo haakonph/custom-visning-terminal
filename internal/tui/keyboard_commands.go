@@ -467,6 +467,7 @@ func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 		return m, nil
 	}
 	var messages []string
+	var prs []model.PullRequest
 	seen := map[string]bool{}
 	for _, r := range refs {
 		if seen[r.URL] && r.URL != "" {
@@ -494,8 +495,12 @@ func (m Model) composeReferences(refs []model.TaskReference) (tea.Model, tea.Cmd
 				}
 			}
 			text = m.mattermostPRText(p)
+			prs = append(prs, p)
 		}
 		messages = append(messages, text)
+	}
+	if allProvider(refs, "github") {
+		messages = m.mattermostPRMessages(prs)
 	}
 	m.dialog = nil
 	cmd := m.sendMattermost(messages)

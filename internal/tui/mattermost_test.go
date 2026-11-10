@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -126,7 +127,7 @@ func TestMattermostPartialFailureRetriesOnlyRemaining(t *testing.T) {
 	}
 }
 
-func TestComposeReferencesSendsUncachedPRsSeparately(t *testing.T) {
+func TestComposeReferencesGroupsUncachedPRsByJira(t *testing.T) {
 	sender := &fakeMessageSender{}
 	m := ready(t).WithMattermost(sender)
 	refs := []model.TaskReference{
@@ -139,14 +140,15 @@ func TestComposeReferencesSendsUncachedPRsSeparately(t *testing.T) {
 		t.Fatal("send not started")
 	}
 	m, _ = update(m, cmd())
-	if sender.calls != 2 || m.mattermost.active {
-		t.Fatal("expected one message per distinct PR")
+	if sender.calls != 1 || m.mattermost.active {
+		t.Fatal("expected one message for the shared Jira issue")
 	}
-	for i, ref := range refs {
-		want := markdownLink("[saksbehandling] "+ref.Title, ref.URL)
-		if sender.messages[i] != want {
-			t.Fatalf("got %q, want %q", sender.messages[i], want)
-		}
+	want := "ABC-123"
+	for _, ref := range refs {
+		want += "\n- " + markdownLink("[saksbehandling] "+ref.Title, ref.URL)
+	}
+	if sender.messages[0] != want {
+		t.Fatalf("got %q, want %q", sender.messages[0], want)
 	}
 }
 
@@ -211,5 +213,52 @@ func TestReviewAgePartialSendPersistsOnlySuccessfulMessages(t *testing.T) {
 	m, _ = update(m, cmd())
 	if !m.mattermost.sent[first.URL].Equal(at) || m.mattermost.sent[second.URL].IsZero() {
 		t.Fatal("retry changed successful send timestamp")
+	}
+}
+
+func TestGroupedMattermostSelectionAndRetry(t *testing.T) {
+	for _, useReferences := range []bool{false, true} {
+		t.Run(fmt.Sprint(useReferences), func(t *testing.T) {
+			sender := &fakeMessageSender{failAt: 2}
+			m := ready(t).WithMattermost(sender)
+			m.jira = &jiraState{rows: []model.JiraIssue{{Key: "APP-1", Title: "Login"}}}
+			rows := []model.PullRequest{
+				{Repository: "acme/api", Number: 1, URL: "https://github.com/acme/api/pull/1", Title: "APP-1 backend"},
+				{Repository: "acme/api", Number: 2, URL: "https://github.com/acme/api/pull/2", Title: "APP-2 separate"},
+				{Repository: "acme/web", Number: 3, URL: "https://github.com/acme/web/pull/3", Title: "frontend", HeadRef: "APP-1/login"},
+				{Repository: "acme/api", Number: 4, URL: "https://github.com/acme/api/pull/4", Title: "no issue"},
+				{Repository: "acme/api", Number: 5, URL: "https://github.com/acme/api/pull/5", Title: "also no issue"},
+			}
+			m.editPRs(func(snapshot *model.Snapshot) { snapshot.Datasets[0].PRs = rows })
+			m.chosen = map[string]struct{}{}
+			var refs []model.TaskReference
+			for _, p := range rows {
+				m.chosen[p.Key()] = struct{}{}
+				refs = append(refs, prRef(p))
+			}
+			var cmd tea.Cmd
+			if useReferences {
+				next, command := m.composeReferences(refs)
+				m, cmd = next.(Model), command
+			} else {
+				cmd = m.composeMattermost()
+			}
+			m, _ = update(m, cmd())
+			want := "APP-1 · Login\n- " + m.mattermostPRText(rows[0]) + "\n- " + m.mattermostPRText(rows[2])
+			if len(sender.messages) != 1 || sender.messages[0] != want || len(m.mattermost.messages) != 3 {
+				t.Fatalf("sent %v; remaining %v", sender.messages, m.mattermost.messages)
+			}
+			for _, p := range []model.PullRequest{rows[0], rows[2]} {
+				if m.mattermost.sent[p.URL].IsZero() {
+					t.Fatalf("missing send time for %s", p.URL)
+				}
+			}
+			sender.failAt = 0
+			m, cmd = sequence(m, "as")
+			m, _ = update(m, cmd())
+			if len(sender.messages) != 4 || m.mattermost.active {
+				t.Fatalf("retry: %v", sender.messages)
+			}
+		})
 	}
 }
