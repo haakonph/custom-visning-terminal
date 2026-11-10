@@ -51,6 +51,56 @@ func (m Model) mattermostPRText(p model.PullRequest) string {
 	return markdownLink("["+m.githubName(p.Repository)+"] "+p.Title, p.URL)
 }
 
+// Use the first Jira key, as in the GitHub list. PRs without a Jira key
+// remain separate messages, even in review and related views.
+func (m Model) mattermostPRMessages(rows []model.PullRequest) []string {
+	var groups [][]model.PullRequest
+	var keys []string
+	positions := map[string]int{}
+	seen := map[string]bool{}
+	for _, p := range rows {
+		if p.URL != "" && seen[p.URL] {
+			continue
+		}
+		seen[p.URL] = true
+		key := ""
+		if jiraKeys := p.JiraKeys(m.jiraPattern); len(jiraKeys) > 0 {
+			key = jiraKeys[0]
+		}
+		if i, ok := positions[key]; key != "" && ok {
+			groups[i] = append(groups[i], p)
+		} else {
+			positions[key] = len(groups)
+			keys = append(keys, key)
+			groups = append(groups, []model.PullRequest{p})
+		}
+	}
+	messages := make([]string, len(groups))
+	for i, prs := range groups {
+		if len(prs) == 1 {
+			messages[i] = m.mattermostPRText(prs[0])
+			continue
+		}
+		heading := keys[i]
+		if m.jira != nil {
+			for _, issue := range m.jira.rows {
+				if issue.Key == keys[i] {
+					if title := strings.TrimSpace(issue.Title); title != "" {
+						heading += " · " + title
+					}
+					break
+				}
+			}
+		}
+		lines := []string{clean(heading)}
+		for _, p := range prs {
+			lines = append(lines, "- "+m.mattermostPRText(p))
+		}
+		messages[i] = strings.Join(lines, "\n")
+	}
+	return messages
+}
+
 func (m *Model) sendMattermost(messages []string) tea.Cmd {
 	s := m.mattermost
 	if s.sending {
@@ -84,11 +134,7 @@ func (m *Model) composeMattermost() tea.Cmd {
 	if len(rows) == 0 {
 		return nil
 	}
-	messages := make([]string, len(rows))
-	for i, p := range rows {
-		messages[i] = m.mattermostPRText(p)
-	}
-	return m.sendMattermost(messages)
+	return m.sendMattermost(m.mattermostPRMessages(rows))
 }
 func (m *Model) mattermostMessage(msg tea.Msg) (bool, tea.Cmd) {
 	s := m.mattermost
