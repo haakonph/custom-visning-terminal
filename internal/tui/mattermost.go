@@ -77,10 +77,6 @@ func (m Model) mattermostPRMessages(rows []model.PullRequest) []string {
 	}
 	messages := make([]string, len(groups))
 	for i, prs := range groups {
-		if len(prs) == 1 {
-			messages[i] = m.mattermostPRText(prs[0])
-			continue
-		}
 		heading := keys[i]
 		if m.jira != nil {
 			for _, issue := range m.jira.rows {
@@ -91,6 +87,10 @@ func (m Model) mattermostPRMessages(rows []model.PullRequest) []string {
 					break
 				}
 			}
+		}
+		if len(prs) == 1 && heading == keys[i] {
+			messages[i] = m.mattermostPRText(prs[0])
+			continue
 		}
 		lines := []string{clean(heading)}
 		for _, p := range prs {

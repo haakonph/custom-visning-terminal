@@ -162,3 +162,21 @@ func TestRefreshSettingsApplyWithoutRestart(t *testing.T) {
 		t.Fatal("invalid polling interval accepted")
 	}
 }
+
+func TestGitHubLoadsJiraWithoutOpeningJiraView(t *testing.T) {
+	j := jiraModel(t)
+	defer j.cancel()
+	m := ready(t).WithJira(j.jira.client, false)
+	defer m.cancel()
+	_ = m.initProviders()
+	if !m.jira.loading || m.jira.query == "" {
+		t.Fatal("GitHub startup did not load Jira")
+	}
+	m.jira.loading = false
+	m.setPageFlag(pageTasks, true)
+	next, cmd := m.viewProvider("g")
+	m = next.(Model)
+	if cmd == nil || !m.jira.loading || m.page != pageGitHub {
+		t.Fatal("opening GitHub did not refresh Jira in the background")
+	}
+}

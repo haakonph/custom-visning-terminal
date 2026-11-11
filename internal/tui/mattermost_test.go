@@ -262,3 +262,13 @@ func TestGroupedMattermostSelectionAndRetry(t *testing.T) {
 		})
 	}
 }
+
+func TestSinglePRMessageIncludesJiraTitle(t *testing.T) {
+	m := ready(t)
+	m.jira = &jiraState{rows: []model.JiraIssue{{Key: "APP-1", Title: "Login"}}}
+	p := model.PullRequest{Repository: "acme/api", Title: "APP-1 backend", URL: "https://github.com/acme/api/pull/1"}
+	want := "APP-1 · Login\n- " + m.mattermostPRText(p)
+	if got := m.mattermostPRMessages([]model.PullRequest{p}); len(got) != 1 || got[0] != want {
+		t.Fatalf("messages = %v, want %q", got, want)
+	}
+}

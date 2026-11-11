@@ -128,7 +128,7 @@ func (m Model) initProviders() tea.Cmd {
 	if m.copilot != nil && m.copilot.client != nil {
 		cmds = append(cmds, m.refreshCopilot())
 	}
-	if m.page == pageJira {
+	if m.jira != nil && (m.page == pageJira || m.page == pageGitHub) {
 		cmds = append(cmds, m.refreshJira())
 	}
 	if m.prs.Source() != nil {

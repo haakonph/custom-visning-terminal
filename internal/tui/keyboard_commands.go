@@ -373,6 +373,9 @@ func (m Model) viewProvider(k string) (tea.Model, tea.Cmd) {
 		return m, mmCmd
 	case "github":
 		m.relatedKey = ""
+		if m.jira != nil {
+			return m, m.refreshJira()
+		}
 	}
 	return m, nil
 }

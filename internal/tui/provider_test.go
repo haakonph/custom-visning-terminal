@@ -15,11 +15,11 @@ func TestProviderShortcutsPreserveFiltersAndSelection(t *testing.T) {
 	m.selected = 2
 	m.filtering = false
 	m.input.SetValue("backend")
-	m.jira.query = "already loaded"
 	m.jira.active = 2
 	m.jira.rows = []jira.Issue{{Key: "APP-1"}, {Key: "APP-2"}}
 	m.jira.selected = 1
 	m.jira.custom = "project = APP"
+	m.jira.query = m.jira.currentQuery()
 	m, _ = sequence(m, "vg")
 	if (m.page == pageJira) || m.active != model.Reviews || m.selected != 2 || m.input.Value() != "backend" || m.filtering {
 		t.Fatal("GitHub state lost")
@@ -28,8 +28,8 @@ func TestProviderShortcutsPreserveFiltersAndSelection(t *testing.T) {
 	if !(m.page == pageJira) || m.jira.active != 2 || m.jira.selected != 1 || m.jira.custom != "project = APP" {
 		t.Fatal("Jira state lost")
 	}
-	if m.jira.generation != 0 {
-		t.Fatal("switch triggered unwanted refresh")
+	if m.jira.generation != 1 {
+		t.Fatal("GitHub should refresh Jira once")
 	}
 	_, cmd := sequence(m, "vt")
 	if cmd != nil {
