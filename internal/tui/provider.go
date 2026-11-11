@@ -29,9 +29,14 @@ func (m Model) switchProvider(toJira bool) (tea.Model, tea.Cmd) {
 		}
 		m.setPageFlag(pageCopilot, false)
 		m.setPageFlag(pageJira, false)
-		if m.filtering {
-			return m, m.input.Focus()
+		var cmd tea.Cmd
+		if m.jira != nil {
+			cmd = m.refreshJira()
 		}
+		if m.filtering {
+			cmd = tea.Batch(cmd, m.input.Focus())
+		}
+		return m, cmd
 	}
 	return m, nil
 }

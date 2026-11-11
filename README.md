@@ -1316,9 +1316,13 @@ For oppsett ved oppstart: Sett `MATTERMOST_WEBHOOK_URL` til en HTTPS incoming-we
 Webhook-adressen er en hemmelighet; oppbevar den utenfor kildekoden.
 1. Marker én eller flere PR-er med `Space`, også på tvers av faner og filtre.
    Uten markering brukes PR-en under markøren.
-2. Trykk `as` for å sende med en gang. Hver PR sendes som en egen melding.
+2. Trykk `as` for å sende med en gang. PR-er med samme første Jira-nøkkel samles i én melding.
+   Meldingen viser Jira-nøkkel og innlastet sakstittel, også for én PR.
+   PR-er uten Jira-nøkkel sendes hver for seg.
 
 Lenketeksten begynner med repoets visningsnavn, for eksempel **[saksbehandling] PR-tittel**.
+Jira-saker lastes også i bakgrunnen ved oppstart i GitHub-visningen og når du åpner
+GitHub-visningen, slik at sakstitler blir tilgjengelige både der og ved deling.
 Jira-lenker legges ikke til som egne linjer. Sending åpner ingen editor.
 
 Ved sendefeil stopper sendingen, og bare meldingene som ikke ble sendt beholdes.
