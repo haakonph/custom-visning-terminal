@@ -15,12 +15,13 @@ acme/backend         #456    Add new endpoint            alice        PENDING   
 h/l tabs • j/k ↑/↓ move • d details • en browser • au refresh • / filter • ? help • Ctrl+C quit
 ```
 
-PR-er som bygger på hverandres brancher eller refererer til hverandre i beskrivelsen,
-vises med `[stack 1/3]`, `[stack 2/3]` osv. foran tittelen. Nummereringen gjelder
-kjente PR-er på tvers av fanene og beholdes ved filtrering. Fullstendige PR-lenker
-og `#123` i samme repository støttes. Avhengigheter kommer først når referansene
-er entydige; sirkulære referanser får en stabil nummerering, ikke en garantert
-merge-rekkefølge. Stacken blir mer komplett når flere PR-er er synkronisert.
+PR-er i samme repository som bygger på hverandres brancher, vises med
+`[stack 1/3]`, `[stack 2/3]` osv. foran tittelen. En PR bygger på en annen når
+base-branchen er lik den andres head-branch. Lenker og `#123` i beskrivelsen
+oppretter ingen stack. Nummereringen gjelder kjente PR-er på tvers av fanene og
+beholdes ved filtrering. Avhengigheter kommer først; sirkulære branch-avhengigheter
+får en stabil nummerering, ikke en garantert merge-rekkefølge. Stacken blir mer
+komplett når flere PR-er er synkronisert.
 
 ## Krav og oppstart
 
