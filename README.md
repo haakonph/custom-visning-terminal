@@ -196,6 +196,10 @@ selv om du ikke lenger står som forespurt reviewer. **Shared Review Requests** 
 reviewforespørsler med PR-lenke i en valgt Mattermost-kanal eller en melding sendt fra appen.
 Hver PR vises én gang. Visningen følger de lastede reviewlistene og oppdateres når meldinger
 eller reviewforespørsler endres. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
+Når en PR forsvinner fra Shared Review Requests, bekrefter appen at du har levert et
+review etter delingen og setter ✅ på den siste meldingen med PR-lenken i en valgt
+Mattermost-kanal. Dette krever at du er logget inn i Mattermost; ved midlertidige feil
+prøver appen igjen ved neste synk.
 Delvise resultater beholder cache og tidspunkt for siste fulle synk. UNKNOWN betyr
 at GitHub ikke har gitt en kjent status; det er ikke bevis på at sjekker har bestått.
 
