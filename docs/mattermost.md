@@ -63,7 +63,11 @@ Appen ber aldri om slettede meldinger. Meldinger som slettes på serveren, kan
 derfor bli liggende i den lokale historikken.
 
 Hver overvåket kanal får en horisontal tab. Tab-raden flytter seg slik at aktiv
-tab er synlig. Meldinger viser tidspunkt, avsender og innhold. Overskrifter,
+tab er synlig. Kanalvisningen viser nyeste melding først som standard, også når du
+bytter kanal. `j` / `↓` går til eldre meldinger, og `k` / `↑` går til nyere.
+Nye meldinger vises øverst ved synkronisering; leser du en eldre melding, beholdes
+valget. Tråder vises fortsatt fra trådstart til siste svar.
+Meldinger viser tidspunkt, avsender og innhold. Overskrifter,
 fet/kursiv tekst, inline-kode, kodeblokker og sitater får terminalstil; øvrig
 Markdown, inkludert lenker, bevares som lesbar tekst. Ingen bilder eller vedlegg
 lastes ned. `d` åpner hele tråden fra serveren og beholder svarene offline.
