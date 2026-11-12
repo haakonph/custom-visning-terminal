@@ -473,6 +473,10 @@ func (m Model) updateGitHubResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil || !msg.result.Complete {
 			observed.PRs = msg.freshRows
 		}
+		var sharedBefore []model.PullRequest
+		if msg.err == nil && msg.result.Complete && (msg.view == model.Reviews || msg.view == model.TeamReviews) {
+			sharedBefore = m.githubDataset(model.SharedReviews).PRs
+		}
 		if !m.prs.ApplyList(msg.view, observed, msg.err, msg.at, token) {
 			return m, m.refresh(msg.view)
 		}
@@ -488,7 +492,8 @@ func (m Model) updateGitHubResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.clamp()
 		}
-		return m, tea.Batch(m.persist(), m.refreshLocal(), m.notifyPullRequests(msg))
+		reactions := m.completeSharedReviews(sharedBefore)
+		return m, tea.Batch(m.persist(), m.refreshLocal(), m.notifyPullRequests(msg), reactions)
 	case cacheMsg:
 		m.saving = false
 		if msg.err != nil && (msg.generation == 0 || msg.generation == m.prs.Generation()) {

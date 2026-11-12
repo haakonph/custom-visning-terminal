@@ -157,3 +157,9 @@ func Merge(old, fresh []PullRequest) []PullRequest {
 type CopilotReviewSource interface {
 	RequestCopilotReview(context.Context, PullRequest) error
 }
+
+// ReviewCompletionSource verifies a submitted review by the current user after
+// a shared request. Disappearing from a request list alone is not evidence.
+type ReviewCompletionSource interface {
+	ReviewedSince(context.Context, PullRequest, string, time.Time) (bool, error)
+}

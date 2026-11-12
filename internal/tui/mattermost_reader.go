@@ -43,6 +43,7 @@ type mattermostReader struct {
 	keychain                                              mm.TokenStore
 	account, apiToken                                     string
 	reviewRequests                                        map[string]time.Time
+	reviewCompletions                                     []sharedReviewCompletion
 	data                                                  model.MattermostData
 	busy, authenticated, choosing, mentions, confirmClear bool
 	tab, row, channelRow, link, scroll                    int
@@ -57,6 +58,7 @@ type mmResult struct {
 	err           error
 	authenticated bool
 	notice        string
+	retryReviews  []sharedReviewCompletion
 }
 type mmTick struct{}
 
@@ -317,6 +319,7 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return true, nil
 		}
 		s.busy = false
+		s.reviewCompletions = append(s.reviewCompletions, msg.retryReviews...)
 		s.authenticated = msg.authenticated
 		s.data = msg.data
 		s.indexed, s.filteredValid = false, false
@@ -355,6 +358,9 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		if errors.Is(msg.err, mm.ErrSession) && (m.page == pageChat) && s.mode == "" {
 			return true, s.prompt("Password")
+		}
+		if msg.err == nil {
+			return true, m.reactToCompletedSharedReviews()
 		}
 		return true, nil
 	case mmTick:
@@ -897,23 +903,31 @@ func (m Model) withMattermostSettings(c mm.Config, token string) (Model, error) 
 // Channel PR shares count regardless of who posted them or which client they used.
 // Derive this index from each snapshot so edits, deletions and deselection remove stale entries.
 func mattermostReviewTimes(data model.MattermostData) map[string]time.Time {
+	times := map[string]time.Time{}
+	for link, post := range mattermostReviewPosts(data) {
+		times[link] = time.UnixMilli(post.CreatedAt)
+	}
+	return times
+}
+
+func mattermostReviewPosts(data model.MattermostData) map[string]model.MattermostPost {
 	selected := map[string]bool{}
 	for _, channel := range data.Channels {
 		selected[channel.ID] = channel.Selected
 	}
-	times := map[string]time.Time{}
+	posts := map[string]model.MattermostPost{}
 	for _, post := range data.Posts {
 		if !selected[post.ChannelID] || post.DeletedAt != 0 || post.CreatedAt <= 0 {
 			continue
 		}
-		at := time.UnixMilli(post.CreatedAt)
 		for _, link := range mm.PRLinks(post.Message) {
-			if at.After(times[link.URL]) {
-				times[link.URL] = at
+			previous := posts[link.URL]
+			if post.CreatedAt > previous.CreatedAt || post.CreatedAt == previous.CreatedAt && post.ID > previous.ID {
+				posts[link.URL] = post
 			}
 		}
 	}
-	return times
+	return posts
 }
 
 func (m *Model) backChat() (bool, tea.Cmd) {
