@@ -172,7 +172,11 @@ func (m Model) bootstrap() tea.Cmd {
 }
 func (m *Model) refresh(view model.View) tea.Cmd {
 	if view == model.SharedReviews {
-		return tea.Batch(m.refresh(model.Reviews), m.refresh(model.TeamReviews))
+		var chat tea.Cmd
+		if m.mmReader != nil {
+			_, chat = m.refreshChat()
+		}
+		return tea.Batch(m.refresh(model.Reviews), m.refresh(model.TeamReviews), chat)
 	}
 	if m.loading[view] || m.prs.Snapshot().User == "" {
 		return nil
