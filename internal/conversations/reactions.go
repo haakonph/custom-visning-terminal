@@ -5,21 +5,31 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/haakonph/custom-visning-terminal/internal/model"
 	mm "github.com/mattermost/mattermost/server/public/model"
 )
 
 type ReviewReactor interface {
-	ReactToReview(context.Context, string, string) error
+	ReactToReview(context.Context, string, string, string) error
 }
 
-func (a *API) ReactToReview(ctx context.Context, user, post string) error {
-	_, _, err := a.sdk.SaveReaction(ctx, &mm.Reaction{UserId: user, PostId: post, EmojiName: "white_check_mark"})
+func (a *API) ReactToReview(ctx context.Context, user, post, emoji string) error {
+	_, _, err := a.sdk.SaveReaction(ctx, &mm.Reaction{UserId: user, PostId: post, EmojiName: emoji})
 	return apiError(err)
 }
 
 // CompleteReview rechecks the current message and channel before writing.
 // Mattermost identifies a reaction by user/post/emoji, so repeating it is safe.
-func (s *Service) CompleteReview(ctx context.Context, postID, prURL string) error {
+func (s *Service) CompleteReview(ctx context.Context, postID, prURL string, review model.ReviewOutcome) error {
+	var emoji string
+	switch review {
+	case model.ReviewApproval:
+		emoji = "white_check_mark"
+	case model.ReviewComment:
+		emoji = "speech_balloon"
+	default:
+		return nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	reactor, ok := s.API.(ReviewReactor)
@@ -51,7 +61,7 @@ func (s *Service) CompleteReview(ctx context.Context, postID, prURL string) erro
 			if user == "" {
 				return ErrSession
 			}
-			return reactor.ReactToReview(ctx, user, post.ID)
+			return reactor.ReactToReview(ctx, user, post.ID, emoji)
 		}
 	}
 	return nil
