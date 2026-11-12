@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -216,6 +217,14 @@ func (s *mattermostReader) posts() []model.MattermostPost {
 		}
 		out = append(out, p)
 	}
+	if s.root == "" && !s.mentions {
+		sort.Slice(out, func(i, j int) bool {
+			if out[i].CreatedAt == out[j].CreatedAt {
+				return out[i].ID > out[j].ID
+			}
+			return out[i].CreatedAt > out[j].CreatedAt
+		})
+	}
 	s.filteredValid, s.filteredKey, s.filteredPosts = true, key, out
 	return out
 }
@@ -318,6 +327,13 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 		if msg.token.Sequence != 0 && !m.chatSession.Accept("operation", msg.token) {
 			return true, nil
 		}
+		// Follow new messages at the top, but keep an older message selected while reading.
+		selectedID := ""
+		if s.row > 0 {
+			if posts := s.posts(); s.row < len(posts) {
+				selectedID = posts[s.row].ID
+			}
+		}
 		s.busy = false
 		s.reviewCompletions = append(s.reviewCompletions, msg.retryReviews...)
 		s.authenticated = msg.authenticated
@@ -336,6 +352,14 @@ func (m *Model) mmMessage(msg tea.Msg) (bool, tea.Cmd) {
 			s.notice = msg.err.Error()
 		}
 		s.clamp()
+		if selectedID != "" {
+			for i, p := range s.posts() {
+				if p.ID == selectedID {
+					s.row = i
+					break
+				}
+			}
+		}
 		if s.jumpID != "" {
 			for _, p := range s.data.Posts {
 				if p.ID == s.jumpID {
@@ -1024,6 +1048,11 @@ func (m *Model) loadChatHistory() (bool, tea.Cmd) {
 	ps := s.posts()
 	if len(ps) > 0 {
 		p := ps[0]
+		for _, post := range ps[1:] {
+			if post.CreatedAt < p.CreatedAt || (post.CreatedAt == p.CreatedAt && post.ID < p.ID) {
+				p = post
+			}
+		}
 		return true, m.mmCommand(func(ctx context.Context) error { return s.service.More(ctx, p.ChannelID, p.ID, "") })
 	}
 	return true, nil

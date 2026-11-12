@@ -21,6 +21,102 @@ func readerModel(t *testing.T) Model {
 	m.mmReader = &mattermostReader{authenticated: true, input: input, data: model.MattermostData{Server: "https://chat.example", Channels: []model.MattermostChannel{{ID: "c", Name: "backend", Selected: true}, {ID: "d", Name: "frontend", Selected: true}}, Posts: []model.MattermostPost{{ID: "p", ChannelID: "c", Message: "https://github.com/acme/api/pull/1", CreatedAt: 100}, {ID: "reply", ChannelID: "d", RootID: "root", Message: "https://github.com/acme/api/pull/1 https://github.com/acme/api/pull/2", CreatedAt: 200}}}}
 	return m
 }
+
+func TestMattermostChannelStartsWithNewestMessage(t *testing.T) {
+	m := readerModel(t)
+	m.mmReader.data.Posts = []model.MattermostPost{
+		{ID: "old", ChannelID: "c", CreatedAt: 100, Message: "old message"},
+		{ID: "new", ChannelID: "c", CreatedAt: 300, Message: "new message"},
+		{ID: "middle", ChannelID: "c", CreatedAt: 200, Message: "middle message"},
+		{ID: "deleted", ChannelID: "c", CreatedAt: 400, DeletedAt: 500},
+		{ID: "other-old", ChannelID: "d", CreatedAt: 100},
+		{ID: "other-new", ChannelID: "d", CreatedAt: 300},
+	}
+	if got := m.mmReader.posts()[m.mmReader.row].ID; got != "new" {
+		t.Fatalf("initial message = %s, want newest", got)
+	}
+	view := ansi.Strip(m.View().Content)
+	if strings.Index(view, "new message") > strings.Index(view, "old message") || !strings.Contains(view, "new message") {
+		t.Fatal("newest message must be visible first", view)
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	if got := m.mmReader.posts()[m.mmReader.row].ID; got != "middle" {
+		t.Fatalf("down selected %s, want next older message", got)
+	}
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyRight})
+	if got := m.mmReader.posts()[m.mmReader.row].ID; got != "other-new" {
+		t.Fatalf("channel switch selected %s, want newest", got)
+	}
+}
+
+func TestMattermostSyncFollowsNewestUnlessReadingOlderMessage(t *testing.T) {
+	for _, readingOlder := range []bool{false, true} {
+		t.Run(fmt.Sprint(readingOlder), func(t *testing.T) {
+			m := readerModel(t)
+			m.mmReader.data.Posts = []model.MattermostPost{
+				{ID: "old", ChannelID: "c", CreatedAt: 100},
+				{ID: "new", ChannelID: "c", CreatedAt: 200},
+			}
+			if readingOlder {
+				m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
+			}
+			data := m.mmReader.data
+			data.Posts = append(append([]model.MattermostPost(nil), data.Posts...), model.MattermostPost{ID: "newest", ChannelID: "c", CreatedAt: 300})
+			m, _ = update(m, indexedMMResult(mmResult{data: data, authenticated: true}))
+			want := "newest"
+			if readingOlder {
+				want = "old"
+			}
+			if got := m.mmReader.posts()[m.mmReader.row].ID; got != want {
+				t.Fatalf("after sync selected %s, want %s", got, want)
+			}
+		})
+	}
+}
+
+func TestMattermostThreadRetainsChronologicalOrder(t *testing.T) {
+	m := readerModel(t)
+	m.mmReader.root = "root"
+	m.mmReader.data.Posts = []model.MattermostPost{
+		{ID: "root", ChannelID: "c", CreatedAt: 100},
+		{ID: "reply", RootID: "root", ChannelID: "c", CreatedAt: 200},
+	}
+	posts := m.mmReader.posts()
+	if len(posts) != 2 || posts[0].ID != "root" || posts[1].ID != "reply" {
+		t.Fatal("thread must start with its root", posts)
+	}
+}
+
+type historyReader struct {
+	mm.ReaderAPI
+	channel, before string
+}
+
+func (r *historyReader) Me(context.Context) (string, error) { return "me", nil }
+func (r *historyReader) History(_ context.Context, channel, before string) ([]model.MattermostPost, error) {
+	r.channel, r.before = channel, before
+	return nil, mm.ErrAccess
+}
+
+func TestMattermostHistoryLoadsBeforeOldestMessage(t *testing.T) {
+	m := readerModel(t)
+	m.mmReader.data.Posts = []model.MattermostPost{
+		{ID: "old", ChannelID: "c", CreatedAt: 100},
+		{ID: "new", ChannelID: "c", CreatedAt: 300},
+		{ID: "middle", ChannelID: "c", CreatedAt: 200},
+	}
+	api := &historyReader{}
+	m.mmReader.service = &mm.Service{API: api, Data: m.mmReader.data}
+	_, cmd := m.loadChatHistory()
+	if cmd == nil {
+		t.Fatal("missing history command")
+	}
+	cmd()
+	if api.channel != "c" || api.before != "old" {
+		t.Fatalf("history request = %s before %s, want c before old", api.channel, api.before)
+	}
+}
+
 func TestMattermostTabsAndAddTab(t *testing.T) {
 	m := readerModel(t)
 	for _, want := range []int{1, 2, 0} {
