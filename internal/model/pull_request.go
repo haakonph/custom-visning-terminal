@@ -158,8 +158,15 @@ type CopilotReviewSource interface {
 	RequestCopilotReview(context.Context, PullRequest) error
 }
 
-// ReviewCompletionSource verifies a submitted review by the current user after
-// a shared request. Disappearing from a request list alone is not evidence.
+type ReviewOutcome string
+
+const (
+	ReviewApproval ReviewOutcome = "APPROVED"
+	ReviewComment  ReviewOutcome = "COMMENTED"
+)
+
+// ReviewCompletionSource verifies the latest submitted review by the current
+// user after a shared request. An empty outcome means no reaction should be sent.
 type ReviewCompletionSource interface {
-	ReviewedSince(context.Context, PullRequest, string, time.Time) (bool, error)
+	LatestReviewSince(context.Context, PullRequest, string, time.Time) (ReviewOutcome, error)
 }

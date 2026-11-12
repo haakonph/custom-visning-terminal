@@ -88,11 +88,11 @@ func (m *Model) reactToCompletedSharedReviews() tea.Cmd {
 			if reacted[request.postID] {
 				continue
 			}
-			completed, err := source.ReviewedSince(ctx, request.pr, user, request.sharedAt)
-			if err == nil && completed {
+			review, err := source.LatestReviewSince(ctx, request.pr, user, request.sharedAt)
+			if err == nil && (review == model.ReviewApproval || review == model.ReviewComment) {
 				err = ctx.Err()
 				if err == nil {
-					err = service.CompleteReview(ctx, request.postID, request.pr.URL)
+					err = service.CompleteReview(ctx, request.postID, request.pr.URL, review)
 				}
 				if err == nil {
 					reacted[request.postID] = true
@@ -100,7 +100,7 @@ func (m *Model) reactToCompletedSharedReviews() tea.Cmd {
 			}
 			if err != nil {
 				retries = append(retries, request)
-				failures = append(failures, fmt.Errorf("Kunne ikke sette ✅ på reviewmeldingen: %w", err))
+				failures = append(failures, fmt.Errorf("Kunne ikke reagere på reviewmeldingen: %w", err))
 			}
 		}
 		err := errors.Join(failures...)

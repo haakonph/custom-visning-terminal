@@ -12,30 +12,31 @@ import (
 
 type completionSource struct {
 	fakeSource
-	completed bool
-	err       error
-	calls     int
-	user      string
-	since     time.Time
+	outcome model.ReviewOutcome
+	err     error
+	calls   int
+	user    string
+	since   time.Time
 }
 
-func (s *completionSource) ReviewedSince(ctx context.Context, _ model.PullRequest, user string, since time.Time) (bool, error) {
+func (s *completionSource) LatestReviewSince(ctx context.Context, _ model.PullRequest, user string, since time.Time) (model.ReviewOutcome, error) {
 	s.calls++
 	s.user, s.since = user, since
 	if err := ctx.Err(); err != nil {
-		return false, err
+		return "", err
 	}
-	return s.completed, s.err
+	return s.outcome, s.err
 }
 
 type completionChat struct {
 	mm.ReaderAPI
-	posts []string
-	err   error
+	posts  []string
+	emojis []string
+	err    error
 }
 
 func (c *completionChat) Me(context.Context) (string, error) { return "mattermost-me", nil }
-func (c *completionChat) ReactToReview(_ context.Context, user, post string) error {
+func (c *completionChat) ReactToReview(_ context.Context, user, post, emoji string) error {
 	if user != "mattermost-me" {
 		panic("reaction must use the authenticated Mattermost user")
 	}
@@ -43,13 +44,14 @@ func (c *completionChat) ReactToReview(_ context.Context, user, post string) err
 		return c.err
 	}
 	c.posts = append(c.posts, post)
+	c.emojis = append(c.emojis, emoji)
 	return nil
 }
 
 func completionFixture(t *testing.T) (Model, *completionSource, *completionChat, model.PullRequest) {
 	t.Helper()
 	m := ready(t)
-	source, chat := &completionSource{completed: true}, &completionChat{}
+	source, chat := &completionSource{outcome: model.ReviewApproval}, &completionChat{}
 	m.useSource(source)
 	pr := model.PullRequest{URL: "https://github.com/acme/api/pull/42", Repository: "acme/api", Number: 42, Author: "bob"}
 	m.editPRs(func(s *model.Snapshot) {
@@ -106,7 +108,7 @@ func TestSharedReviewCompletionRejectsUnconfirmedDisappearance(t *testing.T) {
 			case "failed":
 				result.err = errors.New("offline")
 			case "not reviewed":
-				source.completed = false
+				source.outcome = ""
 			case "deleted message":
 				for i := range m.mmReader.data.Posts {
 					m.mmReader.data.Posts[i].DeletedAt = 1
@@ -172,7 +174,7 @@ func TestSharedReviewCompletionCancelsAfterAccountReplacement(t *testing.T) {
 			m, cmd := update(m, refreshMsg{view: model.Reviews, result: model.Result{Complete: true}, at: time.Now()})
 			switch scenario {
 			case "GitHub queued", "GitHub running":
-				m.useSource(&completionSource{completed: true})
+				m.useSource(&completionSource{outcome: model.ReviewApproval})
 			case "Mattermost running":
 				m.chatSession.Configure(m.ctx)
 			case "request returned":
@@ -188,6 +190,39 @@ func TestSharedReviewCompletionCancelsAfterAccountReplacement(t *testing.T) {
 			}
 			if len(chat.posts) != 0 {
 				t.Fatal("old integration wrote a reaction", chat.posts)
+			}
+		})
+	}
+}
+
+func TestSharedReviewReactionMatchesLatestOutcome(t *testing.T) {
+	for _, tc := range []struct {
+		outcome model.ReviewOutcome
+		emoji   string
+	}{
+		{model.ReviewApproval, "white_check_mark"},
+		{model.ReviewComment, "speech_balloon"},
+		{"CHANGES_REQUESTED", ""},
+		{"DISMISSED", ""},
+		{"", ""},
+	} {
+		t.Run(string(tc.outcome), func(t *testing.T) {
+			m, source, chat, _ := completionFixture(t)
+			source.outcome = tc.outcome
+			m, cmd := update(m, refreshMsg{view: model.Reviews, result: model.Result{Complete: true}, at: time.Now()})
+			if cmd == nil {
+				t.Fatal("missing review check")
+			}
+			m, _ = update(m, cmd())
+			if tc.emoji == "" {
+				if len(chat.posts) != 0 {
+					t.Fatal("unexpected reaction", chat.emojis)
+				}
+			} else if len(chat.posts) != 1 || chat.posts[0] != "original" || chat.emojis[0] != tc.emoji {
+				t.Fatal("wrong review reaction", chat.posts, chat.emojis)
+			}
+			if m.mmReader.busy || len(m.mmReader.reviewCompletions) != 0 {
+				t.Fatal("completed review should not be retried")
 			}
 		})
 	}
