@@ -980,10 +980,13 @@ func (m *Model) requestClearChat() (bool, tea.Cmd) {
 func (m *Model) refreshChat() (bool, tea.Cmd) {
 	s := m.mmReader
 
+	if s.busy {
+		return true, nil
+	}
 	if s.authenticated {
 		return true, m.mmCommand(s.service.Sync)
 	}
-	return true, nil
+	return true, m.mmStart()
 }
 
 func (m *Model) chooseChatChannels() (bool, tea.Cmd) {

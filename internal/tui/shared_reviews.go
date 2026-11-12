@@ -39,7 +39,7 @@ func (m Model) githubDataset(view model.View) model.Dataset {
 
 func (m Model) githubLoading(view model.View) bool {
 	if view == model.SharedReviews {
-		return m.loading[model.Reviews] || m.loading[model.TeamReviews]
+		return m.loading[model.Reviews] || m.loading[model.TeamReviews] || m.mmReader != nil && m.mmReader.busy
 	}
 	return m.loading[view]
 }
@@ -50,6 +50,13 @@ func (m Model) githubWarning(view model.View) string {
 		for _, source := range []model.View{model.Reviews, model.TeamReviews} {
 			if warning := m.warnings[source]; warning != "" {
 				warnings = append(warnings, source.String()+": "+warning)
+			}
+		}
+		if s := m.mmReader; s != nil {
+			if s.notice != "" {
+				warnings = append(warnings, "Mattermost: "+s.notice)
+			} else if !s.authenticated && !s.busy {
+				warnings = append(warnings, "Mattermost: offline; oppdater for å koble til på nytt")
 			}
 		}
 		return strings.Join(warnings, "; ")

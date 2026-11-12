@@ -196,6 +196,8 @@ selv om du ikke lenger står som forespurt reviewer. **Shared Review Requests** 
 reviewforespørsler med PR-lenke i en valgt Mattermost-kanal eller en melding sendt fra appen.
 Hver PR vises én gang. Visningen følger de lastede reviewlistene og oppdateres når meldinger
 eller reviewforespørsler endres. Filteret beholdes ved fanebytte, og oppdatering skjer asynkront.
+`au` i **Shared Review Requests** oppdaterer både GitHub-listene og Mattermost-meldingene,
+og prøver Mattermost-tilkoblingen på nytt hvis den er frakoblet. Synkfeil fra Mattermost vises i fanen.
 Når en PR forsvinner fra Shared Review Requests, sjekker appen ditt siste review etter
 delingen og reagerer på den siste meldingen med PR-lenken i en valgt Mattermost-kanal:
 ✅ hvis du har godkjent PR-en, eller 💬 hvis du har levert et review med kommentarer.
